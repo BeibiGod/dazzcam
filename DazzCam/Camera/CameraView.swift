@@ -9,6 +9,11 @@ struct CameraView: View {
     @State private var fotoConectada = false
     @State private var mostrarCaptura = false
 
+    private var versionTexto: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        return "v\(v) · paso 3"
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -28,6 +33,18 @@ struct CameraView: View {
             }
 
             VStack {
+                HStack {
+                    Text(versionTexto)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.black.opacity(0.45), in: Capsule())
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
                 Spacer()
 
                 if let error = foto.error {
