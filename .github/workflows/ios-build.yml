@@ -1,0 +1,90 @@
+name: ios-build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'DazzCam/**'
+      - 'project.yml'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    paths:
+      - 'DazzCam/**'
+      - 'project.yml'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Traer el codigo
+        uses: actions/checkout@v4
+
+      - name: Ver herramientas
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcode-select -p
+
+      - name: Instalar XcodeGen
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generar el proyecto de Xcode
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          ls -la
+
+      - name: COMPILAR para simulador (este es el semaforo)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project DazzCam.xcodeproj \
+            -scheme DazzCam \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            build -quiet
+
+      - name: Empaquetar .ipa sin firmar
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project DazzCam.xcodeproj \
+            -scheme DazzCam \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath .build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build -quiet
+
+          APP=".build/Build/Products/Release-iphoneos/DazzCam.app"
+          test -d "$APP"
+          rm -rf Payload DazzCam-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry DazzCam-unsigned.ipa Payload
+          ls -lh DazzCam-unsigned.ipa
+
+      - name: Subir el .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: DazzCam-unsigned-ipa
+          path: DazzCam-unsigned.ipa
+          retention-days: 30
+          if-no-files-found: error
