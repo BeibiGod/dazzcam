@@ -7,8 +7,8 @@ desde cero con una regla: **cada linea de codigo que existe ya compilo.**
 
 | Paso | Estado |
 |---|---|
-| 1. Base (app que arranca) | 🟡 esperando primer CI |
-| 2. Camara (preview en vivo) | ⬜ |
+| 1. Base (app que arranca) | ✅ compila en 2m33s, `.ipa` generado |
+| 2. Camara (preview en vivo) | 🟡 en compilacion |
 | 3. Captura de foto | ⬜ |
 | 4. Guardar en fototeca | ⬜ |
 | 5. Filtro simple | ⬜ |

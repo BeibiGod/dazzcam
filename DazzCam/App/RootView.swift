@@ -1,26 +1,39 @@
 import SwiftUI
 
-/// Pantalla base. Su unico trabajo es demostrar que el proyecto compila
-/// y que la app arranca en el telefono. Se reemplaza por la camara
-/// cuando la base este en verde.
+/// Pantalla principal. Paso 2: muestra la camara en vivo.
 struct RootView: View {
+    @StateObject private var camara = CameraSession()
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 18) {
-                Image(systemName: "camera.aperture")
-                    .font(.system(size: 72, weight: .ultraLight))
-                    .foregroundStyle(.white)
+            CameraPreviewView(session: camara.session)
+                .ignoresSafeArea()
 
-                Text("DazzCam")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+            VStack {
+                Spacer()
 
-                Text("Base compilando")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.55))
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(camara.estado == .listo ? Color.green : Color.orange)
+                        .frame(width: 8, height: 8)
+
+                    Text(camara.estado.descripcion)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.black.opacity(0.55), in: Capsule())
+                .padding(.bottom, 40)
             }
+        }
+        .task {
+            await camara.arrancar()
+        }
+        .onDisappear {
+            camara.detener()
         }
     }
 }
