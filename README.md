@@ -8,8 +8,8 @@ desde cero con una regla: **cada linea de codigo que existe ya compilo.**
 | Paso | Estado |
 |---|---|
 | 1. Base (app que arranca) | ✅ compila en 2m33s, `.ipa` generado |
-| 2. Camara (preview en vivo) | 🟡 en compilacion |
-| 3. Captura de foto | ⬜ |
+| 2. Camara (preview en vivo) | ✅ compila y **verificado en el iPhone** |
+| 3. Captura de foto | 🟡 en compilacion |
 | 4. Guardar en fototeca | ⬜ |
 | 5. Filtro simple | ⬜ |
 | 6. Filtro en vivo | ⬜ |
