@@ -22,7 +22,7 @@ enum FilterEngine {
 
     // MARK: - Cadenas de filtros
 
-    private static func cadena(_ preset: FilterPreset, entrada: CIImage) -> CIImage? {
+    static func cadena(_ preset: FilterPreset, entrada: CIImage) -> CIImage? {
         switch preset {
         case .original:
             return entrada

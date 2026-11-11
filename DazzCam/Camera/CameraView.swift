@@ -4,21 +4,32 @@ import SwiftUI
 struct CameraView: View {
     @StateObject private var camara = CameraSession()
     @StateObject private var foto = PhotoCapture()
+    @StateObject private var vivo = LiveFilterPreview()
 
     @State private var fotoConectada = false
     @State private var mostrarCaptura = false
     @State private var aviso: String?
     @State private var preset: FilterPreset = .original
     @State private var fotoFiltrada: UIImage?
+    @State private var modoVivo = false
 
-    private let versionTexto = "paso 5 · v0.5"
+    private let versionTexto = "paso 6 · v0.6"
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            CameraPreviewView(session: camara.session)
-                .ignoresSafeArea()
+            if modoVivo, let imagenViva = vivo.imagen {
+                Image(uiImage: imagenViva)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .ignoresSafeArea()
+            } else {
+                CameraPreviewView(session: camara.session)
+                    .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 HStack {
@@ -30,6 +41,20 @@ struct CameraView: View {
                         .background(.black.opacity(0.45), in: Capsule())
 
                     Spacer()
+
+                    Button {
+                        modoVivo.toggle()
+                    } label: {
+                        Text(modoVivo ? "EN VIVO \(vivo.cuadrosPorSegundo) fps" : "EN VIVO")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(modoVivo ? Color.black : Color.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                modoVivo ? Color.white : Color.white.opacity(0.22),
+                                in: Capsule()
+                            )
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
@@ -109,6 +134,8 @@ struct CameraView: View {
             if !fotoConectada {
                 fotoConectada = foto.conectar(a: camara.session)
             }
+            _ = vivo.conectar(a: camara.session)
+            vivo.preset = preset
             await camara.arrancar()
         }
         .onDisappear {
@@ -139,6 +166,7 @@ struct CameraView: View {
                 ForEach(FilterPreset.allCases) { item in
                     Button {
                         preset = item
+                        vivo.preset = item
                         aplicarFiltroAUltima()
                     } label: {
                         Text(item.rawValue)
