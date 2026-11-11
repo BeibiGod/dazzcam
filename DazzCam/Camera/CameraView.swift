@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Pantalla de camara. Paso 3: preview en vivo + boton de disparo
-/// que captura una foto y la muestra encima.
+/// Pantalla de camara. Paso 5: preview + disparo + guardado + filtros.
 struct CameraView: View {
     @StateObject private var camara = CameraSession()
     @StateObject private var foto = PhotoCapture()
@@ -9,10 +8,10 @@ struct CameraView: View {
     @State private var fotoConectada = false
     @State private var mostrarCaptura = false
     @State private var aviso: String?
+    @State private var preset: FilterPreset = .original
+    @State private var fotoFiltrada: UIImage?
 
-    private var versionTexto: String {
-        "paso 4 · v0.4"
-    }
+    private let versionTexto = "paso 5 · v0.5"
 
     var body: some View {
         ZStack {
@@ -21,18 +20,7 @@ struct CameraView: View {
             CameraPreviewView(session: camara.session)
                 .ignoresSafeArea()
 
-            if mostrarCaptura, let imagen = foto.ultimaFoto {
-                Image(uiImage: imagen)
-                    .resizable()
-                    .scaledToFit()
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        mostrarCaptura = false
-                    }
-                    .transition(.opacity)
-            }
-
-            VStack {
+            VStack(spacing: 0) {
                 HStack {
                     Text(versionTexto)
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
@@ -40,6 +28,7 @@ struct CameraView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(.black.opacity(0.45), in: Capsule())
+
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -47,13 +36,13 @@ struct CameraView: View {
 
                 Spacer()
 
-                if let aviso = aviso {
-                    Text(aviso)
+                if let texto = aviso {
+                    Text(texto)
                         .font(.caption)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.65), in: Capsule())
+                        .background(.black.opacity(0.65), in: Capsule())
                         .padding(.bottom, 10)
                 }
 
@@ -64,13 +53,16 @@ struct CameraView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Color.red.opacity(0.75), in: Capsule())
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 10)
                 }
+
+                carruselFiltros
 
                 HStack(spacing: 20) {
                     Text(camara.estado.descripcion)
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: 70)
 
                     Button {
                         foto.disparar()
@@ -96,9 +88,21 @@ struct CameraView: View {
                             .frame(width: 44, height: 44)
                             .background(.black.opacity(0.4), in: Circle())
                     }
-                    .disabled(foto.ultimaFoto == nil)
+                    .disabled(fotoFiltrada == nil)
+                    .frame(width: 70)
                 }
                 .padding(.bottom, 34)
+            }
+
+            if mostrarCaptura, let imagen = fotoFiltrada {
+                Image(uiImage: imagen)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        mostrarCaptura = false
+                    }
+                    .transition(.opacity)
             }
         }
         .task {
@@ -107,12 +111,18 @@ struct CameraView: View {
             }
             await camara.arrancar()
         }
+        .onDisappear {
+            camara.detener()
+        }
         .onChange(of: foto.capturas) { _, _ in
-            guard let imagen = foto.ultimaFoto else { return }
+            guard let base = foto.ultimaFoto else { return }
+            let procesada = FilterEngine.aplicar(preset, a: base)
+            fotoFiltrada = procesada
             mostrarCaptura = true
+
             Task {
                 do {
-                    try await PhotoLibrarySaver.guardar(imagen)
+                    try await PhotoLibrarySaver.guardar(procesada)
                     aviso = "Guardada en tu fototeca"
                 } catch {
                     aviso = "No se pudo guardar: \(error.localizedDescription)"
@@ -121,9 +131,37 @@ struct CameraView: View {
                 aviso = nil
             }
         }
-        .onDisappear {
-            camara.detener()
+    }
+
+    private var carruselFiltros: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(FilterPreset.allCases) { item in
+                    Button {
+                        preset = item
+                        aplicarFiltroAUltima()
+                    } label: {
+                        Text(item.rawValue)
+                            .font(.caption)
+                            .fontWeight(preset == item ? .bold : .regular)
+                            .foregroundStyle(preset == item ? Color.black : Color.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                preset == item ? Color.white : Color.white.opacity(0.18),
+                                in: Capsule()
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
         }
+        .padding(.bottom, 16)
+    }
+
+    private func aplicarFiltroAUltima() {
+        guard let base = foto.ultimaFoto else { return }
+        fotoFiltrada = FilterEngine.aplicar(preset, a: base)
     }
 }
 
