@@ -8,10 +8,10 @@ struct CameraView: View {
 
     @State private var fotoConectada = false
     @State private var mostrarCaptura = false
+    @State private var aviso: String?
 
     private var versionTexto: String {
-        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        return "v\(v) · paso 3"
+        "paso 4 · v0.4"
     }
 
     var body: some View {
@@ -46,6 +46,16 @@ struct CameraView: View {
                 .padding(.top, 8)
 
                 Spacer()
+
+                if let aviso = aviso {
+                    Text(aviso)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.65), in: Capsule())
+                        .padding(.bottom, 10)
+                }
 
                 if let error = foto.error {
                     Text(error)
@@ -96,6 +106,20 @@ struct CameraView: View {
                 fotoConectada = foto.conectar(a: camara.session)
             }
             await camara.arrancar()
+        }
+        .onChange(of: foto.capturas) { _, _ in
+            guard let imagen = foto.ultimaFoto else { return }
+            mostrarCaptura = true
+            Task {
+                do {
+                    try await PhotoLibrarySaver.guardar(imagen)
+                    aviso = "Guardada en tu fototeca"
+                } catch {
+                    aviso = "No se pudo guardar: \(error.localizedDescription)"
+                }
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                aviso = nil
+            }
         }
         .onDisappear {
             camara.detener()

@@ -8,6 +8,7 @@ final class PhotoCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     @Published private(set) var ultimaFoto: UIImage?
     @Published private(set) var capturando = false
     @Published private(set) var error: String?
+    @Published private(set) var capturas = 0
 
     let salida = AVCapturePhotoOutput()
 
@@ -57,6 +58,7 @@ final class PhotoCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
         DispatchQueue.main.async {
             self.ultimaFoto = imagen
+            self.capturas += 1
             self.capturando = false
         }
     }
