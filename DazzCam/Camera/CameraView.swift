@@ -1,64 +1,32 @@
 import SwiftUI
+import Combine
 
-/// Pantalla de camara. Paso 5: preview + disparo + guardado + filtros.
+/// Pantalla de camara estilo DazzCam: visor a pantalla completa,
+/// tira de camaritas con muestra, disparo y selector completo.
 struct CameraView: View {
     @StateObject private var camara = CameraSession()
     @StateObject private var foto = PhotoCapture()
     @StateObject private var vivo = LiveFilterPreview()
+    @StateObject private var miniaturas = FilterThumbnails()
 
-    @State private var fotoConectada = false
+    @State private var preparado = false
     @State private var mostrarCaptura = false
+    @State private var mostrarTodas = false
     @State private var aviso: String?
-    @State private var preset: FilterPreset = .original
+    @State private var preset: FilterPreset = .dazzClassic
     @State private var fotoFiltrada: UIImage?
-    @State private var modoVivo = false
+    @State private var modoVivo = true
 
-    private let versionTexto = "paso 6 · v0.6"
+    private let versionTexto = "paso 7 · v0.7"
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if modoVivo, let imagenViva = vivo.imagen {
-                Image(uiImage: imagenViva)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-                    .ignoresSafeArea()
-            } else {
-                CameraPreviewView(session: camara.session)
-                    .ignoresSafeArea()
-            }
+            visor
 
             VStack(spacing: 0) {
-                HStack {
-                    Text(versionTexto)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.45), in: Capsule())
-
-                    Spacer()
-
-                    Button {
-                        modoVivo.toggle()
-                    } label: {
-                        Text(modoVivo ? "EN VIVO \(vivo.cuadrosPorSegundo) fps" : "EN VIVO")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(modoVivo ? Color.black : Color.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                modoVivo ? Color.white : Color.white.opacity(0.22),
-                                in: Capsule()
-                            )
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
+                cabecera
                 Spacer()
 
                 if let texto = aviso {
@@ -81,42 +49,15 @@ struct CameraView: View {
                         .padding(.bottom, 10)
                 }
 
-                carruselFiltros
-
-                HStack(spacing: 20) {
-                    Text(camara.estado.descripcion)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.85))
-                        .frame(width: 70)
-
-                    Button {
-                        foto.disparar()
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .strokeBorder(.white, lineWidth: 4)
-                                .frame(width: 72, height: 72)
-
-                            Circle()
-                                .fill(foto.capturando ? Color.gray : Color.white)
-                                .frame(width: 58, height: 58)
-                        }
-                    }
-                    .disabled(camara.estado != .listo || foto.capturando)
-
-                    Button {
-                        mostrarCaptura = true
-                    } label: {
-                        Image(systemName: "photo")
-                            .font(.system(size: 20))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(.black.opacity(0.4), in: Circle())
-                    }
-                    .disabled(fotoFiltrada == nil)
-                    .frame(width: 70)
-                }
-                .padding(.bottom, 34)
+                CameraBar(
+                    seleccionado: $preset,
+                    muestras: miniaturas.muestras,
+                    capturando: foto.capturando,
+                    alDisparar: { foto.disparar() },
+                    alAbrirGaleria: { mostrarCaptura = fotoFiltrada != nil },
+                    alAbrirTodas: { mostrarTodas = true }
+                )
+                .padding(.bottom, 22)
             }
 
             if mostrarCaptura, let imagen = fotoFiltrada {
@@ -124,22 +65,25 @@ struct CameraView: View {
                     .resizable()
                     .scaledToFit()
                     .ignoresSafeArea()
-                    .onTapGesture {
-                        mostrarCaptura = false
-                    }
+                    .onTapGesture { mostrarCaptura = false }
                     .transition(.opacity)
             }
         }
         .task {
-            if !fotoConectada {
-                fotoConectada = foto.conectar(a: camara.session)
+            if !preparado {
+                preparado = true
+                _ = foto.conectar(a: camara.session)
+                _ = vivo.conectar(a: camara.session)
+                vivo.preset = preset
             }
-            _ = vivo.conectar(a: camara.session)
-            vivo.preset = preset
             await camara.arrancar()
         }
         .onDisappear {
             camara.detener()
+        }
+        .onChange(of: preset) { _, nuevo in
+            vivo.preset = nuevo
+            aplicarFiltroAUltima()
         }
         .onChange(of: foto.capturas) { _, _ in
             guard let base = foto.ultimaFoto else { return }
@@ -154,37 +98,65 @@ struct CameraView: View {
                 } catch {
                     aviso = "No se pudo guardar: \(error.localizedDescription)"
                 }
-                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
                 aviso = nil
+            }
+        }
+        .onReceive(vivo.$imagen) { imagen in
+            guard let imagen = imagen, !miniaturas.lista else { return }
+            miniaturas.generar(desde: imagen)
+        }
+        .sheet(isPresented: $mostrarTodas) {
+            CameraPickerSheet(seleccionado: $preset, muestras: miniaturas.muestras)
+        }
+    }
+
+    // MARK: - Partes
+
+    private var visor: some View {
+        Group {
+            if modoVivo, let imagenViva = vivo.imagen {
+                Image(uiImage: imagenViva)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .ignoresSafeArea()
+            } else {
+                CameraPreviewView(session: camara.session)
+                    .ignoresSafeArea()
             }
         }
     }
 
-    private var carruselFiltros: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(FilterPreset.allCases) { item in
-                    Button {
-                        preset = item
-                        vivo.preset = item
-                        aplicarFiltroAUltima()
-                    } label: {
-                        Text(item.rawValue)
-                            .font(.caption)
-                            .fontWeight(preset == item ? .bold : .regular)
-                            .foregroundStyle(preset == item ? Color.black : Color.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                preset == item ? Color.white : Color.white.opacity(0.18),
-                                in: Capsule()
-                            )
-                    }
-                }
+    private var cabecera: some View {
+        HStack {
+            Text(versionTexto)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(.black.opacity(0.45), in: Capsule())
+
+            Spacer()
+
+            Button {
+                modoVivo.toggle()
+            } label: {
+                Text(modoVivo ? "EN VIVO \(vivo.cuadrosPorSegundo) fps" : "EN VIVO")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(modoVivo ? Color.black : Color.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        modoVivo ? Color.white : Color.white.opacity(0.22),
+                        in: Capsule()
+                    )
             }
-            .padding(.horizontal, 16)
+            .buttonStyle(.plain)
         }
-        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     private func aplicarFiltroAUltima() {
