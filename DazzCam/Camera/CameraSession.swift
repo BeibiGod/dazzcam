@@ -51,6 +51,8 @@ final class CameraSession: NSObject, ObservableObject {
     @Published private(set) var estado: Estado = .configurando
     @Published private(set) var lente: Lente = .ancha
     @Published private(set) var lentes: [Lente] = []
+    @Published private(set) var zoom: CGFloat = 1
+    @Published private(set) var tieneFlash = false
 
     let session = AVCaptureSession()
 
@@ -126,6 +128,8 @@ final class CameraSession: NSObject, ObservableObject {
                 self.ajustarEnfoqueInicial(dispositivo)
                 DispatchQueue.main.async {
                     self.lente = nueva
+                    self.zoom = 1
+                    self.tieneFlash = dispositivo.hasFlash
                 }
             } else if let vieja = entradaVieja, sesion.canAddInput(vieja) {
                 // si la lente nueva no entra, se regresa a la anterior
@@ -138,6 +142,37 @@ final class CameraSession: NSObject, ObservableObject {
     }
 
     // MARK: - Enfoque
+
+    /// Zoom de pellizco. Se limita a lo que aguanta la lente actual.
+    func ponerZoom(_ factor: CGFloat) {
+        guard let dispositivo = dispositivo else { return }
+
+        do {
+            try dispositivo.lockForConfiguration()
+
+            let maximo = min(dispositivo.activeFormat.videoMaxZoomFactor, 8)
+            let valor = min(max(factor, 1), maximo)
+            dispositivo.videoZoomFactor = valor
+            dispositivo.unlockForConfiguration()
+
+            zoom = valor
+        } catch {
+        }
+    }
+
+    /// Compensacion de exposicion en pasos EV.
+    func fijarExposicion(_ ev: Float) {
+        guard let dispositivo = dispositivo else { return }
+
+        let valor = min(max(ev, dispositivo.minExposureTargetBias), dispositivo.maxExposureTargetBias)
+
+        do {
+            try dispositivo.lockForConfiguration()
+            dispositivo.setExposureTargetBias(valor, completionHandler: nil)
+            dispositivo.unlockForConfiguration()
+        } catch {
+        }
+    }
 
     /// `punto` viene en coordenadas de la camara (0..1), ya convertidas
     /// desde el toque en pantalla por la capa de preview.
@@ -228,6 +263,7 @@ final class CameraSession: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.lentes = disponibles
                     self.lente = inicial
+                    self.tieneFlash = self.dispositivo?.hasFlash ?? false
                 }
                 continuacion.resume(returning: exito)
             }

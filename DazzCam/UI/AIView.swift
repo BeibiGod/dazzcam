@@ -4,6 +4,7 @@ import SwiftUI
 struct AIView: View {
     let analisis: Analisis
     var alElegirCamara: (FilterPreset) -> Void
+    var alVerTodas: () -> Void
 
     @Environment(\.dismiss) private var cerrar
 
@@ -65,20 +66,57 @@ struct AIView: View {
                         }
                     }
 
-                    Button {
-                        alElegirCamara(analisis.camaraSugerida)
-                    } label: {
-                        HStack {
-                            Image(systemName: "sparkles")
-                            Text("USAR \(analisis.camaraSugerida.nombre.uppercased())")
-                                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("CAMARAS QUE LE QUEDAN")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.4))
+
+                        ForEach(Array(analisis.sugerencias.enumerated()), id: \.offset) { indice, preset in
+                            Button {
+                                alElegirCamara(preset)
+                            } label: {
+                                HStack {
+                                    Text(preset.nombre)
+                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                    Spacer()
+                                    if indice == 0 {
+                                        Text("LA QUE MAS PEGA")
+                                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                            .foregroundStyle(.black)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(colorPuntaje, in: Capsule())
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white.opacity(0.08))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
+
+                        Button {
+                            alVerTodas()
+                        } label: {
+                            Text("VER LAS 30 CAMARAS")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.75))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.white.opacity(0.06), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
 
                     Text("Mide luz, contraste, color, composicion y caras con Vision de Apple. No manda tu foto a internet.")
                         .font(.system(size: 11))

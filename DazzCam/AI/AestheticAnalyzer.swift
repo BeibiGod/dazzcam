@@ -9,7 +9,7 @@ struct Analisis {
     var consejos: [String]
     var etiquetas: [String]
     var caras: Int
-    var camaraSugerida: FilterPreset
+    var sugerencias: [FilterPreset]
 }
 
 /// Analiza la escena actual con Vision de Apple: brillo, contraste, color,
@@ -166,7 +166,7 @@ enum AestheticAnalyzer {
             consejos: Array(consejos.prefix(3)),
             etiquetas: etiquetas,
             caras: caras.count,
-            camaraSugerida: camaraPara(etiquetas: etiquetas, caras: caras.count, luz: luz)
+            sugerencias: sugerencias(etiquetas: etiquetas, caras: caras.count, luz: luz)
         )
     }
 
@@ -179,39 +179,76 @@ enum AestheticAnalyzer {
         }
     }
 
-    /// Elige una camara segun lo que se ve en el cuadro.
-    private static func camaraPara(etiquetas: [String], caras: Int, luz: Double) -> FilterPreset {
+    /// Hasta tres camaras que le quedan a lo que se ve en el cuadro,
+    /// en orden de que tan bien pegan.
+    private static func sugerencias(etiquetas: [String], caras: Int, luz: Double) -> [FilterPreset] {
         let texto = etiquetas.joined(separator: " ")
 
         func contiene(_ palabras: [String]) -> Bool {
             palabras.contains { texto.contains($0) }
         }
 
+        var lista: [FilterPreset] = []
+
+        func agregar(_ preset: FilterPreset) {
+            if !lista.contains(preset) {
+                lista.append(preset)
+            }
+        }
+
         if luz < 0.25 {
-            return .tealNight
+            agregar(.tealNight)
+            agregar(.noir)
+            agregar(.d3d)
         }
+
         if caras > 0 || contiene(["person", "portrait", "selfie", "face", "people"]) {
-            return .portra
+            agregar(.portra)
+            agregar(.kodakGold)
+            agregar(.warmFlash)
         }
+
         if contiene(["food", "meal", "drink", "coffee", "dessert", "fruit"]) {
-            return .warmFlash
+            agregar(.warmFlash)
+            agregar(.kodachrome)
+            agregar(.instaxMini)
         }
+
         if contiene(["sky", "cloud", "beach", "sunset", "sunrise", "sea", "ocean"]) {
-            return .kodakGold
+            agregar(.kodakGold)
+            agregar(.ektar100)
+            agregar(.superia)
         }
+
         if contiene(["plant", "flower", "tree", "forest", "nature", "garden", "leaf"]) {
-            return .fujiPro400
+            agregar(.fujiPro400)
+            agregar(.agfaVista)
+            agregar(.superia)
         }
+
         if contiene(["building", "architecture", "city", "street", "skyscraper", "bridge"]) {
-            return .ektar100
+            agregar(.ektar100)
+            agregar(.bleachBypass)
+            agregar(.d3d)
         }
+
         if contiene(["car", "vehicle", "motorcycle", "bicycle", "traffic"]) {
-            return .chatarraCCD
+            agregar(.chatarraCCD)
+            agregar(.vhs)
+            agregar(.copper)
         }
+
         if contiene(["night", "dark", "neon", "concert", "light"]) {
-            return .vhs
+            agregar(.vhs)
+            agregar(.tealNight)
+            agregar(.vaporwave)
         }
-        return .dazzClassic
+
+        agregar(.dazzClassic)
+        agregar(.kodakGold)
+        agregar(.polaroid600)
+
+        return Array(lista.prefix(3))
     }
 
     // MARK: - Medidas de la imagen

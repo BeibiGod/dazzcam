@@ -28,7 +28,7 @@ targets:
       base:
         PRODUCT_NAME: DazzCam
         PRODUCT_BUNDLE_IDENTIFIER: com.diego.dazzcam
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "1.1.0"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO

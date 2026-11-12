@@ -12,6 +12,9 @@ final class PhotoCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     let salida = AVCapturePhotoOutput()
 
+    /// Lo pone la pantalla: si el flash debe dispararse en la proxima foto.
+    var flash: AVCaptureDevice.FlashMode = .off
+
     /// Agrega la salida de foto a la sesion. Debe llamarse antes de arrancar.
     func conectar(a sesion: AVCaptureSession) -> Bool {
         guard !sesion.outputs.contains(where: { $0 === salida }) else { return true }
@@ -29,6 +32,9 @@ final class PhotoCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         error = nil
 
         let ajustes = AVCapturePhotoSettings()
+        if flash != .off {
+            ajustes.flashMode = flash
+        }
         salida.capturePhoto(with: ajustes, delegate: self)
     }
 

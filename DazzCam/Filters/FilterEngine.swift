@@ -261,6 +261,32 @@ enum FilterEngine {
 
     // MARK: - Utilidades
 
+    /// Recorta al centro con la relacion ancho/alto pedida (ej. 9/16 para 16:9 vertical).
+    static func recortar(_ imagen: UIImage, relacion: CGFloat) -> UIImage {
+        let normal = normalizar(imagen)
+        guard let cg = normal.cgImage, relacion > 0 else { return normal }
+
+        let ancho = CGFloat(cg.width)
+        let alto = CGFloat(cg.height)
+        guard ancho > 0, alto > 0 else { return normal }
+
+        let actual = ancho / alto
+        var recorte: CGRect
+
+        if actual > relacion {
+            let nuevoAncho = alto * relacion
+            recorte = CGRect(x: (ancho - nuevoAncho) / 2, y: 0, width: nuevoAncho, height: alto)
+        } else if actual < relacion {
+            let nuevoAlto = ancho / relacion
+            recorte = CGRect(x: 0, y: (alto - nuevoAlto) / 2, width: ancho, height: nuevoAlto)
+        } else {
+            return normal
+        }
+
+        guard let recortada = cg.cropping(to: recorte) else { return normal }
+        return UIImage(cgImage: recortada, scale: normal.scale, orientation: .up)
+    }
+
     /// Redibuja la imagen derecha para evitar fotos torcidas tras filtrar.
     static func normalizar(_ imagen: UIImage) -> UIImage {
         guard imagen.imageOrientation != .up else { return imagen }
