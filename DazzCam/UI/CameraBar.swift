@@ -11,7 +11,7 @@ struct CameraBar: View {
     let segundos: Int
 
     var alDisparar: () -> Void
-    var alAbrirGaleria: () -> Void
+    var alImportar: () -> Void
     var alAbrirTodas: () -> Void
 
     private var tiempoTexto: String {
@@ -94,12 +94,16 @@ struct CameraBar: View {
             }
 
             HStack {
-                Button(action: alAbrirGaleria) {
-                    Image(systemName: "photo.on.rectangle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white)
-                        .frame(width: 50, height: 50)
-                        .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+                Button(action: alImportar) {
+                    VStack(spacing: 3) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 18))
+                        Text("FOTOS")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: 50, height: 50)
+                    .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
 

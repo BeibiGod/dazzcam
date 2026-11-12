@@ -10,11 +10,16 @@ struct Analisis {
     var etiquetas: [String]
     var caras: Int
     var sugerencias: [FilterPreset]
+
+    /// Medidas reales de la escena, para que se vea que si se analizo.
+    var luz: Int          // 0-100
+    var contraste: Int    // 0-100
+    var color: Int        // 0-100
+    var horizonte: Int    // grados de inclinacion, 0 = derecho
 }
 
-/// Analiza la escena actual con Vision de Apple: brillo, contraste, color,
-/// composicion, caras y que hay en el cuadro. No es magia: son mediciones
-/// reales convertidas en un puntaje y en consejos concretos.
+/// Analiza la escena con Vision de Apple: luz, contraste, color, caras,
+/// horizonte y que hay en el cuadro. Con eso califica y elige las camaras.
 enum AestheticAnalyzer {
 
     static func analizar(_ imagen: UIImage) async -> Analisis? {
@@ -30,9 +35,10 @@ enum AestheticAnalyzer {
                 let clasificar = VNClassifyImageRequest()
                 let carasRequest = VNDetectFaceRectanglesRequest()
                 let saliencia = VNGenerateAttentionBasedSaliencyImageRequest()
+                let horizonteRequest = VNDetectHorizonRequest()
 
                 do {
-                    try manejador.perform([clasificar, carasRequest, saliencia])
+                    try manejador.perform([clasificar, carasRequest, saliencia, horizonteRequest])
                 } catch {
                     continuacion.resume(returning: nil)
                     return
@@ -44,15 +50,21 @@ enum AestheticAnalyzer {
                     .map { $0.identifier.replacingOccurrences(of: "_", with: " ") }
 
                 let caras = carasRequest.results ?? []
-                let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?.salientObjects ?? []
+                let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?.salientObjects
+
+                // Vision devuelve radianes; pasamos a grados.
+                let inclinacion: Double? = (horizonteRequest.results?.first).map {
+                    abs(Double($0.angle) * 180.0 / .pi)
+                }
 
                 let resultado = calificar(
                     luz: medidas.luz,
                     contraste: medidas.contraste,
                     color: medidas.color,
                     caras: caras,
-                    objetos: objetos,
-                    etiquetas: Array(etiquetas)
+                    objetos: objetos ?? [],
+                    etiquetas: Array(etiquetas),
+                    horizonte: inclinacion
                 )
 
                 continuacion.resume(returning: resultado)
@@ -68,7 +80,8 @@ enum AestheticAnalyzer {
         color: Double,
         caras: [VNFaceObservation],
         objetos: [VNRectangleObservation],
-        etiquetas: [String]
+        etiquetas: [String],
+        horizonte: Double?
     ) -> Analisis {
 
         var puntos = 0
@@ -153,20 +166,40 @@ enum AestheticAnalyzer {
             consejos.append("Hay varias caras: acerca o enfoca a una sola.")
         }
 
-        // si todo esta bien, al menos un consejo util
+        // 6. horizonte torcido: resta hasta 8 puntos
+        let inclinacion = horizonte ?? 0
+        if inclinacion > 1.5 {
+            puntos -= min(8, Int(inclinacion * 1.4))
+            consejos.append(String(
+                format: "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula.",
+                inclinacion
+            ))
+        }
+
         if consejos.isEmpty {
             consejos.append("Se ve bien. Dispara ahora, la luz es la correcta.")
         }
 
         let puntaje = min(max(puntos, 0), 100)
+        let carasCount = caras.count
 
         return Analisis(
             puntaje: puntaje,
             resumen: resumenPara(puntaje),
             consejos: Array(consejos.prefix(3)),
             etiquetas: etiquetas,
-            caras: caras.count,
-            sugerencias: sugerencias(etiquetas: etiquetas, caras: caras.count, luz: luz)
+            caras: carasCount,
+            sugerencias: sugerencias(
+                etiquetas: etiquetas,
+                caras: carasCount,
+                luz: luz,
+                color: color,
+                horizonte: inclinacion
+            ),
+            luz: Int((luz * 100).rounded()),
+            contraste: min(Int((contraste / 0.30 * 100).rounded()), 100),
+            color: min(Int((color / 0.35 * 100).rounded()), 100),
+            horizonte: Int(inclinacion.rounded())
         )
     }
 
@@ -181,7 +214,13 @@ enum AestheticAnalyzer {
 
     /// Hasta tres camaras que le quedan a lo que se ve en el cuadro,
     /// en orden de que tan bien pegan.
-    private static func sugerencias(etiquetas: [String], caras: Int, luz: Double) -> [FilterPreset] {
+    private static func sugerencias(
+        etiquetas: [String],
+        caras: Int,
+        luz: Double,
+        color: Double,
+        horizonte: Double
+    ) -> [FilterPreset] {
         let texto = etiquetas.joined(separator: " ")
 
         func contiene(_ palabras: [String]) -> Bool {
@@ -196,16 +235,19 @@ enum AestheticAnalyzer {
             }
         }
 
+        // de noche manda el look frio o el negro
         if luz < 0.25 {
             agregar(.tealNight)
+            agregar(.y2kDigi)
             agregar(.noir)
-            agregar(.d3d)
         }
 
+        // hay gente: pelicula de retrato
         if caras > 0 || contiene(["person", "portrait", "selfie", "face", "people"]) {
             agregar(.portra)
             agregar(.kodakGold)
             agregar(.warmFlash)
+            agregar(.polaroidGo)
         }
 
         if contiene(["food", "meal", "drink", "coffee", "dessert", "fruit"]) {
@@ -214,34 +256,46 @@ enum AestheticAnalyzer {
             agregar(.instaxMini)
         }
 
+        // cielo, playa, atardecer: saturar un poco con diapositiva
         if contiene(["sky", "cloud", "beach", "sunset", "sunrise", "sea", "ocean"]) {
-            agregar(.kodakGold)
+            agregar(.velvia)
             agregar(.ektar100)
-            agregar(.superia)
+            agregar(.goldenHour)
         }
 
         if contiene(["plant", "flower", "tree", "forest", "nature", "garden", "leaf"]) {
+            agregar(.provia)
+            agregar(.velvia)
             agregar(.fujiPro400)
-            agregar(.agfaVista)
-            agregar(.superia)
         }
 
         if contiene(["building", "architecture", "city", "street", "skyscraper", "bridge"]) {
-            agregar(.ektar100)
+            agregar(.ektachrome)
             agregar(.bleachBypass)
-            agregar(.d3d)
+            agregar(.contaxT2)
         }
 
         if contiene(["car", "vehicle", "motorcycle", "bicycle", "traffic"]) {
             agregar(.chatarraCCD)
             agregar(.vhs)
-            agregar(.copper)
+            agregar(.disposable)
         }
 
-        if contiene(["night", "dark", "neon", "concert", "light"]) {
+        if contiene(["night", "dark", "neon", "concert", "light", "party"]) {
             agregar(.vhs)
-            agregar(.tealNight)
+            agregar(.y2kDigi)
             agregar(.vaporwave)
+        }
+
+        // sin color en la escena: mejor blanco y negro
+        if color < 0.10 {
+            agregar(.triX)
+            agregar(.noir)
+        }
+
+        // horizonte torcido: un look duro disimula menos, mejor clasico
+        if horizonte > 4 {
+            agregar(.kodakGold)
         }
 
         agregar(.dazzClassic)

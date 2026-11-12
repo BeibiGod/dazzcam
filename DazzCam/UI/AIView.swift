@@ -17,6 +17,21 @@ struct AIView: View {
         }
     }
 
+    private func medida(_ titulo: String, _ valor: String) -> some View {
+        VStack(spacing: 2) {
+            Text(valor)
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+
+            Text(titulo)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -37,6 +52,17 @@ struct AIView: View {
                     Text(analisis.resumen)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            medida("LUZ", "\(analisis.luz)%")
+                            medida("CONTRASTE", "\(analisis.contraste)%")
+                            medida("COLOR", "\(analisis.color)%")
+                            medida("CARAS", "\(analisis.caras)")
+                            medida("HORIZONTE", "\(analisis.horizonte)°")
+                        }
+                        .padding(.vertical, 2)
+                    }
 
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(Array(analisis.consejos.enumerated()), id: \.offset) { _, consejo in
@@ -118,7 +144,7 @@ struct AIView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Text("Mide luz, contraste, color, composicion y caras con Vision de Apple. No manda tu foto a internet.")
+                    Text("Mira toda la escena, no solo el centro: mide luz, contraste, color, caras y horizonte, y con eso elige las camaras que mejor le quedan. Todo pasa dentro de tu iPhone; no se sube nada a internet.")
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.35))
                         .fixedSize(horizontal: false, vertical: true)

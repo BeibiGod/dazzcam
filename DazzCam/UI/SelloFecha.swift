@@ -25,23 +25,24 @@ enum SelloFecha: String, CaseIterable {
 
     var encendido: Bool { self != .apagado }
 
-    /// Texto tipo camara de los 90:  '26 11 12   /   '26 11 12 18:40
+    /// Texto con la fecha del iPhone:  12/11/2026   /   12/11/2026 2:28 AM
     static func texto(_ modo: SelloFecha, fecha: Date = Date()) -> String {
         switch modo {
         case .apagado:
             return ""
 
         case .fecha:
-            return formatear(fecha, patron: "'yy MM dd")
+            return formatear(fecha, patron: "dd/MM/yyyy")
 
         case .fechaHora:
-            return formatear(fecha, patron: "'yy MM dd HH:mm")
+            return formatear(fecha, patron: "dd/MM/yyyy h:mm a")
         }
     }
 
     private static func formatear(_ fecha: Date, patron: String) -> String {
         let formato = DateFormatter()
         formato.locale = Locale(identifier: "en_US_POSIX")
+        formato.timeZone = TimeZone.current
         formato.dateFormat = patron
         return formato.string(from: fecha)
     }

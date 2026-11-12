@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UIKit
+import PhotosUI
 
 /// Pantalla de camara completa: visor, lentes, zoom de pellizco, enfoque,
 /// temporizador, exposicion, flash, proporcion, video e IA.
@@ -36,9 +37,13 @@ struct CameraView: View {
     @State private var mostrarCuadricula = true
     @State private var sello: SelloFecha = .apagado
     @State private var destello: Double = 0
+    @State private var mostrarImportar = false
+    @State private var fotoElegida: PhotosPickerItem?
+    @State private var fotoImportada: UIImage?
+    @State private var mostrarEditor = false
 
     private var versionTexto: String {
-        "v1.5 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.6 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -133,7 +138,7 @@ struct CameraView: View {
                         procesando: video.procesando,
                         segundos: video.segundos,
                         alDisparar: accionDeDisparo,
-                        alAbrirGaleria: { mostrarCaptura = fotoFiltrada != nil },
+                        alImportar: { mostrarImportar = true },
                         alAbrirTodas: { mostrarTodas = true }
                     )
                     .padding(.bottom, insetAbajo + 6)
@@ -236,6 +241,39 @@ struct CameraView: View {
                     alVerTodas: {
                         mostrarIA = false
                         abrirCatalogo()
+                    }
+                )
+            }
+        }
+        .photosPicker(isPresented: $mostrarImportar, selection: $fotoElegida, matching: .images)
+        .onChange(of: fotoElegida) { _, item in
+            guard let item = item else { return }
+
+            Task {
+                if let datos = try? await item.loadTransferable(type: Data.self),
+                   let imagen = UIImage(data: datos) {
+                    fotoImportada = imagen
+                    mostrarEditor = true
+                } else {
+                    aviso = "No pude abrir esa foto"
+                }
+                fotoElegida = nil
+            }
+        }
+        .sheet(isPresented: $mostrarEditor) {
+            if let fotoImportada = fotoImportada {
+                PhotoEditorView(
+                    imagen: fotoImportada,
+                    preset: preset,
+                    proporcion: proporcion,
+                    sello: sello,
+                    alGuardar: { _, elegido in
+                        preset = elegido
+                        aviso = "Copia guardada con \(elegido.nombre)"
+                        Task {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            aviso = nil
+                        }
                     }
                 )
             }
