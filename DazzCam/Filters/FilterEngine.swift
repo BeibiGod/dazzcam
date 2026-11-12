@@ -13,7 +13,6 @@ struct AjusteFoto {
     var vineta: CGFloat = 0              // 0 = nada, 1 = esquinas negras
     var grano: CGFloat = 0               // 0 = nada, 0.2 = pelicula sucia
     var blancoYNegro: Bool = false
-    var movimiento: CGFloat = 0          // cuadros dobles tipo VHS
 }
 
 /// Aplica los looks de pelicula a fotos y a video.
@@ -30,7 +29,7 @@ enum FilterEngine {
         guard let entrada = CIImage(image: base) else { return imagen }
         guard let salida = cadena(preset, entrada: entrada) else { return imagen }
 
-        guard let cg = contexto.createCGImage(salida, from: entrada.extent) else {
+        guard let cg = contexto.createCGImage(salida, from: salida.extent) else {
             return imagen
         }
         return UIImage(cgImage: cg, scale: base.scale, orientation: .up)
@@ -50,141 +49,124 @@ enum FilterEngine {
         case .original:
             break
 
+        // ---- clasicas ----
         case .portra:
-            a.temperatura = 7100
-            a.saturacion = 1.02
-            a.contraste = 0.97
-            a.desvanecido = 0.02
-            a.grano = 0.06
-            a.vineta = 0.3
+            a.temperatura = 7100; a.saturacion = 1.02; a.contraste = 0.97
+            a.desvanecido = 0.02; a.grano = 0.06; a.vineta = 0.3
 
         case .superia:
-            a.temperatura = 6600
-            a.saturacion = 1.16
-            a.contraste = 1.08
-            a.grano = 0.09
-            a.vineta = 0.35
+            a.temperatura = 6600; a.saturacion = 1.16; a.contraste = 1.08
+            a.grano = 0.09; a.vineta = 0.35
 
         case .kodachrome:
-            a.temperatura = 7400
-            a.saturacion = 1.25
-            a.contraste = 1.12
-            a.grano = 0.05
-            a.vineta = 0.25
+            a.temperatura = 7400; a.saturacion = 1.25; a.contraste = 1.12
+            a.grano = 0.05; a.vineta = 0.25
 
         case .instColor:
-            a.temperatura = 8000
-            a.saturacion = 1.15
-            a.contraste = 0.95
-            a.desvanecido = 0.03
-            a.vineta = 0.3
+            a.temperatura = 8000; a.saturacion = 1.15; a.contraste = 0.95
+            a.desvanecido = 0.03; a.vineta = 0.3
 
         case .dazzClassic:
-            a.temperatura = 7000
-            a.saturacion = 1.05
-            a.contraste = 1.05
-            a.grano = 0.07
-            a.vineta = 0.35
+            a.temperatura = 7000; a.saturacion = 1.05; a.contraste = 1.05
+            a.grano = 0.07; a.vineta = 0.35
 
+        // ---- vintage ----
         case .cinestill:
-            a.temperatura = 5400
-            a.tinte = -8
-            a.saturacion = 1.1
-            a.contraste = 1.05
-            a.desvanecido = 0.03
-            a.grano = 0.1
-            a.vineta = 0.3
+            a.temperatura = 5400; a.tinte = -8; a.saturacion = 1.1
+            a.contraste = 1.05; a.desvanecido = 0.03; a.grano = 0.1; a.vineta = 0.3
 
         case .hp5:
-            a.blancoYNegro = true
-            a.contraste = 1.2
-            a.grano = 0.14
-            a.vineta = 0.4
-
-        case .polaroid:
-            a.temperatura = 7800
-            a.saturacion = 0.85
-            a.contraste = 0.9
-            a.desvanecido = 0.06
-            a.vineta = 0.5
-            a.grano = 0.05
+            a.blancoYNegro = true; a.contraste = 1.2; a.grano = 0.14; a.vineta = 0.4
 
         case .lomo:
-            a.saturacion = 1.35
-            a.contraste = 1.2
-            a.vineta = 0.85
-            a.grano = 0.1
+            a.saturacion = 1.35; a.contraste = 1.2; a.vineta = 0.85; a.grano = 0.1
 
         case .crossProcess:
-            a.temperatura = 6000
-            a.tinte = 15
-            a.saturacion = 1.3
-            a.contraste = 1.25
-            a.desvanecido = 0.05
+            a.temperatura = 6000; a.tinte = 15; a.saturacion = 1.3
+            a.contraste = 1.25; a.desvanecido = 0.05
 
         case .bleachBypass:
-            a.saturacion = 0.45
-            a.contraste = 1.35
-            a.grano = 0.08
+            a.saturacion = 0.45; a.contraste = 1.35; a.grano = 0.08
 
         case .faded90s:
-            a.temperatura = 7200
-            a.saturacion = 0.75
-            a.contraste = 0.85
-            a.desvanecido = 0.1
-            a.grano = 0.08
+            a.temperatura = 7200; a.saturacion = 0.75; a.contraste = 0.85
+            a.desvanecido = 0.1; a.grano = 0.08
 
         case .copper:
-            a.temperatura = 8500
-            a.tinte = 8
-            a.saturacion = 1.2
-            a.contraste = 1.12
-            a.grano = 0.07
+            a.temperatura = 8500; a.tinte = 8; a.saturacion = 1.2
+            a.contraste = 1.12; a.grano = 0.07
 
+        case .kodakGold:
+            a.temperatura = 7600; a.saturacion = 1.12; a.contraste = 1.05
+            a.desvanecido = 0.02; a.grano = 0.08; a.vineta = 0.28
+
+        case .ektar100:
+            a.temperatura = 6800; a.saturacion = 1.25; a.contraste = 1.15
+            a.grano = 0.03; a.vineta = 0.2
+
+        case .fujiPro400:
+            a.temperatura = 7000; a.tinte = -5; a.saturacion = 1.05
+            a.contraste = 0.95; a.desvanecido = 0.03; a.grano = 0.06; a.vineta = 0.22
+
+        case .delta3200:
+            a.blancoYNegro = true; a.contraste = 1.25; a.grano = 0.2; a.vineta = 0.35
+
+        case .agfaVista:
+            a.temperatura = 7300; a.saturacion = 1.18; a.contraste = 1.05
+            a.grano = 0.1; a.vineta = 0.3
+
+        // ---- polaroid / instantanea ----
+        case .polaroid600:
+            a.temperatura = 7800; a.saturacion = 0.85; a.contraste = 0.9
+            a.desvanecido = 0.06; a.vineta = 0.5; a.grano = 0.05
+
+        case .sx70:
+            a.temperatura = 7500; a.saturacion = 0.9; a.contraste = 1.0
+            a.desvanecido = 0.05; a.vineta = 0.35; a.grano = 0.06
+
+        case .instaxMini:
+            a.temperatura = 8000; a.saturacion = 1.1; a.contraste = 0.88
+            a.desvanecido = 0.08; a.vineta = 0.2; a.grano = 0.04
+
+        case .instaxWide:
+            a.temperatura = 7000; a.saturacion = 1.0; a.contraste = 0.92
+            a.desvanecido = 0.07; a.vineta = 0.25; a.grano = 0.05
+
+        case .polaroidFrio:
+            a.temperatura = 5600; a.tinte = -6; a.saturacion = 0.8
+            a.contraste = 0.95; a.desvanecido = 0.07; a.vineta = 0.55; a.grano = 0.06
+
+        case .polaroidNoir:
+            a.blancoYNegro = true; a.contraste = 1.05; a.desvanecido = 0.05
+            a.vineta = 0.6; a.grano = 0.08
+
+        // ---- underground ----
         case .vhs:
-            a.temperatura = 6800
-            a.tinte = -10
-            a.saturacion = 0.9
-            a.contraste = 0.9
-            a.desvanecido = 0.08
-            a.grano = 0.15
-            a.movimiento = 1.0
+            a.temperatura = 6800; a.tinte = -10; a.saturacion = 0.9
+            a.contraste = 0.9; a.desvanecido = 0.08; a.grano = 0.15
 
         case .d3d:
-            a.temperatura = 6200
-            a.saturacion = 1.2
-            a.contraste = 1.15
-            a.vineta = 0.5
-            a.grano = 0.12
+            a.temperatura = 6200; a.saturacion = 1.2; a.contraste = 1.15
+            a.vineta = 0.5; a.grano = 0.12
 
         case .tealNight:
-            a.temperatura = 5200
-            a.tinte = -12
-            a.saturacion = 1.1
-            a.contraste = 1.1
-            a.vineta = 0.45
-            a.grano = 0.1
+            a.temperatura = 5200; a.tinte = -12; a.saturacion = 1.1
+            a.contraste = 1.1; a.vineta = 0.45; a.grano = 0.1
 
         case .warmFlash:
-            a.temperatura = 8200
-            a.saturacion = 1.1
-            a.contraste = 1.05
-            a.desvanecido = 0.02
-            a.vineta = 0.3
+            a.temperatura = 8200; a.saturacion = 1.1; a.contraste = 1.05
+            a.desvanecido = 0.02; a.vineta = 0.3
 
         case .noir:
-            a.blancoYNegro = true
-            a.contraste = 1.45
-            a.vineta = 0.8
-            a.grano = 0.1
+            a.blancoYNegro = true; a.contraste = 1.45; a.vineta = 0.8; a.grano = 0.1
 
         case .vaporwave:
-            a.temperatura = 6000
-            a.tinte = 25
-            a.saturacion = 1.4
-            a.contraste = 1.05
-            a.desvanecido = 0.04
-            a.vineta = 0.3
+            a.temperatura = 6000; a.tinte = 25; a.saturacion = 1.4
+            a.contraste = 1.05; a.desvanecido = 0.04; a.vineta = 0.3
+
+        case .chatarraCCD:
+            a.temperatura = 6300; a.saturacion = 1.3; a.contraste = 1.2
+            a.grano = 0.18; a.vineta = 0.3
         }
 
         return a
@@ -256,6 +238,7 @@ enum FilterEngine {
     private static func grano(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
         guard let ruido = ruidoBase?.cropped(to: imagen.extent) else { return nil }
 
+        // ruido a gris
         let gris = CIFilter.colorMatrix()
         gris.inputImage = ruido
         gris.rVector = CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0)
@@ -264,6 +247,7 @@ enum FilterEngine {
         gris.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
         guard let grisSalida = gris.outputImage else { return nil }
 
+        // transparencia = cantidad
         let transparencia = CIFilter.colorMatrix()
         transparencia.inputImage = grisSalida
         transparencia.aVector = CIVector(x: 0, y: 0, z: 0, w: cantidad)

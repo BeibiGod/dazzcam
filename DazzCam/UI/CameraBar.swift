@@ -20,41 +20,49 @@ struct CameraBar: View {
                 .padding(.vertical, 5)
                 .background(.black.opacity(0.45), in: Capsule())
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(FilterPreset.allCases) { preset in
-                        Button {
-                            seleccionado = preset
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white.opacity(0.12))
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(FilterPreset.allCases) { preset in
+                            Button {
+                                seleccionado = preset
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.12))
 
-                                if let muestra = muestras[preset] {
-                                    Image(uiImage: muestra)
-                                        .resizable()
-                                        .scaledToFill()
-                                } else {
-                                    Image(systemName: "camera.aperture")
-                                        .font(.system(size: 20))
-                                        .foregroundStyle(.white.opacity(0.5))
+                                    if let muestra = muestras[preset] {
+                                        Image(uiImage: muestra)
+                                            .resizable()
+                                            .scaledToFill()
+                                    } else {
+                                        Image(systemName: "camera.aperture")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(.white.opacity(0.5))
+                                    }
                                 }
-                            }
-                            .frame(width: 58, height: 58)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle().strokeBorder(
-                                    seleccionado == preset ? Color.white : Color.white.opacity(0.22),
-                                    lineWidth: seleccionado == preset ? 3 : 1
+                                .frame(width: 58, height: 58)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle().strokeBorder(
+                                        seleccionado == preset ? Color.white : Color.white.opacity(0.22),
+                                        lineWidth: seleccionado == preset ? 3 : 1
+                                    )
                                 )
-                            )
+                            }
+                            .buttonStyle(.plain)
+                            .id(preset)
                         }
-                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .frame(height: 64)
+                .onChange(of: seleccionado) { _, nuevo in
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(nuevo, anchor: .center)
                     }
                 }
-                .padding(.horizontal, 16)
             }
-            .frame(height: 64)
 
             HStack {
                 Button(action: alAbrirGaleria) {
@@ -99,5 +107,6 @@ struct CameraBar: View {
             }
             .padding(.horizontal, 26)
         }
+        .frame(maxWidth: .infinity)
     }
 }

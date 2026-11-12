@@ -17,7 +17,9 @@ struct CameraView: View {
     @State private var fotoFiltrada: UIImage?
     @State private var modoVivo = true
 
-    private let versionTexto = "paso 7 · v0.7"
+    private var versionTexto: String {
+        "v0.8 · \(FilterPreset.cantidadCamaras) cam"
+    }
 
     var body: some View {
         ZStack {
@@ -59,6 +61,7 @@ struct CameraView: View {
                 )
                 .padding(.bottom, 22)
             }
+            .frame(maxWidth: .infinity)
 
             if mostrarCaptura, let imagen = fotoFiltrada {
                 Image(uiImage: imagen)
@@ -136,22 +139,40 @@ struct CameraView: View {
     }
 
     private var cabecera: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text(versionTexto)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.75))
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(.black.opacity(0.45), in: Capsule())
+                .background(.black.opacity(0.5), in: Capsule())
 
-            Spacer()
+            Spacer(minLength: 6)
+
+            if modoVivo {
+                Text("\(vivo.cuadrosPorSegundo) FPS")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.black)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        vivo.cuadrosPorSegundo >= 20 ? Color.green : Color.yellow,
+                        in: Capsule()
+                    )
+            }
 
             Button {
                 modoVivo.toggle()
             } label: {
-                Text(modoVivo ? "EN VIVO \(vivo.cuadrosPorSegundo) fps" : "EN VIVO")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                Text("EN VIVO")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(modoVivo ? Color.black : Color.white)
+                    .lineLimit(1)
+                    .fixedSize()
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(
@@ -160,6 +181,7 @@ struct CameraView: View {
                     )
             }
             .buttonStyle(.plain)
+            .fixedSize()
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
