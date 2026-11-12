@@ -8,6 +8,7 @@ struct CameraView: View {
     @StateObject private var foto = PhotoCapture()
     @StateObject private var vivo = LiveFilterPreview()
     @StateObject private var miniaturas = FilterThumbnails()
+    @StateObject private var video = MovieRecorder()
 
     @State private var preparado = false
     @State private var mostrarCaptura = false
@@ -20,9 +21,11 @@ struct CameraView: View {
     @State private var anillo: CGPoint?
     @State private var analisis: Analisis?
     @State private var analizando = false
+    @State private var modo: ModoCaptura = .foto
+    @State private var vivoAntesDeGrabar = true
 
     private var versionTexto: String {
-        "v0.9 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     var body: some View {
@@ -71,14 +74,27 @@ struct CameraView: View {
                             .padding(.bottom, 8)
                     }
 
-                    barraLentes
+                    if let error = video.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.75), in: Capsule())
+                            .padding(.bottom, 8)
+                    }
+
+                    barraModos
                         .padding(.bottom, 8)
 
                     CameraBar(
                         seleccionado: $preset,
                         muestras: miniaturas.muestras,
                         capturando: foto.capturando,
-                        alDisparar: { foto.disparar() },
+                        grabando: video.grabando,
+                        procesando: video.procesando,
+                        segundos: video.segundos,
+                        alDisparar: accionDeDisparo,
                         alAbrirGaleria: { mostrarCaptura = fotoFiltrada != nil },
                         alAbrirTodas: { mostrarTodas = true }
                     )
@@ -105,12 +121,21 @@ struct CameraView: View {
                 preparado = true
                 _ = foto.conectar(a: camara.session)
                 _ = vivo.conectar(a: camara.session)
+                video.conectar(a: camara.session)
                 vivo.preset = preset
             }
             await camara.arrancar()
         }
         .onDisappear {
             camara.detener()
+        }
+        .onChange(of: video.grabando) { _, grabando in
+            if grabando {
+                vivoAntesDeGrabar = modoVivo
+                modoVivo = false
+            } else if vivoAntesDeGrabar {
+                modoVivo = true
+            }
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
@@ -225,9 +250,9 @@ struct CameraView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Lentes
+    // MARK: - Lentes y modo
 
-    private var barraLentes: some View {
+    private var barraModos: some View {
         HStack(spacing: 8) {
             ForEach(camara.lentes) { lente in
                 Button {
@@ -252,7 +277,32 @@ struct CameraView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            Spacer()
+
+            HStack(spacing: 0) {
+                ForEach(ModoCaptura.allCases) { opcion in
+                    Button {
+                        guard !video.grabando else { return }
+                        modo = opcion
+                    } label: {
+                        Text(opcion.rawValue)
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(modo == opcion ? Color.black : Color.white.opacity(0.75))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                modo == opcion ? Color.white : Color.clear,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3)
+            .background(Color.black.opacity(0.45), in: Capsule())
         }
+        .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
     }
 
@@ -286,6 +336,22 @@ struct CameraView: View {
     }
 
     // MARK: - Acciones
+
+    private func accionDeDisparo() {
+        switch modo {
+        case .foto:
+            foto.disparar()
+
+        case .video:
+            if video.grabando {
+                video.parar()
+            } else {
+                Task {
+                    await video.empezar(preset: preset, quitar: vivo.salida)
+                }
+            }
+        }
+    }
 
     private func analizarEscena() {
         guard let imagen = vivo.imagen ?? foto.ultimaFoto else {

@@ -13,7 +13,7 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// Lo cambia la vista cuando el usuario elige otro filtro.
     var preset: FilterPreset = .dazzClassic
 
-    private let salida = AVCaptureVideoDataOutput()
+    let salida = AVCaptureVideoDataOutput()
     private let renderer = VideoFrameRenderer()
     private let cola = DispatchQueue(label: "com.diego.dazzcam.vivo", qos: .userInitiated)
 

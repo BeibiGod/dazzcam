@@ -6,19 +6,48 @@ struct CameraBar: View {
     @Binding var seleccionado: FilterPreset
     let muestras: [FilterPreset: UIImage]
     let capturando: Bool
+    let grabando: Bool
+    let procesando: Bool
+    let segundos: Int
 
     var alDisparar: () -> Void
     var alAbrirGaleria: () -> Void
     var alAbrirTodas: () -> Void
 
+    private var tiempoTexto: String {
+        let minutos = segundos / 60
+        let resto = segundos % 60
+        return String(format: "%d:%02d", minutos, resto)
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            Text(seleccionado.nombre.uppercased())
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(.black.opacity(0.45), in: Capsule())
+            HStack(spacing: 8) {
+                Text(seleccionado.nombre.uppercased())
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.5), in: Capsule())
+
+                if grabando {
+                    Text("● \(tiempoTexto)")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.red, in: Capsule())
+                } else if procesando {
+                    Text("GUARDANDO...")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.yellow, in: Capsule())
+                }
+            }
+            .frame(maxWidth: .infinity)
 
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -82,13 +111,19 @@ struct CameraBar: View {
                             .strokeBorder(.white, lineWidth: 4)
                             .frame(width: 78, height: 78)
 
-                        Circle()
-                            .fill(capturando ? Color.gray : Color.white)
-                            .frame(width: 64, height: 64)
+                        if grabando {
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color.red)
+                                .frame(width: 32, height: 32)
+                        } else {
+                            Circle()
+                                .fill(capturando || procesando ? Color.gray : Color.white)
+                                .frame(width: 64, height: 64)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(capturando)
+                .disabled(capturando || procesando)
 
                 Spacer()
 
@@ -105,7 +140,7 @@ struct CameraBar: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 26)
+            .padding(.horizontal, 22)
         }
         .frame(maxWidth: .infinity)
     }

@@ -19,11 +19,37 @@ enum PhotoLibrarySaver {
     }
 
     static func guardar(_ imagen: UIImage) async throws {
+        try await pedirPermiso()
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: imagen)
+            }
+        } catch {
+            throw ErrorGuardado.fallo(error.localizedDescription)
+        }
+    }
+
+    /// Guarda un video que ya esta en disco.
+    static func guardarVideo(_ url: URL) async throws {
+        try await pedirPermiso()
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let peticion = PHAssetCreationRequest.forAsset()
+                peticion.addResource(with: .video, fileURL: url, options: nil)
+            }
+        } catch {
+            throw ErrorGuardado.fallo(error.localizedDescription)
+        }
+    }
+
+    private static func pedirPermiso() async throws {
         let estado = PHPhotoLibrary.authorizationStatus(for: .addOnly)
 
         switch estado {
         case .authorized, .limited:
-            break
+            return
         case .denied, .restricted:
             throw ErrorGuardado.sinPermiso
         case .notDetermined:
@@ -33,14 +59,6 @@ enum PhotoLibrarySaver {
             }
         @unknown default:
             throw ErrorGuardado.sinPermiso
-        }
-
-        do {
-            try await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAsset(from: imagen)
-            }
-        } catch {
-            throw ErrorGuardado.fallo(error.localizedDescription)
         }
     }
 }
