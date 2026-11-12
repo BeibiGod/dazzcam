@@ -11,7 +11,7 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     @Published private(set) var cuadrosPorSegundo = 0
 
     /// Lo cambia la vista cuando el usuario elige otro filtro.
-    var preset: FilterPreset = .calido
+    var preset: FilterPreset = .dazzClassic
 
     private let salida = AVCaptureVideoDataOutput()
     private let renderer = VideoFrameRenderer()

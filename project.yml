@@ -41,7 +41,7 @@ targets:
     info:
       path: DazzCam/Info.plist
       properties:
-        CFBundleDisplayName: DazzCam
+        CFBundleDisplayName: Beibi Cam
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
