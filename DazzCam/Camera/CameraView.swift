@@ -10,6 +10,7 @@ struct CameraView: View {
     @StateObject private var vivo = LiveFilterPreview()
     @StateObject private var miniaturas = FilterThumbnails()
     @StateObject private var video = MovieRecorder()
+    @StateObject private var nivel = Nivel()
 
     @State private var preparado = false
     @State private var mostrarCaptura = false
@@ -32,9 +33,10 @@ struct CameraView: View {
     @State private var exposicion: Double = 0
     @State private var mostrarExposicion = false
     @State private var cuenta: Int?
+    @State private var mostrarCuadricula = true
 
     private var versionTexto: String {
-        "v1.1 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.2 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     var body: some View {
@@ -42,7 +44,7 @@ struct CameraView: View {
             ZStack {
                 Color.black
 
-                visor
+                visor(geo)
 
                 if let cuenta = cuenta {
                     Text("\(cuenta)")
@@ -146,16 +148,18 @@ struct CameraView: View {
                 vivo.preset = preset
             }
             await camara.arrancar()
+            zoomBase = camara.zoom
+            if mostrarCuadricula {
+                nivel.empezar()
+            }
         }
         .onDisappear {
+            nivel.parar()
             camara.detener()
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
             aplicarFiltroAUltima()
-        }
-        .onChange(of: camara.zoom) { _, nuevo in
-            zoomBase = nuevo
         }
         .onChange(of: video.grabando) { _, grabando in
             if grabando {
@@ -239,14 +243,31 @@ struct CameraView: View {
 
     // MARK: - Visor
 
-    private var visor: some View {
-        Group {
-            if proporcion == .completa {
-                visorBase
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                visorBase
-                    .aspectRatio(9.0 / 16.0, contentMode: .fit)
+    /// Alto de las barras negras cuando esta en 16:9.
+    private func alturaBarra(_ geo: GeometryProxy) -> CGFloat {
+        guard let relacion = proporcion.relacion else { return 0 }
+        let alto = geo.size.width / relacion
+        return max(0, (geo.size.height - alto) / 2)
+    }
+
+    private func visor(_ geo: GeometryProxy) -> some View {
+        let barra = alturaBarra(geo)
+
+        return ZStack {
+            visorBase
+
+            if barra > 0 {
+                VStack(spacing: 0) {
+                    Color.black.frame(height: barra)
+                    Spacer(minLength: 0)
+                    Color.black.frame(height: barra)
+                }
+                .allowsHitTesting(false)
+            }
+
+            if mostrarCuadricula {
+                GridNivel(nivel: nivel.roll)
+                    .padding(.vertical, barra)
             }
         }
         .contentShape(Rectangle())
@@ -372,6 +393,19 @@ struct CameraView: View {
             }
 
             herramienta(
+                icono: "square.grid.3x3",
+                texto: nil,
+                activo: mostrarCuadricula
+            ) {
+                mostrarCuadricula.toggle()
+                if mostrarCuadricula {
+                    nivel.empezar()
+                } else {
+                    nivel.parar()
+                }
+            }
+
+            herramienta(
                 icono: "sun.max.fill",
                 texto: String(format: "%+.1f", exposicion),
                 activo: abs(exposicion) > 0.05
@@ -430,25 +464,43 @@ struct CameraView: View {
 
     // MARK: - Lentes y modo
 
+    /// Lente mas cercana al zoom actual.
+    private var lenteResaltada: Lente? {
+        camara.lentes.min {
+            abs(log($0.factor) - log(camara.zoom)) < abs(log($1.factor) - log(camara.zoom))
+        }
+    }
+
+    /// true solo si el zoom esta pegado a una distancia tipica (0.5x, 1x, 3x).
+    private var enDistanciaTipica: Bool {
+        guard let cercana = lenteResaltada else { return true }
+        return abs(camara.zoom - cercana.factor) / cercana.factor < 0.08
+    }
+
+    private func lenteActiva(_ lente: Lente) -> Bool {
+        enDistanciaTipica && lenteResaltada == lente
+    }
+
     private var barraModos: some View {
         HStack(spacing: 8) {
             ForEach(camara.lentes) { lente in
                 Button {
-                    camara.cambiarLente(lente)
+                    camara.irA(lente)
+                    zoomBase = camara.zoom
                 } label: {
                     Text(lente.etiqueta)
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(camara.lente == lente ? Color.black : Color.white)
+                        .foregroundStyle(lenteActiva(lente) ? Color.black : Color.white)
                         .frame(width: 40, height: 40)
                         .background(
-                            camara.lente == lente
+                            lenteActiva(lente)
                                 ? Color.yellow
                                 : Color.black.opacity(0.5),
                             in: Circle()
                         )
                         .overlay(
                             Circle().strokeBorder(
-                                Color.white.opacity(camara.lente == lente ? 0 : 0.25),
+                                Color.white.opacity(lenteActiva(lente) ? 0 : 0.25),
                                 lineWidth: 1
                             )
                         )
@@ -456,7 +508,7 @@ struct CameraView: View {
                 .buttonStyle(.plain)
             }
 
-            if camara.zoom > 1.05 {
+            if !enDistanciaTipica {
                 Text(String(format: "%.1fx", camara.zoom))
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(.yellow)
