@@ -58,6 +58,7 @@ final class CameraSession: NSObject, ObservableObject {
     @Published private(set) var lentes: [Lente] = []
     @Published private(set) var zoom: CGFloat = 1
     @Published private(set) var tieneFlash = false
+    @Published private(set) var esFrontal = false
 
     let session = AVCaptureSession()
 
@@ -104,6 +105,90 @@ final class CameraSession: NSObject, ObservableObject {
         cola.async { [session] in
             if session.isRunning {
                 session.stopRunning()
+            }
+        }
+    }
+
+    // MARK: - Voltear
+
+    /// Cambia entre camara trasera y frontal (doble toque en la pantalla).
+    func voltear() async {
+        await cambiar(frontal: !esFrontal)
+    }
+
+    private func cambiar(frontal: Bool) async {
+        guard configurada else { return }
+
+        await withCheckedContinuation { (continuacion: CheckedContinuation<Void, Never>) in
+            cola.async {
+                let sesion = self.session
+                let anterior = self.entrada
+
+                sesion.beginConfiguration()
+
+                if let vieja = anterior {
+                    sesion.removeInput(vieja)
+                    self.entrada = nil
+                }
+
+                let posicion: AVCaptureDevice.Position = frontal ? .front : .back
+                let tipos: [AVCaptureDevice.DeviceType] = frontal
+                    ? [.builtInWideAngleCamera]
+                    : [.builtInTripleCamera, .builtInDualWideCamera, .builtInWideAngleCamera]
+
+                var nuevo: AVCaptureDevice?
+                for tipo in tipos {
+                    if let encontrado = AVCaptureDevice.default(tipo, for: .video, position: posicion) {
+                        nuevo = encontrado
+                        break
+                    }
+                }
+
+                if let elegido = nuevo,
+                   let entrada = try? AVCaptureDeviceInput(device: elegido),
+                   sesion.canAddInput(entrada) {
+
+                    sesion.addInput(entrada)
+                    self.entrada = entrada
+                    self.dispositivo = elegido
+
+                    let esVirtual = elegido.deviceType == .builtInTripleCamera
+                        || elegido.deviceType == .builtInDualWideCamera
+                    self.baseZoom = esVirtual ? 0.5 : 1
+
+                    self.ajustarInicial(elegido)
+                    self.subirCuadros(elegido)
+
+                    sesion.commitConfiguration()
+
+                    var lista: [Lente] = []
+                    if esVirtual {
+                        lista = [.ultra, .ancha]
+                        if AVCaptureDevice.default(.builtInTelephotoCamera, for: .video, position: .back) != nil {
+                            lista.append(.tele)
+                        }
+                    } else {
+                        lista = [.ancha]
+                    }
+
+                    let base = esVirtual ? CGFloat(0.5) : CGFloat(1)
+
+                    DispatchQueue.main.async {
+                        self.lentes = lista
+                        self.zoom = base
+                        self.esFrontal = frontal
+                        self.tieneFlash = elegido.hasFlash
+                    }
+                } else {
+                    // no se pudo cambiar: dejamos la camara que estaba
+                    if let anterior = anterior, sesion.canAddInput(anterior) {
+                        sesion.addInput(anterior)
+                        self.entrada = anterior
+                    }
+                    sesion.commitConfiguration()
+                }
+
+                continuacion.resume()
             }
         }
     }

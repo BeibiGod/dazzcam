@@ -53,7 +53,7 @@ struct GridNivel: View {
                         .fill(color)
                         .frame(width: 7, height: 7)
                 }
-                .rotationEffect(.radians(-angulo))
+                .rotationEffect(.radians(angulo))
                 .position(centro)
                 .animation(.linear(duration: 0.06), value: angulo)
             }

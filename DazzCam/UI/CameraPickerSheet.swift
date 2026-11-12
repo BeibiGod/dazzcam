@@ -53,10 +53,27 @@ struct CameraPickerSheet: View {
                                                         lineWidth: seleccionado == preset ? 2 : 1
                                                     )
                                             )
+                                            .overlay(alignment: .bottomTrailing) {
+                                                MiniCamara(familia: preset.familia)
+                                                    .frame(width: 38, height: 27)
+                                                    .padding(3)
+                                                    .background(
+                                                        Color.black.opacity(0.65),
+                                                        in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                                    )
+                                                    .padding(5)
+                                            }
 
                                             Text(preset.nombre)
                                                 .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(.white.opacity(0.85))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.7)
+
+                                            Text(preset.marca)
+                                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                                .tracking(1.2)
+                                                .foregroundStyle(.white.opacity(0.35))
                                                 .lineLimit(1)
                                         }
                                     }

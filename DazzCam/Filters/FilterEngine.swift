@@ -167,6 +167,65 @@ enum FilterEngine {
         case .chatarraCCD:
             a.temperatura = 6300; a.saturacion = 1.3; a.contraste = 1.2
             a.grano = 0.18; a.vineta = 0.3
+
+        // ---- agregadas en la v1.4 ----
+        case .contaxT2:
+            a.temperatura = 7000; a.saturacion = 1.06; a.contraste = 1.08
+            a.grano = 0.06; a.vineta = 0.3
+
+        case .goldenHour:
+            a.temperatura = 8300; a.saturacion = 1.15; a.contraste = 1.02
+            a.desvanecido = 0.02; a.grano = 0.05; a.vineta = 0.22
+
+        case .ultramax:
+            a.temperatura = 7200; a.saturacion = 1.15; a.contraste = 1.06
+            a.grano = 0.09; a.vineta = 0.3
+
+        case .fujiC200:
+            a.temperatura = 6900; a.tinte = -4; a.saturacion = 1.08
+            a.contraste = 1.0; a.desvanecido = 0.03; a.grano = 0.08; a.vineta = 0.25
+
+        case .provia:
+            a.temperatura = 6600; a.tinte = -3; a.saturacion = 1.12
+            a.contraste = 1.1; a.grano = 0.03; a.vineta = 0.18
+
+        case .velvia:
+            a.temperatura = 6500; a.tinte = -6; a.saturacion = 1.45
+            a.contraste = 1.18; a.grano = 0.03; a.vineta = 0.25
+
+        case .triX:
+            a.blancoYNegro = true; a.contraste = 1.28; a.grano = 0.16; a.vineta = 0.35
+
+        case .tmax:
+            a.blancoYNegro = true; a.contraste = 1.35; a.grano = 0.22; a.vineta = 0.3
+
+        case .cinestill50d:
+            a.temperatura = 6200; a.tinte = 4; a.saturacion = 1.1
+            a.contraste = 1.08; a.grano = 0.05; a.vineta = 0.2
+
+        case .ektachrome:
+            a.temperatura = 6800; a.saturacion = 1.2; a.contraste = 1.12
+            a.grano = 0.04; a.vineta = 0.2
+
+        case .disposable:
+            a.temperatura = 7600; a.saturacion = 1.05; a.contraste = 0.95
+            a.desvanecido = 0.08; a.grano = 0.12; a.vineta = 0.55
+
+        case .sepiaViejo:
+            a.temperatura = 8200; a.saturacion = 0.5; a.contraste = 1.1
+            a.desvanecido = 0.12; a.grano = 0.18; a.vineta = 0.7
+
+        case .polaroidGo:
+            a.temperatura = 7700; a.saturacion = 0.88; a.contraste = 0.92
+            a.desvanecido = 0.06; a.vineta = 0.45; a.grano = 0.05
+
+        case .instaxMono:
+            a.blancoYNegro = true; a.contraste = 0.95; a.desvanecido = 0.07
+            a.vineta = 0.25; a.grano = 0.06
+
+        case .y2kDigi:
+            a.temperatura = 6400; a.tinte = 3; a.saturacion = 1.25
+            a.contraste = 1.05; a.grano = 0.12; a.vineta = 0.2
         }
 
         return a

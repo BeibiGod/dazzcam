@@ -34,9 +34,10 @@ struct CameraView: View {
     @State private var mostrarExposicion = false
     @State private var cuenta: Int?
     @State private var mostrarCuadricula = true
+    @State private var sello: SelloFecha = .apagado
 
     private var versionTexto: String {
-        "v1.3 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.4 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -64,6 +65,21 @@ struct CameraView: View {
                         .padding(.top, insetArriba + 6)
 
                     Spacer(minLength: 0)
+
+                    if sello.encendido {
+                        HStack {
+                            Spacer()
+
+                            TimelineView(.periodic(from: .now, by: 1)) { contexto in
+                                Text(SelloFecha.texto(sello, fecha: contexto.date))
+                                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.12))
+                                    .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 6)
+                    }
 
                     barraHerramientas
                         .padding(.horizontal, 16)
@@ -178,6 +194,7 @@ struct CameraView: View {
             if let relacion = proporcion.relacion {
                 procesada = FilterEngine.recortar(procesada, relacion: relacion)
             }
+            procesada = SelloFecha.estampar(procesada, modo: sello)
 
             fotoFiltrada = procesada
             mostrarCaptura = true
@@ -282,10 +299,16 @@ struct CameraView: View {
 
     private var visorBase: some View {
         ZStack {
-            CameraPreviewView(session: camara.session) { puntoCamara, puntoPantalla in
-                camara.enfocar(en: puntoCamara)
-                mostrarAnillo(en: puntoPantalla)
-            }
+            CameraPreviewView(
+                session: camara.session,
+                alTocar: { puntoCamara, puntoPantalla in
+                    camara.enfocar(en: puntoCamara)
+                    mostrarAnillo(en: puntoPantalla)
+                },
+                alTocarDoble: {
+                    voltearCamara()
+                }
+            )
 
             if modoVivo, let imagenViva = vivo.imagen {
                 Image(uiImage: imagenViva)
@@ -347,7 +370,7 @@ struct CameraView: View {
     // MARK: - Herramientas
 
     private var barraHerramientas: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             herramienta(
                 icono: flashEncendido ? "bolt.fill" : "bolt.slash.fill",
                 texto: nil,
@@ -399,6 +422,14 @@ struct CameraView: View {
                 activo: abs(exposicion) > 0.05
             ) {
                 mostrarExposicion.toggle()
+            }
+
+            herramienta(
+                icono: "calendar",
+                texto: sello.encendido ? sello.etiqueta : nil,
+                activo: sello.encendido
+            ) {
+                sello = sello.siguiente
             }
 
             herramientaIA
@@ -649,7 +680,25 @@ struct CameraView: View {
 
     private func aplicarFiltroAUltima() {
         guard let base = foto.ultimaFoto else { return }
-        fotoFiltrada = FilterEngine.aplicar(preset, a: base)
+
+        var procesada = FilterEngine.aplicar(preset, a: base)
+        if let relacion = proporcion.relacion {
+            procesada = FilterEngine.recortar(procesada, relacion: relacion)
+        }
+        fotoFiltrada = SelloFecha.estampar(procesada, modo: sello)
+    }
+
+    private func voltearCamara() {
+        guard !video.grabando, !foto.capturando else { return }
+
+        Task {
+            await camara.voltear()
+            zoomBase = camara.zoom
+
+            aviso = camara.esFrontal ? "Camara frontal" : "Camara trasera"
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            aviso = nil
+        }
     }
 }
 

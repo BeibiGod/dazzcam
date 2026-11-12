@@ -19,6 +19,14 @@ enum FilterCategoria: String, CaseIterable, Identifiable {
     }
 }
 
+/// Tipo de camara real que imita cada look (para el dibujito del selector).
+enum FamiliaCamara {
+    case compacta
+    case reflex
+    case instantanea
+    case digital
+}
+
 /// Las "camaritas": cada una es un look de pelicula completo.
 enum FilterPreset: String, CaseIterable, Identifiable {
     case original
@@ -55,6 +63,26 @@ enum FilterPreset: String, CaseIterable, Identifiable {
     case noir
     case vaporwave
     case chatarraCCD
+
+    // ---- agregadas en la v1.4 ----
+    case contaxT2
+    case goldenHour
+
+    case ultramax
+    case fujiC200
+    case provia
+    case velvia
+    case triX
+    case tmax
+    case cinestill50d
+    case ektachrome
+    case disposable
+    case sepiaViejo
+
+    case polaroidGo
+    case instaxMono
+
+    case y2kDigi
 
     var id: String { rawValue }
 
@@ -94,20 +122,82 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .noir: return "Noir"
         case .vaporwave: return "Vaporwave"
         case .chatarraCCD: return "Chatarra CCD"
+
+        case .contaxT2: return "Contax T2"
+        case .goldenHour: return "Golden Hour"
+        case .ultramax: return "Ultramax 400"
+        case .fujiC200: return "Fuji C200"
+        case .provia: return "Provia 100F"
+        case .velvia: return "Velvia 50"
+        case .triX: return "Tri-X 400"
+        case .tmax: return "T-Max 3200"
+        case .cinestill50d: return "CineStill 50D"
+        case .ektachrome: return "Ektachrome"
+        case .disposable: return "Desechable"
+        case .sepiaViejo: return "Sepia 1920"
+        case .polaroidGo: return "Polaroid Go"
+        case .instaxMono: return "Instax Mono"
+        case .y2kDigi: return "Y2K Digi"
+        }
+    }
+
+    /// Marca real de la pelicula o camara.
+    var marca: String {
+        switch self {
+        case .portra, .kodachrome, .kodakGold, .ektar100, .ultramax,
+             .triX, .tmax, .ektachrome, .disposable, .goldenHour:
+            return "KODAK"
+        case .superia, .fujiPro400, .provia, .velvia, .fujiC200,
+             .instaxMini, .instaxWide, .instaxMono:
+            return "FUJIFILM"
+        case .polaroid600, .sx70, .polaroidFrio, .polaroidNoir,
+             .polaroidGo, .instColor:
+            return "POLAROID"
+        case .hp5, .delta3200:
+            return "ILFORD"
+        case .agfaVista:
+            return "AGFA"
+        case .cinestill, .cinestill50d:
+            return "CINESTILL"
+        case .contaxT2:
+            return "CONTAX"
+        case .y2kDigi, .chatarraCCD:
+            return "SONY"
+        default:
+            return "BEIBI"
+        }
+    }
+
+    /// Como se ve la camarita en el selector.
+    var familia: FamiliaCamara {
+        switch self {
+        case .polaroid600, .sx70, .instaxMini, .instaxWide,
+             .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono:
+            return .instantanea
+        case .hp5, .delta3200, .triX, .tmax:
+            return .reflex
+        case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi:
+            return .digital
+        default:
+            return .compacta
         }
     }
 
     var categoria: FilterCategoria {
         switch self {
-        case .original, .portra, .superia, .kodachrome, .instColor, .dazzClassic:
+        case .original, .portra, .superia, .kodachrome, .instColor, .dazzClassic,
+             .contaxT2, .goldenHour:
             return .clasica
         case .cinestill, .hp5, .lomo, .crossProcess, .bleachBypass,
              .faded90s, .copper, .kodakGold, .ektar100, .fujiPro400,
-             .delta3200, .agfaVista:
+             .delta3200, .agfaVista, .ultramax, .fujiC200, .provia, .velvia,
+             .triX, .tmax, .cinestill50d, .ektachrome, .disposable, .sepiaViejo:
             return .vintage
-        case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio, .polaroidNoir:
+        case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio,
+             .polaroidNoir, .polaroidGo, .instaxMono:
             return .instantanea
-        case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave, .chatarraCCD:
+        case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave,
+             .chatarraCCD, .y2kDigi:
             return .underground
         }
     }

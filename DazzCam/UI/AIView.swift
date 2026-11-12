@@ -108,7 +108,7 @@ struct AIView: View {
                         Button {
                             alVerTodas()
                         } label: {
-                            Text("VER LAS 30 CAMARAS")
+                            Text("VER LAS \(FilterPreset.cantidadCamaras) CAMARAS")
                                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.75))
                                 .frame(maxWidth: .infinity)
