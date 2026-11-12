@@ -42,15 +42,17 @@ targets:
       path: DazzCam/Info.plist
       properties:
         CFBundleDisplayName: Beibi Cam
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIRequiredDeviceCapabilities:
           - arm64
-        NSCameraUsageDescription: DazzCam usa la camara para tomar fotos y grabar video.
-        NSMicrophoneUsageDescription: DazzCam usa el microfono para grabar el sonido del video.
-        NSPhotoLibraryAddUsageDescription: DazzCam guarda tus fotos y videos en tu fototeca.
-        NSPhotoLibraryUsageDescription: DazzCam abre tu fototeca para mostrar y editar tus fotos.
+        NSCameraUsageDescription: Beibi Cam usa la camara para tomar fotos y grabar video.
+        NSMicrophoneUsageDescription: Beibi Cam usa el microfono para grabar el sonido del video.
+        NSPhotoLibraryAddUsageDescription: Beibi Cam guarda tus fotos y videos en tu fototeca.
+        NSPhotoLibraryUsageDescription: Beibi Cam abre tu fototeca para mostrar y editar tus fotos.
 
 schemes:
   DazzCam:
