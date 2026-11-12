@@ -35,9 +35,10 @@ struct CameraView: View {
     @State private var cuenta: Int?
     @State private var mostrarCuadricula = true
     @State private var sello: SelloFecha = .apagado
+    @State private var destello: Double = 0
 
     private var versionTexto: String {
-        "v1.4 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.5 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -147,6 +148,13 @@ struct CameraView: View {
                         .background(Color.black)
                         .onTapGesture { mostrarCaptura = false }
                         .transition(.opacity)
+                }
+
+                if destello > 0 {
+                    Color.white
+                        .opacity(destello)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .allowsHitTesting(false)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -373,10 +381,10 @@ struct CameraView: View {
         HStack(spacing: 6) {
             herramienta(
                 icono: flashEncendido ? "bolt.fill" : "bolt.slash.fill",
-                texto: nil,
+                texto: (camara.esFrontal && flashEncendido) ? "PANT" : nil,
                 activo: flashEncendido
             ) {
-                guard camara.tieneFlash else {
+                guard camara.tieneFlash || camara.esFrontal else {
                     aviso = "Esta lente no tiene flash"
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -613,11 +621,12 @@ struct CameraView: View {
     }
 
     private func dispararConTemporizador() {
+        let flashPantalla = flashEncendido && camara.esFrontal
         foto.flash = (flashEncendido && camara.tieneFlash) ? .on : .off
 
         let segundos = temporizador.segundos
         guard segundos > 0 else {
-            foto.disparar()
+            dispararAhora(conDestello: flashPantalla)
             return
         }
 
@@ -629,7 +638,36 @@ struct CameraView: View {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             cuenta = nil
+            dispararAhora(conDestello: flashPantalla)
+        }
+    }
+
+    /// En selfie el flash es la pantalla en blanco, como en Instagram:
+    /// primero ilumina la cara y despues dispara.
+    private func dispararAhora(conDestello: Bool) {
+        guard conDestello else {
             foto.disparar()
+            return
+        }
+
+        Task { @MainActor in
+            let pantalla = ventana?.windowScene?.screen
+            let brilloAnterior = pantalla?.brightness ?? 0.5
+            pantalla?.brightness = 1.0
+
+            withAnimation(.easeOut(duration: 0.06)) {
+                destello = 1
+            }
+            try? await Task.sleep(nanoseconds: 420_000_000)
+
+            foto.disparar()
+
+            withAnimation(.easeIn(duration: 0.3)) {
+                destello = 0
+            }
+            try? await Task.sleep(nanoseconds: 320_000_000)
+
+            pantalla?.brightness = brilloAnterior
         }
     }
 
