@@ -87,6 +87,12 @@ struct CameraView: View {
         }
         .onChange(of: foto.capturas) { _, _ in
             guard let base = foto.ultimaFoto else { return }
+
+            // Si el video en vivo no dio cuadros, las muestras salen de la foto.
+            if !miniaturas.lista {
+                miniaturas.generar(desde: base)
+            }
+
             let procesada = FilterEngine.aplicar(preset, a: base)
             fotoFiltrada = procesada
             mostrarCaptura = true

@@ -261,7 +261,7 @@ enum FilterEngine {
         gris.rVector = CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0)
         gris.gVector = CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0)
         gris.bVector = CIVector(x: 0.33, y: 0.33, z: 0.33, w: 0)
-        gris.aVector = CIVector(x: 0, y: 0, z: 0, w: 0)
+        gris.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
         guard let grisSalida = gris.outputImage else { return nil }
 
         let transparencia = CIFilter.colorMatrix()

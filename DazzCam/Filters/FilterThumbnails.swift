@@ -35,15 +35,18 @@ final class FilterThumbnails: ObservableObject {
         let normal = FilterEngine.normalizar(imagen)
         let ancho = normal.size.width
         let alto = normal.size.height
-        guard ancho > 0, alto > 0 else { return imagen }
+        guard ancho > 0, alto > 0, let cg = normal.cgImage else { return imagen }
 
-        let menor = min(ancho, alto)
+        let ladoPx = min(CGFloat(cg.width), CGFloat(cg.height))
+        guard ladoPx > 0 else { return imagen }
+
         let recorte = CGRect(
-            x: (ancho - menor) / 2,
-            y: (alto - menor) / 2,
-            width: menor,
-            height: menor
+            x: (CGFloat(cg.width) - ladoPx) / 2,
+            y: (CGFloat(cg.height) - ladoPx) / 2,
+            width: ladoPx,
+            height: ladoPx
         )
+        guard let recortada = cg.cropping(to: recorte) else { return imagen }
 
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = 1
@@ -54,10 +57,8 @@ final class FilterThumbnails: ObservableObject {
         )
 
         return renderer.image { _ in
-            normal.draw(
-                in: CGRect(x: 0, y: 0, width: lado, height: lado),
-                from: recorte
-            )
+            UIImage(cgImage: recortada, scale: 1, orientation: .up)
+                .draw(in: CGRect(x: 0, y: 0, width: lado, height: lado))
         }
     }
 }
