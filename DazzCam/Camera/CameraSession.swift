@@ -189,6 +189,25 @@ final class CameraSession: NSObject, ObservableObject {
         }
     }
 
+    /// Le pide al iPhone la tasa de cuadros mas alta que aguante su formato.
+    /// Si el formato no llega a 60, se queda como estaba.
+    private nonisolated func subirCuadros(_ dispositivo: AVCaptureDevice) {
+        let tope = dispositivo.activeFormat.videoSupportedFrameRateRanges
+            .map { $0.maxFrameRate }
+            .max() ?? 30
+
+        guard tope >= 60 else { return }
+
+        do {
+            try dispositivo.lockForConfiguration()
+            let duracion = CMTime(value: 1, timescale: 60)
+            dispositivo.activeVideoMinFrameDuration = duracion
+            dispositivo.activeVideoMaxFrameDuration = duracion
+            dispositivo.unlockForConfiguration()
+        } catch {
+        }
+    }
+
     // MARK: - Permisos
 
     private func pedirPermiso() async -> Bool {
@@ -240,6 +259,7 @@ final class CameraSession: NSObject, ObservableObject {
                     self.entrada = entrada
                     self.dispositivo = dispositivo
                     self.ajustarInicial(dispositivo)
+                    self.subirCuadros(dispositivo)
 
                     // En la camara virtual triple, 1.0 de zoom equivale al
                     // ultra gran angular, o sea 0.5x en pantalla.

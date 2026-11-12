@@ -36,7 +36,12 @@ struct CameraView: View {
     @State private var mostrarCuadricula = true
 
     private var versionTexto: String {
-        "v1.2 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.3 · \(FilterPreset.cantidadCamaras) cam"
+    }
+
+    private var textoVivo: String {
+        guard modoVivo else { return "VIVO" }
+        return vivo.cuadrosPorSegundo > 0 ? "VIVO \(vivo.cuadrosPorSegundo)" : "VIVO"
     }
 
     var body: some View {
@@ -59,13 +64,6 @@ struct CameraView: View {
                         .padding(.top, insetArriba + 6)
 
                     Spacer(minLength: 0)
-
-                    HStack {
-                        Spacer()
-                        botonIA
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
 
                     barraHerramientas
                         .padding(.horizontal, 16)
@@ -266,7 +264,7 @@ struct CameraView: View {
             }
 
             if mostrarCuadricula {
-                GridNivel(nivel: nivel.roll)
+                GridNivel(angulo: nivel.angulo, estable: nivel.estable)
                     .padding(.vertical, barra)
             }
         }
@@ -311,44 +309,34 @@ struct CameraView: View {
     private var cabecera: some View {
         HStack(spacing: 8) {
             Text(versionTexto)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.8))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.55))
                 .lineLimit(1)
                 .fixedSize()
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.black.opacity(0.55), in: Capsule())
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(.black.opacity(0.45), in: Capsule())
 
             Spacer(minLength: 4)
-
-            if modoVivo {
-                Text("\(vivo.cuadrosPorSegundo) FPS")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.black)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(
-                        vivo.cuadrosPorSegundo >= 20 ? Color.green : Color.yellow,
-                        in: Capsule()
-                    )
-            }
 
             Button {
                 modoVivo.toggle()
             } label: {
-                Text(modoVivo ? "QUITAR VIVO" : "EN VIVO")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(modoVivo ? Color.black : Color.white)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        modoVivo ? Color.white : Color.white.opacity(0.25),
-                        in: Capsule()
-                    )
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(modoVivo ? Color.green : Color.white.opacity(0.35))
+                        .frame(width: 6, height: 6)
+
+                    Text(textoVivo)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(modoVivo ? Color.black : Color.white.opacity(0.8))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    modoVivo ? Color.white : Color.black.opacity(0.45),
+                    in: Capsule()
+                )
             }
             .buttonStyle(.plain)
             .fixedSize()
@@ -407,11 +395,13 @@ struct CameraView: View {
 
             herramienta(
                 icono: "sun.max.fill",
-                texto: String(format: "%+.1f", exposicion),
+                texto: abs(exposicion) > 0.05 ? String(format: "%+.1f", exposicion) : nil,
                 activo: abs(exposicion) > 0.05
             ) {
                 mostrarExposicion.toggle()
             }
+
+            herramientaIA
 
             Spacer()
         }
@@ -545,26 +535,27 @@ struct CameraView: View {
 
     // MARK: - Boton IA
 
-    private var botonIA: some View {
+    private var herramientaIA: some View {
         Button {
             analizarEscena()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if analizando {
                     ProgressView()
-                        .scaleEffect(0.7)
+                        .scaleEffect(0.55)
                         .tint(.black)
+                        .frame(width: 13, height: 13)
                 } else {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                 }
 
-                Text(analizando ? "ANALIZANDO" : "IA")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                Text("IA")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
             }
             .foregroundStyle(.black)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
         }
         .buttonStyle(.plain)

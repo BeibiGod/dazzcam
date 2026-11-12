@@ -12,7 +12,7 @@ final class VideoFrameRenderer {
     private let contexto = CIContext(options: [.cacheIntermediates: false])
 
     /// Lado mayor al que se reduce el frame antes de filtrar.
-    private let ladoMayor: CGFloat = 1280
+    private let ladoMayor: CGFloat = 1080
 
     func renderizar(_ buffer: CVPixelBuffer, preset: FilterPreset) -> UIImage? {
         let entrada = CIImage(cvPixelBuffer: buffer)

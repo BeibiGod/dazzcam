@@ -18,7 +18,7 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     private let cola = DispatchQueue(label: "com.diego.dazzcam.vivo", qos: .userInitiated)
 
     private var ultimoRender: CFAbsoluteTime = 0
-    private let intervaloMinimo: CFAbsoluteTime = 1.0 / 30.0
+    private let intervaloMinimo: CFAbsoluteTime = 1.0 / 60.0
     private var contadorCuadros = 0
     private var marcaContador: CFAbsoluteTime = 0
 
@@ -67,18 +67,17 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         guard let filtrada = renderer.renderizar(buffer, preset: preset) else { return }
 
         contadorCuadros += 1
-        var fps = cuadrosPorSegundo
         if ahora - marcaContador >= 1.0 {
-            fps = contadorCuadros
+            let fps = contadorCuadros
             contadorCuadros = 0
             marcaContador = ahora
+            DispatchQueue.main.async {
+                self.cuadrosPorSegundo = fps
+            }
         }
 
         DispatchQueue.main.async {
             self.imagen = filtrada
-            if fps != self.cuadrosPorSegundo {
-                self.cuadrosPorSegundo = fps
-            }
         }
     }
 }
