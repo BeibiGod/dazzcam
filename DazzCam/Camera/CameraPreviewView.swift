@@ -14,14 +14,24 @@ final class PreviewLayerView: UIView {
 }
 
 /// Puente entre SwiftUI y la preview de AVFoundation.
+/// Tambien traduce el toque en pantalla a un punto de la camara para enfocar.
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
+    var alTocar: (CGPoint, CGPoint) -> Void = { _, _ in }
 
     func makeUIView(context: Context) -> PreviewLayerView {
         let vista = PreviewLayerView()
         vista.backgroundColor = .black
         vista.capa?.session = session
         vista.capa?.videoGravity = .resizeAspectFill
+
+        let toque = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.toco(_:))
+        )
+        vista.addGestureRecognizer(toque)
+        context.coordinator.vista = vista
+
         return vista
     }
 
@@ -29,6 +39,27 @@ struct CameraPreviewView: UIViewRepresentable {
         if uiView.capa?.session !== session {
             uiView.capa?.session = session
             uiView.capa?.videoGravity = .resizeAspectFill
+        }
+        context.coordinator.alTocar = alTocar
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(alTocar: alTocar)
+    }
+
+    final class Coordinator: NSObject {
+        var alTocar: (CGPoint, CGPoint) -> Void
+        weak var vista: PreviewLayerView?
+
+        init(alTocar: @escaping (CGPoint, CGPoint) -> Void) {
+            self.alTocar = alTocar
+        }
+
+        @objc func toco(_ gesto: UITapGestureRecognizer) {
+            guard let vista = vista, let capa = vista.capa else { return }
+            let enVista = gesto.location(in: vista)
+            let enCamara = capa.captureDevicePointConverted(fromLayerPoint: enVista)
+            alTocar(enCamara, enVista)
         }
     }
 }

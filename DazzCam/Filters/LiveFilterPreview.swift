@@ -19,7 +19,6 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
 
     private var ultimoRender: CFAbsoluteTime = 0
     private let intervaloMinimo: CFAbsoluteTime = 1.0 / 30.0
-    private var orientacionAjustada = false
     private var contadorCuadros = 0
     private var marcaContador: CFAbsoluteTime = 0
 
@@ -57,11 +56,8 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     ) {
         let ahora = CFAbsoluteTimeGetCurrent()
 
-        if !orientacionAjustada {
-            orientacionAjustada = true
-            if connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
+        if connection.isVideoRotationAngleSupported(90), connection.videoRotationAngle != 90 {
+            connection.videoRotationAngle = 90
         }
 
         guard ahora - ultimoRender >= intervaloMinimo else { return }

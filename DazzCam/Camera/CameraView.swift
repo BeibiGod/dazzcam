@@ -1,8 +1,8 @@
 import SwiftUI
 import Combine
 
-/// Pantalla de camara estilo DazzCam: visor a pantalla completa,
-/// tira de camaritas con muestra, disparo y selector completo.
+/// Pantalla de camara: visor a pantalla completa, lentes del telefono,
+/// tira de camaritas con muestra, enfoque al tocar y analisis con IA.
 struct CameraView: View {
     @StateObject private var camara = CameraSession()
     @StateObject private var foto = PhotoCapture()
@@ -12,66 +12,94 @@ struct CameraView: View {
     @State private var preparado = false
     @State private var mostrarCaptura = false
     @State private var mostrarTodas = false
+    @State private var mostrarIA = false
     @State private var aviso: String?
     @State private var preset: FilterPreset = .dazzClassic
     @State private var fotoFiltrada: UIImage?
     @State private var modoVivo = true
+    @State private var anillo: CGPoint?
+    @State private var analisis: Analisis?
+    @State private var analizando = false
 
     private var versionTexto: String {
-        "v0.8 · \(FilterPreset.cantidadCamaras) cam"
+        "v0.9 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        GeometryReader { geo in
+            ZStack {
+                Color.black
 
-            visor
+                visor
 
-            VStack(spacing: 0) {
-                cabecera
-                Spacer()
-
-                if let texto = aviso {
-                    Text(texto)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(.black.opacity(0.65), in: Capsule())
-                        .padding(.bottom, 10)
+                if let punto = anillo {
+                    FocusRing()
+                        .position(x: punto.x, y: punto.y)
+                        .allowsHitTesting(false)
                 }
 
-                if let error = foto.error {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.red.opacity(0.75), in: Capsule())
-                        .padding(.bottom, 10)
+                VStack(spacing: 0) {
+                    cabecera
+                        .padding(.top, max(geo.safeAreaInsets.top, 12))
+
+                    Spacer(minLength: 0)
+
+                    HStack {
+                        Spacer()
+                        botonIA
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 10)
+
+                    if let texto = aviso {
+                        Text(texto)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(.black.opacity(0.65), in: Capsule())
+                            .padding(.bottom, 8)
+                    }
+
+                    if let error = foto.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.75), in: Capsule())
+                            .padding(.bottom, 8)
+                    }
+
+                    barraLentes
+                        .padding(.bottom, 8)
+
+                    CameraBar(
+                        seleccionado: $preset,
+                        muestras: miniaturas.muestras,
+                        capturando: foto.capturando,
+                        alDisparar: { foto.disparar() },
+                        alAbrirGaleria: { mostrarCaptura = fotoFiltrada != nil },
+                        alAbrirTodas: { mostrarTodas = true }
+                    )
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8) + 6)
                 }
+                .frame(width: geo.size.width)
 
-                CameraBar(
-                    seleccionado: $preset,
-                    muestras: miniaturas.muestras,
-                    capturando: foto.capturando,
-                    alDisparar: { foto.disparar() },
-                    alAbrirGaleria: { mostrarCaptura = fotoFiltrada != nil },
-                    alAbrirTodas: { mostrarTodas = true }
-                )
-                .padding(.bottom, 22)
+                if mostrarCaptura, let imagen = fotoFiltrada {
+                    Image(uiImage: imagen)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .background(Color.black)
+                        .onTapGesture { mostrarCaptura = false }
+                        .transition(.opacity)
+                }
             }
-            .frame(maxWidth: .infinity)
-
-            if mostrarCaptura, let imagen = fotoFiltrada {
-                Image(uiImage: imagen)
-                    .resizable()
-                    .scaledToFit()
-                    .ignoresSafeArea()
-                    .onTapGesture { mostrarCaptura = false }
-                    .transition(.opacity)
-            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
         }
+        .ignoresSafeArea()
         .task {
             if !preparado {
                 preparado = true
@@ -91,7 +119,6 @@ struct CameraView: View {
         .onChange(of: foto.capturas) { _, _ in
             guard let base = foto.ultimaFoto else { return }
 
-            // Si el video en vivo no dio cuadros, las muestras salen de la foto.
             if !miniaturas.lista {
                 miniaturas.generar(desde: base)
             }
@@ -118,25 +145,37 @@ struct CameraView: View {
         .sheet(isPresented: $mostrarTodas) {
             CameraPickerSheet(seleccionado: $preset, muestras: miniaturas.muestras)
         }
+        .sheet(isPresented: $mostrarIA) {
+            if let analisis = analisis {
+                AIView(analisis: analisis) { sugerida in
+                    preset = sugerida
+                    mostrarIA = false
+                }
+            }
+        }
     }
 
-    // MARK: - Partes
+    // MARK: - Visor
 
     private var visor: some View {
-        Group {
+        ZStack {
+            CameraPreviewView(session: camara.session) { puntoCamara, puntoPantalla in
+                camara.enfocar(en: puntoCamara)
+                mostrarAnillo(en: puntoPantalla)
+            }
+
             if modoVivo, let imagenViva = vivo.imagen {
                 Image(uiImage: imagenViva)
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
-                    .ignoresSafeArea()
-            } else {
-                CameraPreviewView(session: camara.session)
-                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
         }
     }
+
+    // MARK: - Encabezado
 
     private var cabecera: some View {
         HStack(spacing: 8) {
@@ -168,7 +207,7 @@ struct CameraView: View {
             Button {
                 modoVivo.toggle()
             } label: {
-                Text("EN VIVO")
+                Text(modoVivo ? "QUITAR VIVO" : "EN VIVO")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(modoVivo ? Color.black : Color.white)
                     .lineLimit(1)
@@ -176,7 +215,7 @@ struct CameraView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(
-                        modoVivo ? Color.white : Color.white.opacity(0.22),
+                        modoVivo ? Color.white : Color.white.opacity(0.25),
                         in: Capsule()
                     )
             }
@@ -184,12 +223,129 @@ struct CameraView: View {
             .fixedSize()
         }
         .padding(.horizontal, 16)
-        .padding(.top, 8)
+    }
+
+    // MARK: - Lentes
+
+    private var barraLentes: some View {
+        HStack(spacing: 8) {
+            ForEach(camara.lentes) { lente in
+                Button {
+                    camara.cambiarLente(lente)
+                } label: {
+                    Text(lente.etiqueta)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(camara.lente == lente ? Color.black : Color.white)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            camara.lente == lente
+                                ? Color.yellow
+                                : Color.black.opacity(0.45),
+                            in: Circle()
+                        )
+                        .overlay(
+                            Circle().strokeBorder(
+                                Color.white.opacity(camara.lente == lente ? 0 : 0.25),
+                                lineWidth: 1
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Boton IA
+
+    private var botonIA: some View {
+        Button {
+            analizarEscena()
+        } label: {
+            HStack(spacing: 6) {
+                if analizando {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(.black)
+                } else {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                }
+
+                Text(analizando ? "ANALIZANDO" : "IA")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(analizando)
+        .fixedSize()
+    }
+
+    // MARK: - Acciones
+
+    private func analizarEscena() {
+        guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
+            aviso = "La camara todavia no tiene imagen"
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                aviso = nil
+            }
+            return
+        }
+
+        analizando = true
+
+        Task {
+            let resultado = await AestheticAnalyzer.analizar(imagen)
+            analizando = false
+
+            guard let resultado = resultado else {
+                aviso = "No pude analizar la escena"
+                return
+            }
+
+            analisis = resultado
+            mostrarIA = true
+        }
+    }
+
+    private func mostrarAnillo(en punto: CGPoint) {
+        withAnimation(.easeOut(duration: 0.12)) {
+            anillo = punto
+        }
+
+        Task {
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            withAnimation(.easeIn(duration: 0.25)) {
+                anillo = nil
+            }
+        }
     }
 
     private func aplicarFiltroAUltima() {
         guard let base = foto.ultimaFoto else { return }
         fotoFiltrada = FilterEngine.aplicar(preset, a: base)
+    }
+}
+
+/// Cuadro amarillo que marca donde enfocaste.
+private struct FocusRing: View {
+    @State private var escala: CGFloat = 1.5
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .strokeBorder(Color.yellow, lineWidth: 1.6)
+            .frame(width: 74, height: 74)
+            .scaleEffect(escala)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    escala = 1
+                }
+            }
     }
 }
 
