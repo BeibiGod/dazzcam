@@ -113,8 +113,8 @@ enum FilterEngine {
             a.desvanecido = 0.03; a.vineta = 0.3
 
         case .dazzClassic:
-            a.temperatura = 7000; a.saturacion = 1.05; a.contraste = 1.05
-            a.grano = 0.07; a.vineta = 0.35
+            a.temperatura = 7100; a.saturacion = 1.04; a.contraste = 0.99
+            a.desvanecido = 0.025; a.grano = 0.04; a.vineta = 0.2
 
         // ---- vintage ----
         case .cinestill:
@@ -355,24 +355,9 @@ enum FilterEngine {
             a.contraste = 1.1; a.desvanecido = 0.05; a.grano = 0.12; a.vineta = 0.35
         }
 
-        // Puntitos blancos y rayones de pelicula vieja.
-        switch preset {
-        case .dazzClassic, .disposable, .faded90s, .sepiaViejo, .chatarraCCD,
-             .vhs, .oldRoll8, .framedFade:
-            a.polvo = 0.75
-
-        case .sx70, .polaroid600, .polaroidGo, .polaroidFrio, .instaxWide,
-             .oldRoll35, .oldRollFlash, .oldRollInstant, .tezzaGrain,
-             .tezzaPolaroid:
-            a.polvo = 0.55
-
-        case .kodakGold, .ultramax, .agfaVista, .superia, .fujiC200, .portra,
-             .hp5, .triX, .delta3200, .tmax, .tezzaClean, .tezzaWarm:
-            a.polvo = 0.4
-
-        default:
-            a.polvo = 0
-        }
+        // Puntitos de pelicula: apagados por defecto. Se suben a mano en el
+        // editor si el usuario los quiere; asi ninguna camara los trae fake.
+        a.polvo = 0
 
         // Fugas de luz: la camara decide donde y cuanto (0 a 100%).
         switch preset {
@@ -546,9 +531,11 @@ enum FilterEngine {
 
     // MARK: - Polvo de pelicula
 
-    /// Puntitos blancos y rayones, como el polvo de un negativo viejo.
+    /// Puntitos de polvo y pelusas, como un negativo que estuvo guardado.
+    /// Son chicos (1-2 pixeles), suaves y con poca opacidad: si se ven como
+    /// puntos de pantalla, se ven falsos.
     private static let polvoTile: CIImage? = {
-        let lado = 512
+        let lado = 1024
         let espacio = CGColorSpaceCreateDeviceRGB()
 
         guard let contexto = CGContext(
@@ -565,11 +552,12 @@ enum FilterEngine {
 
         contexto.clear(CGRect(x: 0, y: 0, width: lado, height: lado))
 
-        for _ in 0..<260 {
-            let radio = CGFloat.random(in: 0.4...1.5)
+        // granitos de polvo
+        for _ in 0..<900 {
+            let radio = CGFloat.random(in: 0.3...0.9)
             let x = CGFloat.random(in: 0..<CGFloat(lado))
             let y = CGFloat.random(in: 0..<CGFloat(lado))
-            let alfa = CGFloat.random(in: 0.15...0.8)
+            let alfa = CGFloat.random(in: 0.04...0.20)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
                 contexto.setFillColor(color)
@@ -579,38 +567,58 @@ enum FilterEngine {
             }
         }
 
-        for _ in 0..<10 {
+        // pelusas cortas, no rayones largos
+        contexto.setLineWidth(0.6)
+        contexto.setLineCap(.round)
+
+        for _ in 0..<7 {
             let x = CGFloat.random(in: 0..<CGFloat(lado))
             let y = CGFloat.random(in: 0..<CGFloat(lado))
-            let alto = CGFloat.random(in: 8...34)
-            let alfa = CGFloat.random(in: 0.1...0.3)
+            let largo = CGFloat.random(in: 3...11)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let alfa = CGFloat.random(in: 0.06...0.16)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
-                contexto.setFillColor(color)
-                contexto.fill(CGRect(x: x, y: y, width: 0.7, height: alto))
+                contexto.setStrokeColor(color)
+                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.addLine(to: CGPoint(
+                    x: x + cos(angulo) * largo,
+                    y: y + sin(angulo) * largo
+                ))
+                contexto.strokePath()
             }
         }
 
         guard let cg = contexto.makeImage() else { return nil }
-        return CIImage(cgImage: cg)
+
+        var imagen = CIImage(cgImage: cg)
+
+        // un pelo de desenfoque para que no parezcan pixeles muertos
+        let suave = CIFilter.gaussianBlur()
+        suave.inputImage = imagen
+        suave.radius = 0.4
+        if let salida = suave.outputImage?.cropped(to: imagen.extent) {
+            imagen = salida
+        }
+
+        return imagen
     }()
 
     private static func polvo(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
         guard let azulejo = polvoTile else { return nil }
 
-        let escala = max(imagen.extent.width / 900.0, 0.3)
-
+        // A tamano real: cada granito mide 1-2 pixeles en la foto final.
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
-        repetir.transform = CGAffineTransform(scaleX: escala, y: escala)
+        repetir.transform = .identity
         guard let infinito = repetir.outputImage else { return nil }
 
         let control = CIFilter.colorMatrix()
         control.inputImage = infinito.cropped(to: imagen.extent)
-        control.aVector = CIVector(x: 0, y: 0, z: 0, w: cantidad)
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.9))
         guard let capa = control.outputImage else { return nil }
 
-        let mezcla = CIFilter.screenBlendMode()
+        let mezcla = CIFilter.softLightBlendMode()
         mezcla.inputImage = capa
         mezcla.backgroundImage = imagen
         return mezcla.outputImage

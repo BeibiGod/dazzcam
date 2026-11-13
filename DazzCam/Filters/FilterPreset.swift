@@ -115,7 +115,7 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .superia: return "Superia 400"
         case .kodachrome: return "Kodachrome 64"
         case .instColor: return "Inst Color"
-        case .dazzClassic: return "Dazz Classic"
+        case .dazzClassic: return "D Classic"
 
         case .cinestill: return "CineStill 800"
         case .hp5: return "HP5 B y N"
@@ -206,6 +206,8 @@ enum FilterPreset: String, CaseIterable, Identifiable {
             return "CONTAX"
         case .y2kDigi, .chatarraCCD:
             return "SONY"
+        case .dazzClassic:
+            return "DAZZ"
         case .framedSoft, .framedFade:
             return "FRAMED"
         case .ismPastel, .ismCream, .ismNight:

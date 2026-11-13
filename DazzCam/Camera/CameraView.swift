@@ -47,9 +47,14 @@ struct CameraView: View {
     @State private var mostrarEditorVideo = false
     @State private var controles = ControlesLook()
     @State private var mostrarAjustes = false
+    @State private var puntoExposicion: CGPoint?
+    @State private var barraExposicionVisible = false
+    @State private var tokenExposicion = 0
+    @State private var tokenAjuste = 0
+    @State private var guardandoFoto = false
 
     private var versionTexto: String {
-        "v1.8 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.9 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -152,13 +157,77 @@ struct CameraView: View {
                 .frame(width: geo.size.width)
 
                 if mostrarCaptura, let imagen = fotoFiltrada {
-                    Image(uiImage: imagen)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .background(Color.black)
-                        .onTapGesture { mostrarCaptura = false }
-                        .transition(.opacity)
+                    ZStack {
+                        Color.black
+
+                        Image(uiImage: imagen)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .onTapGesture { guardarCaptura() }
+
+                        VStack {
+                            Spacer()
+
+                            VStack(spacing: 10) {
+                                HStack(spacing: 10) {
+                                    Text("INTENSIDAD")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.65))
+
+                                    Slider(value: $controles.intensidad, in: 0...1)
+                                        .tint(.white)
+
+                                    Text("\(Int((controles.intensidad * 100).rounded()))%")
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .monospacedDigit()
+                                        .frame(width: 38, alignment: .trailing)
+                                }
+
+                                HStack(spacing: 10) {
+                                    Button {
+                                        mostrarAjustes = true
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "slider.horizontal.3")
+                                                .font(.system(size: 11, weight: .semibold))
+                                            Text("MÁS AJUSTES")
+                                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        }
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(Color.white.opacity(0.14), in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        guardarCaptura()
+                                    } label: {
+                                        Text(guardandoFoto ? "GUARDANDO" : "GUARDAR")
+                                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                            .foregroundStyle(.black)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 12)
+                                            .background(Color.white, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(guardandoFoto)
+                                }
+
+                                Text("Toca la foto para guardarla y volver")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.white.opacity(0.4))
+                            }
+                            .padding(14)
+                            .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 18))
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, insetAbajo + 10)
+                        }
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .transition(.opacity)
                 }
 
                 if destello > 0 {
@@ -202,13 +271,13 @@ struct CameraView: View {
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
             if mostrarCaptura {
-                aplicarFiltroAUltima()
+                programarRecalculo()
             }
         }
         .onChange(of: controles) { _, nuevo in
             vivo.controles = nuevo
             if mostrarCaptura {
-                aplicarFiltroAUltima()
+                programarRecalculo()
             }
         }
         .onChange(of: video.grabando) { _, grabando in
@@ -226,25 +295,14 @@ struct CameraView: View {
                 miniaturas.generar(desde: base)
             }
 
-            var procesada = FilterEngine.aplicar(preset, a: base, controles: controles)
-            if let relacion = proporcion.relacion {
-                procesada = FilterEngine.recortar(procesada, relacion: relacion)
-            }
-            procesada = SelloFecha.estampar(procesada, modo: sello)
-
-            fotoFiltrada = procesada
+            fotoFiltrada = Self.componer(
+                base,
+                look: preset,
+                ajustes: controles,
+                relacion: proporcion.relacion,
+                marca: sello
+            )
             mostrarCaptura = true
-
-            Task {
-                do {
-                    try await PhotoLibrarySaver.guardar(procesada)
-                    aviso = "Guardada en tu fototeca"
-                } catch {
-                    aviso = "No se pudo guardar: \(error.localizedDescription)"
-                }
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                aviso = nil
-            }
         }
         .onReceive(vivo.$imagen) { imagen in
             guard let imagen = imagen, !miniaturas.lista else { return }
@@ -388,6 +446,23 @@ struct CameraView: View {
                 GridNivel(angulo: nivel.angulo, estable: nivel.estable)
                     .padding(.vertical, barra)
             }
+
+            if let punto = puntoExposicion, barraExposicionVisible {
+                BarraExposicion(
+                    valor: Binding(
+                        get: { exposicion },
+                        set: { nuevo in
+                            exposicion = nuevo
+                            camara.fijarExposicion(Float(nuevo))
+                        }
+                    )
+                )
+                .position(
+                    x: min(max(punto.x + 66, 40), geo.size.width - 40),
+                    y: min(max(punto.y, barra + 100), geo.size.height - barra - 100)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
         }
         .contentShape(Rectangle())
         .simultaneousGesture(
@@ -408,6 +483,7 @@ struct CameraView: View {
                 alTocar: { puntoCamara, puntoPantalla in
                     camara.enfocar(en: puntoCamara)
                     mostrarAnillo(en: puntoPantalla)
+                    mostrarBarraExposicion(en: puntoPantalla)
                 },
                 alTocarDoble: {
                     voltearCamara()
@@ -464,21 +540,6 @@ struct CameraView: View {
                     modoVivo ? Color.white : Color.black.opacity(0.45),
                     in: Capsule()
                 )
-            }
-            .buttonStyle(.plain)
-            .fixedSize()
-
-            Button {
-                mostrarAjustes = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(controles.automatico ? Color.white.opacity(0.85) : Color.black)
-                    .frame(width: 30, height: 27)
-                    .background(
-                        controles.automatico ? Color.black.opacity(0.45) : Color.yellow,
-                        in: Capsule()
-                    )
             }
             .buttonStyle(.plain)
             .fixedSize()
@@ -544,6 +605,18 @@ struct CameraView: View {
             }
 
             menuFecha
+
+            // En video no hay revision despues de grabar, asi que el look se
+            // ajusta antes. En foto se ajusta despues de disparar.
+            if modo == .video {
+                herramienta(
+                    icono: "slider.horizontal.3",
+                    texto: controles.automatico ? nil : "LOOK",
+                    activo: !controles.automatico
+                ) {
+                    mostrarAjustes = true
+                }
+            }
 
             herramientaIA
 
@@ -856,14 +929,110 @@ struct CameraView: View {
         }
     }
 
-    private func aplicarFiltroAUltima() {
+    /// Al tocar para enfocar sale la barrita de exposicion, como en la
+    /// camara del iPhone. Se esconde sola a los 5 segundos.
+    private func mostrarBarraExposicion(en punto: CGPoint) {
+        puntoExposicion = punto
+        tokenExposicion += 1
+        let mio = tokenExposicion
+
+        withAnimation(.easeOut(duration: 0.18)) {
+            barraExposicionVisible = true
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard mio == tokenExposicion else { return }
+            withAnimation(.easeIn(duration: 0.25)) {
+                barraExposicionVisible = false
+            }
+        }
+    }
+
+    /// Guarda la foto que estas revisando, con el look ya ajustado.
+    private func guardarCaptura() {
+        guard !guardandoFoto, let base = foto.ultimaFoto else { return }
+
+        guardandoFoto = true
+        tokenAjuste += 1
+
+        // Se vuelve a componer con lo que esta puesto ahora, para que se guarde
+        // justo lo que el usuario esta viendo.
+        let final = Self.componer(
+            base,
+            look: preset,
+            ajustes: controles,
+            relacion: proporcion.relacion,
+            marca: sello
+        )
+        fotoFiltrada = final
+
+        Task {
+            do {
+                try await PhotoLibrarySaver.guardar(final)
+                aviso = "Guardada en tu fototeca"
+            } catch {
+                aviso = "No se pudo guardar: \(error.localizedDescription)"
+            }
+
+            mostrarCaptura = false
+            guardandoFoto = false
+
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            aviso = nil
+        }
+    }
+
+    /// Recalcula la foto de la revision sin trabar el visor: espera a que el
+    /// dedo deje de moverse y hace el trabajo pesado en segundo plano.
+    private func programarRecalculo() {
         guard let base = foto.ultimaFoto else { return }
 
-        var procesada = FilterEngine.aplicar(preset, a: base, controles: controles)
-        if let relacion = proporcion.relacion {
+        let look = preset
+        let ajustes = controles
+        let relacion = proporcion.relacion
+        let marca = sello
+
+        tokenAjuste += 1
+        let mio = tokenAjuste
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            guard mio == tokenAjuste else { return }
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                let procesada = Self.componer(
+                    base,
+                    look: look,
+                    ajustes: ajustes,
+                    relacion: relacion,
+                    marca: marca
+                )
+
+                DispatchQueue.main.async {
+                    guard mio == tokenAjuste else { return }
+                    fotoFiltrada = procesada
+                }
+            }
+        }
+    }
+
+    /// Aplica el look, recorta y quema la fecha. Se usa en el visor, en la
+    /// revision y al guardar, para que los tres den exactamente lo mismo.
+    private static func componer(
+        _ base: UIImage,
+        look: FilterPreset,
+        ajustes: ControlesLook,
+        relacion: CGFloat?,
+        marca: SelloFecha
+    ) -> UIImage {
+        var procesada = FilterEngine.aplicar(look, a: base, controles: ajustes)
+
+        if let relacion = relacion {
             procesada = FilterEngine.recortar(procesada, relacion: relacion)
         }
-        fotoFiltrada = SelloFecha.estampar(procesada, modo: sello)
+
+        return SelloFecha.estampar(procesada, modo: marca)
     }
 
     private func voltearCamara() {
@@ -877,6 +1046,58 @@ struct CameraView: View {
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             aviso = nil
         }
+    }
+}
+
+/// Barrita vertical de exposicion que sale al tocar para enfocar.
+private struct BarraExposicion: View {
+    @Binding var valor: Double
+
+    private let alto: CGFloat = 112
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: "sun.max.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.85))
+
+            ZStack(alignment: .bottom) {
+                Capsule()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(width: 3, height: alto)
+
+                Capsule()
+                    .fill(Color.yellow)
+                    .frame(width: 3, height: max(4, progreso * alto))
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 15, height: 15)
+                    .shadow(color: .black.opacity(0.5), radius: 2)
+                    .offset(y: -(progreso * alto) + 7.5)
+            }
+            .frame(width: 26, height: alto)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesto in
+                        let y = min(max(gesto.location.y, 0), alto)
+                        let t = 1 - Double(y / alto)
+                        valor = -1.5 + t * 3.0
+                    }
+            )
+
+            Image(systemName: "sun.min")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+        .padding(.vertical, 9)
+        .padding(.horizontal, 5)
+        .background(.black.opacity(0.45), in: Capsule())
+    }
+
+    private var progreso: CGFloat {
+        CGFloat((min(max(valor, -1.5), 1.5) + 1.5) / 3.0)
     }
 }
 

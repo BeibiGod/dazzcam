@@ -15,7 +15,7 @@ struct AjustesLookView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                Text("Muevelo y mira el cambio en el visor.")
+                Text("Muevelo y mira el cambio.")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.45))
 
