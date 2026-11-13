@@ -54,7 +54,7 @@ struct CameraView: View {
     @State private var guardandoFoto = false
 
     private var versionTexto: String {
-        "v1.9 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.10 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -164,7 +164,28 @@ struct CameraView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: geo.size.width, height: geo.size.height)
-                            .onTapGesture { guardarCaptura() }
+
+                        VStack {
+                            HStack {
+                                Spacer()
+
+                                Button {
+                                    descartarCaptura()
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 34, height: 34)
+                                        .background(.black.opacity(0.55), in: Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(guardandoFoto)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.top, insetArriba + 6)
+
+                            Spacer()
+                        }
 
                         VStack {
                             Spacer()
@@ -216,7 +237,7 @@ struct CameraView: View {
                                     .disabled(guardandoFoto)
                                 }
 
-                                Text("Toca la foto para guardarla y volver")
+                                Text("GUARDAR la manda a tu fototeca")
                                     .font(.system(size: 9))
                                     .foregroundStyle(.white.opacity(0.4))
                             }
@@ -365,7 +386,12 @@ struct CameraView: View {
             videoImportado = nil
         }) {
             if let url = videoImportado {
-                VideoEditorView(url: url, preset: preset, controles: controles) { elegido in
+                VideoEditorView(
+                    url: url,
+                    preset: preset,
+                    controles: controles,
+                    sello: sello
+                ) { elegido in
                     preset = elegido
                     aviso = "Video guardado con \(elegido.nombre)"
                     Task {
@@ -827,7 +853,12 @@ struct CameraView: View {
                 video.parar()
             } else {
                 Task {
-                    await video.empezar(preset: preset, controles: controles, quitar: vivo.salida)
+                    await video.empezar(
+                        preset: preset,
+                        controles: controles,
+                        sello: sello,
+                        quitar: vivo.salida
+                    )
                 }
             }
         }
@@ -947,6 +978,15 @@ struct CameraView: View {
                 barraExposicionVisible = false
             }
         }
+    }
+
+    /// Cierra la revision sin guardar nada. La foto queda descartada.
+    private func descartarCaptura() {
+        guard !guardandoFoto else { return }
+
+        tokenAjuste += 1
+        fotoFiltrada = nil
+        mostrarCaptura = false
     }
 
     /// Guarda la foto que estas revisando, con el look ya ajustado.

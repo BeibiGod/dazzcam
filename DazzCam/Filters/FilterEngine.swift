@@ -531,11 +531,11 @@ enum FilterEngine {
 
     // MARK: - Polvo de pelicula
 
-    /// Puntitos de polvo y pelusas, como un negativo que estuvo guardado.
-    /// Son chicos (1-2 pixeles), suaves y con poca opacidad: si se ven como
-    /// puntos de pantalla, se ven falsos.
+    /// Polvo y rayones de una foto de rollo de verdad: puntitos blancos de
+    /// varios tamanos, pelusas suaves y rayones finos. Al 100% se nota claro
+    /// y al 0% desaparece por completo.
     private static let polvoTile: CIImage? = {
-        let lado = 1024
+        let lado = 2048
         let espacio = CGColorSpaceCreateDeviceRGB()
 
         guard let contexto = CGContext(
@@ -551,40 +551,101 @@ enum FilterEngine {
         }
 
         contexto.clear(CGRect(x: 0, y: 0, width: lado, height: lado))
+        contexto.setShouldAntialias(true)
 
-        // granitos de polvo
-        for _ in 0..<900 {
-            let radio = CGFloat.random(in: 0.3...0.9)
-            let x = CGFloat.random(in: 0..<CGFloat(lado))
-            let y = CGFloat.random(in: 0..<CGFloat(lado))
-            let alfa = CGFloat.random(in: 0.04...0.20)
+        let ancho = CGFloat(lado)
+        let alto = CGFloat(lado)
+
+        func punto() -> CGPoint {
+            CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
+            )
+        }
+
+        // 1. Puntitos de polvo, de 2 a 7 pixeles: se alcanzan a ver en la foto.
+        for _ in 0..<420 {
+            let radio = CGFloat.random(in: 0.8...3.4)
+            let centro = punto()
+            let alfa = CGFloat.random(in: 0.12...0.55)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
                 contexto.setFillColor(color)
                 contexto.fillEllipse(
-                    in: CGRect(x: x, y: y, width: radio * 2, height: radio * 2)
+                    in: CGRect(
+                        x: centro.x - radio,
+                        y: centro.y - radio,
+                        width: radio * 2,
+                        height: radio * 2
+                    )
                 )
             }
         }
 
-        // pelusas cortas, no rayones largos
-        contexto.setLineWidth(0.6)
+        // 2. Motas mas grandes y suaves, como pelusa fuera de foco.
+        for _ in 0..<22 {
+            let radio = CGFloat.random(in: 3.5...7.5)
+            let centro = punto()
+            let alfa = CGFloat.random(in: 0.05...0.15)
+
+            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+                contexto.setFillColor(color)
+                contexto.fillEllipse(
+                    in: CGRect(
+                        x: centro.x - radio,
+                        y: centro.y - radio,
+                        width: radio * 2,
+                        height: radio * 2
+                    )
+                )
+            }
+        }
+
+        // 3. Rayones finos, casi verticales como los de un rollo raspado.
         contexto.setLineCap(.round)
 
-        for _ in 0..<7 {
-            let x = CGFloat.random(in: 0..<CGFloat(lado))
-            let y = CGFloat.random(in: 0..<CGFloat(lado))
-            let largo = CGFloat.random(in: 3...11)
-            let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let alfa = CGFloat.random(in: 0.06...0.16)
+        for _ in 0..<16 {
+            let inicio = punto()
+            let largo = CGFloat.random(in: 25...105)
+            let desvio = CGFloat.random(in: -9...9)
+            let anchoLinea = CGFloat.random(in: 0.7...1.7)
+            let alfa = CGFloat.random(in: 0.12...0.36)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
                 contexto.setStrokeColor(color)
-                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.setLineWidth(anchoLinea)
+                contexto.move(to: inicio)
                 contexto.addLine(to: CGPoint(
-                    x: x + cos(angulo) * largo,
-                    y: y + sin(angulo) * largo
+                    x: inicio.x + desvio,
+                    y: inicio.y + largo
                 ))
+                contexto.strokePath()
+            }
+        }
+
+        // 4. Pelusas cortas y torcidas, mas transparentes.
+        for _ in 0..<12 {
+            let inicio = punto()
+            let largo = CGFloat.random(in: 12...38)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let alfa = CGFloat.random(in: 0.08...0.22)
+            let anchoLinea = CGFloat.random(in: 0.6...1.2)
+
+            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+                contexto.setStrokeColor(color)
+                contexto.setLineWidth(anchoLinea)
+                contexto.move(to: inicio)
+
+                let medio = CGPoint(
+                    x: inicio.x + cos(angulo) * largo * 0.55 + CGFloat.random(in: -4...4),
+                    y: inicio.y + sin(angulo) * largo * 0.55 + CGFloat.random(in: -4...4)
+                )
+                let fin = CGPoint(
+                    x: inicio.x + cos(angulo) * largo,
+                    y: inicio.y + sin(angulo) * largo
+                )
+
+                contexto.addQuadCurve(to: fin, control: medio)
                 contexto.strokePath()
             }
         }
@@ -593,10 +654,11 @@ enum FilterEngine {
 
         var imagen = CIImage(cgImage: cg)
 
-        // un pelo de desenfoque para que no parezcan pixeles muertos
+        // Solo un pelo de desenfoque: si se desenfoca mas se pierden los
+        // rayones y parece suciedad de pantalla.
         let suave = CIFilter.gaussianBlur()
         suave.inputImage = imagen
-        suave.radius = 0.4
+        suave.radius = 0.3
         if let salida = suave.outputImage?.cropped(to: imagen.extent) {
             imagen = salida
         }
@@ -605,9 +667,9 @@ enum FilterEngine {
     }()
 
     private static func polvo(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
-        guard let azulejo = polvoTile else { return nil }
+        guard let azulejo = polvoTile, cantidad > 0.001 else { return nil }
 
-        // A tamano real: cada granito mide 1-2 pixeles en la foto final.
+        // A tamano real: los puntitos y rayones conservan su medida en pixeles.
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
         repetir.transform = .identity
@@ -615,10 +677,11 @@ enum FilterEngine {
 
         let control = CIFilter.colorMatrix()
         control.inputImage = infinito.cropped(to: imagen.extent)
-        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.9))
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.98))
         guard let capa = control.outputImage else { return nil }
 
-        let mezcla = CIFilter.softLightBlendMode()
+        // Screen: el polvo de un negativo se ve blanco, no gris.
+        let mezcla = CIFilter.screenBlendMode()
         mezcla.inputImage = capa
         mezcla.backgroundImage = imagen
         return mezcla.outputImage

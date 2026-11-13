@@ -42,20 +42,26 @@ enum VideoBaker {
         }
     }
 
-    /// Composicion que aplica el filtro cuadro por cuadro.
+    /// Composicion que aplica el filtro cuadro por cuadro y quema la fecha.
     /// Se usa igual para exportar y para verlo en el reproductor.
     static func composicion(
         _ asset: AVAsset,
         preset: FilterPreset,
-        controles: ControlesLook = ControlesLook()
+        controles: ControlesLook = ControlesLook(),
+        sello: SelloFecha = .apagado,
+        fecha: Date = Date()
     ) -> AVVideoComposition {
-        AVVideoComposition(asset: asset) { peticion in
+        let capa = CapaFecha(modo: sello, fecha: fecha)
+
+        return AVVideoComposition(asset: asset) { peticion in
             let filtrada = FilterEngine.cadena(
                 preset,
                 entrada: peticion.sourceImage,
                 controles: controles
             )
-            peticion.finish(with: filtrada ?? peticion.sourceImage, context: nil)
+
+            let base = filtrada ?? peticion.sourceImage
+            peticion.finish(with: capa.aplicar(sobre: base), context: nil)
         }
     }
 
@@ -63,7 +69,9 @@ enum VideoBaker {
     static func exportar(
         _ url: URL,
         preset: FilterPreset,
-        controles: ControlesLook = ControlesLook()
+        controles: ControlesLook = ControlesLook(),
+        sello: SelloFecha = .apagado,
+        fecha: Date = Date()
     ) async throws -> URL {
         let asset = AVURLAsset(url: url)
 
@@ -81,7 +89,13 @@ enum VideoBaker {
 
         exportador.outputURL = destino
         exportador.outputFileType = .mp4
-        exportador.videoComposition = composicion(asset, preset: preset, controles: controles)
+        exportador.videoComposition = composicion(
+            asset,
+            preset: preset,
+            controles: controles,
+            sello: sello,
+            fecha: fecha
+        )
         exportador.shouldOptimizeForNetworkUse = true
 
         await withCheckedContinuation { (continuacion: CheckedContinuation<Void, Never>) in
@@ -115,5 +129,53 @@ enum VideoBaker {
                 }
             }
         }
+    }
+}
+
+/// Guarda la fecha ya dibujada para no rehacerla en cada cuadro del video.
+/// Es la misma durante todo el clip, como en una camara de rollo.
+private final class CapaFecha {
+
+    private let modo: SelloFecha
+    private let fecha: Date
+    private let cerrojo = NSLock()
+    private var cache: (tamano: CGSize, imagen: CIImage)?
+
+    init(modo: SelloFecha, fecha: Date) {
+        self.modo = modo
+        self.fecha = fecha
+    }
+
+    func aplicar(sobre imagen: CIImage) -> CIImage {
+        guard modo.encendido else { return imagen }
+
+        let extent = imagen.extent
+        guard extent.width > 1, extent.height > 1 else { return imagen }
+        guard let capa = capaPara(tamano: extent.size) else { return imagen }
+
+        let margen = max(extent.width * 0.032, 2)
+        let x = extent.maxX - margen - capa.extent.width
+        let y = extent.minY + margen
+
+        let puesta = capa.transformed(
+            by: CGAffineTransform(translationX: x, y: y)
+        )
+        return puesta.composited(over: imagen)
+    }
+
+    private func capaPara(tamano: CGSize) -> CIImage? {
+        cerrojo.lock()
+        defer { cerrojo.unlock() }
+
+        if let cache = cache, cache.tamano == tamano {
+            return cache.imagen
+        }
+
+        guard let creada = SelloFecha.capaVideo(modo, fecha: fecha, tamano: tamano) else {
+            return nil
+        }
+
+        cache = (tamano, creada)
+        return creada
     }
 }

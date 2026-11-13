@@ -1,3 +1,4 @@
+import CoreImage
 import Foundation
 import UIKit
 
@@ -94,31 +95,9 @@ enum SelloFecha: String, CaseIterable, Identifiable {
             let alto = base.size.height
             let esDazz = (modo == .dazz || modo == .dazzHora)
             let tamano = max(ancho * (esDazz ? 0.036 : 0.042), 10)
-            let fuente = UIFont.monospacedSystemFont(ofSize: tamano, weight: .bold)
+            let estilo = piezas(texto, tamanoFuente: tamano)
 
-            let principal = NSAttributedString(
-                string: texto,
-                attributes: [
-                    .font: fuente,
-                    .foregroundColor: UIColor(red: 1.0, green: 0.58, blue: 0.16, alpha: 0.96)
-                ]
-            )
-            let brillo = NSAttributedString(
-                string: texto,
-                attributes: [
-                    .font: fuente,
-                    .foregroundColor: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.45)
-                ]
-            )
-            let sombra = NSAttributedString(
-                string: texto,
-                attributes: [
-                    .font: fuente,
-                    .foregroundColor: UIColor.black.withAlphaComponent(0.5)
-                ]
-            )
-
-            let medida = principal.size()
+            let medida = estilo.principal.size()
             let margen = ancho * 0.032
             let punto = CGPoint(
                 x: ancho - medida.width - margen,
@@ -126,12 +105,84 @@ enum SelloFecha: String, CaseIterable, Identifiable {
             )
             let corrimiento = max(tamano * 0.05, 1)
 
-            sombra.draw(at: CGPoint(x: punto.x + corrimiento, y: punto.y + corrimiento))
+            estilo.sombra.draw(at: CGPoint(x: punto.x + corrimiento, y: punto.y + corrimiento))
             if esDazz {
-                brillo.draw(at: CGPoint(x: punto.x - 0.6, y: punto.y - 0.6))
-                brillo.draw(at: CGPoint(x: punto.x + 0.6, y: punto.y + 0.6))
+                estilo.brillo.draw(at: CGPoint(x: punto.x - 0.6, y: punto.y - 0.6))
+                estilo.brillo.draw(at: CGPoint(x: punto.x + 0.6, y: punto.y + 0.6))
             }
-            principal.draw(at: punto)
+            estilo.principal.draw(at: punto)
         }
+    }
+
+    /// Capa chiquita con la fecha dibujada, para pegarla en cada cuadro del
+    /// video sin tener que dibujar la foto entera. Devuelve nil si esta apagada.
+    static func capaVideo(_ modo: SelloFecha, fecha: Date, tamano: CGSize) -> CIImage? {
+        guard modo.encendido, tamano.width > 1, tamano.height > 1 else { return nil }
+
+        let texto = texto(modo, fecha: fecha)
+        guard !texto.isEmpty else { return nil }
+
+        let esDazz = (modo == .dazz || modo == .dazzHora)
+        let tamanoFuente = max(tamano.width * (esDazz ? 0.036 : 0.042), 10)
+        let estilo = piezas(texto, tamanoFuente: tamanoFuente)
+
+        let medida = estilo.principal.size()
+        let relleno = max(tamanoFuente * 0.22, 2)
+        let lienzo = CGSize(
+            width: ceil(medida.width + relleno * 2),
+            height: ceil(medida.height + relleno * 2)
+        )
+
+        let formato = UIGraphicsImageRendererFormat.default()
+        formato.scale = 1
+        formato.opaque = false
+
+        let imagen = UIGraphicsImageRenderer(size: lienzo, format: formato).image { _ in
+            let punto = CGPoint(x: relleno, y: relleno)
+            let corrimiento = max(tamanoFuente * 0.05, 1)
+
+            estilo.sombra.draw(at: CGPoint(x: punto.x + corrimiento, y: punto.y + corrimiento))
+            if esDazz {
+                estilo.brillo.draw(at: CGPoint(x: punto.x - 0.6, y: punto.y - 0.6))
+                estilo.brillo.draw(at: CGPoint(x: punto.x + 0.6, y: punto.y + 0.6))
+            }
+            estilo.principal.draw(at: punto)
+        }
+
+        guard let cg = imagen.cgImage else { return nil }
+        return CIImage(cgImage: cg)
+    }
+
+    /// El mismo estilo para fotos y video: naranja, monoespaciado y con un
+    /// brillito suave alrededor cuando es formato DazzCam.
+    private static func piezas(
+        _ texto: String,
+        tamanoFuente: CGFloat
+    ) -> (principal: NSAttributedString, brillo: NSAttributedString, sombra: NSAttributedString) {
+        let fuente = UIFont.monospacedSystemFont(ofSize: tamanoFuente, weight: .bold)
+
+        let principal = NSAttributedString(
+            string: texto,
+            attributes: [
+                .font: fuente,
+                .foregroundColor: UIColor(red: 1.0, green: 0.58, blue: 0.16, alpha: 0.96)
+            ]
+        )
+        let brillo = NSAttributedString(
+            string: texto,
+            attributes: [
+                .font: fuente,
+                .foregroundColor: UIColor(red: 1.0, green: 0.5, blue: 0.1, alpha: 0.45)
+            ]
+        )
+        let sombra = NSAttributedString(
+            string: texto,
+            attributes: [
+                .font: fuente,
+                .foregroundColor: UIColor.black.withAlphaComponent(0.5)
+            ]
+        )
+
+        return (principal, brillo, sombra)
     }
 }

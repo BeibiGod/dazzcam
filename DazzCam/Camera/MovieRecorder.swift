@@ -26,6 +26,8 @@ final class MovieRecorder: NSObject, ObservableObject {
     private var pausada: AVCaptureVideoDataOutput?
     private var preset: FilterPreset = .dazzClassic
     private var controles = ControlesLook()
+    private var sello: SelloFecha = .apagado
+    private var fechaInicio = Date()
     private var reloj: Timer?
 
     // MARK: - Preparacion
@@ -51,6 +53,7 @@ final class MovieRecorder: NSObject, ObservableObject {
     func empezar(
         preset: FilterPreset,
         controles: ControlesLook = ControlesLook(),
+        sello: SelloFecha = .apagado,
         quitar: AVCaptureVideoDataOutput?
     ) async {
         guard !grabando, !procesando, let sesion = sesion else { return }
@@ -58,6 +61,7 @@ final class MovieRecorder: NSObject, ObservableObject {
         error = nil
         self.preset = preset
         self.controles = controles
+        self.sello = sello
         pausada = quitar
 
         let conMicro = await pedirMicrofono()
@@ -90,6 +94,7 @@ final class MovieRecorder: NSObject, ObservableObject {
         let destino = FileManager.default.temporaryDirectory
             .appendingPathComponent("beibi-grabando-\(UUID().uuidString).mov")
 
+        fechaInicio = Date()
         salida.startRecording(to: destino, recordingDelegate: self)
 
         grabando = true
@@ -188,6 +193,8 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
 
         let look = preset
         let ajustes = controles
+        let marca = sello
+        let cuando = fechaInicio
         procesando = true
 
         Task {
@@ -197,7 +204,9 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
                 let conFiltro = try await VideoBaker.exportar(
                     url,
                     preset: look,
-                    controles: ajustes
+                    controles: ajustes,
+                    sello: marca,
+                    fecha: cuando
                 )
                 try await PhotoLibrarySaver.guardarVideo(conFiltro)
                 guardados += 1

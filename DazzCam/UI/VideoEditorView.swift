@@ -7,6 +7,8 @@ import UIKit
 struct VideoEditorView: View {
     let url: URL
     let controles: ControlesLook
+    let sello: SelloFecha
+    let fecha: Date
     var alGuardar: (FilterPreset) -> Void
 
     @StateObject private var miniaturas = FilterThumbnails()
@@ -23,10 +25,14 @@ struct VideoEditorView: View {
         url: URL,
         preset: FilterPreset,
         controles: ControlesLook = ControlesLook(),
+        sello: SelloFecha = .apagado,
+        fecha: Date = Date(),
         alGuardar: @escaping (FilterPreset) -> Void
     ) {
         self.url = url
         self.controles = controles
+        self.sello = sello
+        self.fecha = fecha
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
         _intensidad = State(initialValue: controles.intensidad)
@@ -191,6 +197,8 @@ struct VideoEditorView: View {
         ajustes.intensidad = intensidad
 
         let archivo = url
+        let marca = sello
+        let cuando = fecha
 
         // Espera a que el dedo deje de moverse antes de rehacer el video.
         Task { @MainActor in
@@ -202,7 +210,9 @@ struct VideoEditorView: View {
             item.videoComposition = VideoBaker.composicion(
                 asset,
                 preset: look,
-                controles: ajustes
+                controles: ajustes,
+                sello: marca,
+                fecha: cuando
             )
 
             reproductor = AVPlayer(playerItem: item)
@@ -220,13 +230,17 @@ struct VideoEditorView: View {
         let look = preset
         var ajustes = controles
         ajustes.intensidad = intensidad
+        let marca = sello
+        let cuando = fecha
 
         Task {
             do {
                 let salida = try await VideoBaker.exportar(
                     archivo,
                     preset: look,
-                    controles: ajustes
+                    controles: ajustes,
+                    sello: marca,
+                    fecha: cuando
                 )
                 try await PhotoLibrarySaver.guardarVideo(salida)
                 try? FileManager.default.removeItem(at: salida)
