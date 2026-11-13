@@ -54,7 +54,7 @@ struct CameraView: View {
     @State private var guardandoFoto = false
 
     private var versionTexto: String {
-        "v1.10 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.10.1 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {

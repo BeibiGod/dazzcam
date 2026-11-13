@@ -28,9 +28,9 @@ struct AjustesLookView: View {
                 )
 
                 fila(
-                    titulo: "PUNTITOS",
-                    detalle: "Polvo y rayones de pelicula",
-                    valor: opcional(\.polvo, sugerido: sugerido.polvo),
+                    titulo: "RAYONES",
+                    detalle: "Rayones finos de pelicula vieja",
+                    valor: opcional(\.rayones, sugerido: sugerido.rayones),
                     rango: 0...1,
                     maximo: 1
                 )

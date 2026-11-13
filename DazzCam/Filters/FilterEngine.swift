@@ -12,7 +12,7 @@ struct AjusteFoto {
     var desvanecido: CGFloat = 0         // sube los negros (look viejo)
     var vineta: CGFloat = 0              // 0 = nada, 1 = esquinas negras
     var grano: CGFloat = 0               // 0 = nada, 0.2 = pelicula sucia
-    var polvo: CGFloat = 0               // puntitos blancos de pelicula vieja
+    var rayones: CGFloat = 0             // rayones finos de pelicula vieja
     var fuga: CGFloat = 0                // luz que se cuela por la esquina
     var fugaEsquina: Int = 0             // 0-3: cual esquina usa la fuga
     var blancoYNegro: Bool = false
@@ -21,13 +21,13 @@ struct AjusteFoto {
 /// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
 struct ControlesLook: Equatable {
     var intensidad: CGFloat = 1
-    var polvo: CGFloat? = nil
+    var rayones: CGFloat? = nil
     var fuga: CGFloat? = nil
     var grano: CGFloat? = nil
 
     /// true si el usuario no ha tocado nada.
     var automatico: Bool {
-        abs(intensidad - 1) < 0.001 && polvo == nil && fuga == nil && grano == nil
+        abs(intensidad - 1) < 0.001 && rayones == nil && fuga == nil && grano == nil
     }
 }
 
@@ -63,7 +63,7 @@ enum FilterEngine {
         guard preset != .original else { return entrada }
 
         var a = ajuste(preset)
-        a.polvo = controles.polvo ?? a.polvo
+        a.rayones = controles.rayones ?? a.rayones
         a.fuga = controles.fuga ?? a.fuga
         a.grano = controles.grano ?? a.grano
 
@@ -355,9 +355,9 @@ enum FilterEngine {
             a.contraste = 1.1; a.desvanecido = 0.05; a.grano = 0.12; a.vineta = 0.35
         }
 
-        // Puntitos de pelicula: apagados por defecto. Se suben a mano en el
+        // Rayones de pelicula: apagados por defecto. Se suben a mano en el
         // editor si el usuario los quiere; asi ninguna camara los trae fake.
-        a.polvo = 0
+        a.rayones = 0
 
         // Fugas de luz: la camara decide donde y cuanto (0 a 100%).
         switch preset {
@@ -446,9 +446,9 @@ enum FilterEngine {
             actual = conGrano
         }
 
-        // 7. puntitos blancos y rayones de pelicula
-        if a.polvo > 0, let conPolvo = polvo(actual, cantidad: a.polvo) {
-            actual = conPolvo
+        // 7. rayones finos de pelicula
+        if a.rayones > 0, let conRayones = rayones(actual, cantidad: a.rayones) {
+            actual = conRayones
         }
 
         // 8. fuga de luz por una esquina
@@ -529,12 +529,12 @@ enum FilterEngine {
         return mezcla.outputImage
     }
 
-    // MARK: - Polvo de pelicula
+    // MARK: - Rayones de pelicula
 
-    /// Polvo y rayones de una foto de rollo de verdad: puntitos blancos de
-    /// varios tamanos, pelusas suaves y rayones finos. Al 100% se nota claro
-    /// y al 0% desaparece por completo.
-    private static let polvoTile: CIImage? = {
+    /// Solo rayones y pelusas finas, como un negativo que se raspo un poco.
+    /// Nada de puntitos redondos: se ven a computadora y quedan falsos.
+    /// Al 100% se notan discretos; al 0% desaparecen por completo.
+    private static let rayonesTile: CIImage? = {
         let lado = 2048
         let espacio = CGColorSpaceCreateDeviceRGB()
 
@@ -552,6 +552,7 @@ enum FilterEngine {
 
         contexto.clear(CGRect(x: 0, y: 0, width: lado, height: lado))
         contexto.setShouldAntialias(true)
+        contexto.setLineCap(.round)
 
         let ancho = CGFloat(lado)
         let alto = CGFloat(lado)
@@ -563,89 +564,76 @@ enum FilterEngine {
             )
         }
 
-        // 1. Puntitos de polvo, de 2 a 7 pixeles: se alcanzan a ver en la foto.
-        for _ in 0..<420 {
-            let radio = CGFloat.random(in: 0.8...3.4)
-            let centro = punto()
-            let alfa = CGFloat.random(in: 0.12...0.55)
-
-            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
-                contexto.setFillColor(color)
-                contexto.fillEllipse(
-                    in: CGRect(
-                        x: centro.x - radio,
-                        y: centro.y - radio,
-                        width: radio * 2,
-                        height: radio * 2
-                    )
-                )
-            }
-        }
-
-        // 2. Motas mas grandes y suaves, como pelusa fuera de foco.
-        for _ in 0..<22 {
-            let radio = CGFloat.random(in: 3.5...7.5)
-            let centro = punto()
-            let alfa = CGFloat.random(in: 0.05...0.15)
-
-            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
-                contexto.setFillColor(color)
-                contexto.fillEllipse(
-                    in: CGRect(
-                        x: centro.x - radio,
-                        y: centro.y - radio,
-                        width: radio * 2,
-                        height: radio * 2
-                    )
-                )
-            }
-        }
-
-        // 3. Rayones finos, casi verticales como los de un rollo raspado.
-        contexto.setLineCap(.round)
-
+        // 1. Rayones largos y casi verticales, como los del arrastre del rollo.
         for _ in 0..<16 {
             let inicio = punto()
-            let largo = CGFloat.random(in: 25...105)
-            let desvio = CGFloat.random(in: -9...9)
-            let anchoLinea = CGFloat.random(in: 0.7...1.7)
-            let alfa = CGFloat.random(in: 0.12...0.36)
+            let largo = CGFloat.random(in: 40...170)
+            let desvio = CGFloat.random(in: -10...10)
+            let anchoLinea = CGFloat.random(in: 0.8...2.2)
+            let alfa = CGFloat.random(in: 0.05...0.15)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
                 contexto.setStrokeColor(color)
                 contexto.setLineWidth(anchoLinea)
+
+                let control = CGPoint(
+                    x: inicio.x + desvio * 0.35,
+                    y: inicio.y + largo * 0.55
+                )
+                let fin = CGPoint(x: inicio.x + desvio, y: inicio.y + largo)
+
                 contexto.move(to: inicio)
-                contexto.addLine(to: CGPoint(
-                    x: inicio.x + desvio,
-                    y: inicio.y + largo
-                ))
+                contexto.addQuadCurve(to: fin, control: control)
                 contexto.strokePath()
             }
         }
 
-        // 4. Pelusas cortas y torcidas, mas transparentes.
-        for _ in 0..<12 {
+        // 2. Rayones cortos en cualquier direccion, de tanto manipular la foto.
+        for _ in 0..<10 {
             let inicio = punto()
-            let largo = CGFloat.random(in: 12...38)
+            let largo = CGFloat.random(in: 15...60)
             let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let alfa = CGFloat.random(in: 0.08...0.22)
-            let anchoLinea = CGFloat.random(in: 0.6...1.2)
+            let anchoLinea = CGFloat.random(in: 0.7...1.6)
+            let alfa = CGFloat.random(in: 0.05...0.13)
 
             if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
                 contexto.setStrokeColor(color)
                 contexto.setLineWidth(anchoLinea)
-                contexto.move(to: inicio)
 
-                let medio = CGPoint(
-                    x: inicio.x + cos(angulo) * largo * 0.55 + CGFloat.random(in: -4...4),
-                    y: inicio.y + sin(angulo) * largo * 0.55 + CGFloat.random(in: -4...4)
+                let fin = CGPoint(
+                    x: inicio.x + cos(angulo) * largo,
+                    y: inicio.y + sin(angulo) * largo
+                )
+
+                contexto.move(to: inicio)
+                contexto.addLine(to: fin)
+                contexto.strokePath()
+            }
+        }
+
+        // 3. Pelusas muy finas y torcidas.
+        for _ in 0..<10 {
+            let inicio = punto()
+            let largo = CGFloat.random(in: 20...70)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let anchoLinea = CGFloat.random(in: 0.6...1.1)
+            let alfa = CGFloat.random(in: 0.04...0.10)
+
+            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+                contexto.setStrokeColor(color)
+                contexto.setLineWidth(anchoLinea)
+
+                let control = CGPoint(
+                    x: inicio.x + cos(angulo) * largo * 0.5 + CGFloat.random(in: -8...8),
+                    y: inicio.y + sin(angulo) * largo * 0.5 + CGFloat.random(in: -8...8)
                 )
                 let fin = CGPoint(
                     x: inicio.x + cos(angulo) * largo,
                     y: inicio.y + sin(angulo) * largo
                 )
 
-                contexto.addQuadCurve(to: fin, control: medio)
+                contexto.move(to: inicio)
+                contexto.addQuadCurve(to: fin, control: control)
                 contexto.strokePath()
             }
         }
@@ -654,11 +642,10 @@ enum FilterEngine {
 
         var imagen = CIImage(cgImage: cg)
 
-        // Solo un pelo de desenfoque: si se desenfoca mas se pierden los
-        // rayones y parece suciedad de pantalla.
+        // Un desenfoque chiquito para que no parezcan lineas de paint.
         let suave = CIFilter.gaussianBlur()
         suave.inputImage = imagen
-        suave.radius = 0.3
+        suave.radius = 0.35
         if let salida = suave.outputImage?.cropped(to: imagen.extent) {
             imagen = salida
         }
@@ -666,10 +653,9 @@ enum FilterEngine {
         return imagen
     }()
 
-    private static func polvo(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
-        guard let azulejo = polvoTile, cantidad > 0.001 else { return nil }
+    private static func rayones(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
+        guard let azulejo = rayonesTile, cantidad > 0.001 else { return nil }
 
-        // A tamano real: los puntitos y rayones conservan su medida en pixeles.
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
         repetir.transform = .identity
@@ -677,10 +663,10 @@ enum FilterEngine {
 
         let control = CIFilter.colorMatrix()
         control.inputImage = infinito.cropped(to: imagen.extent)
-        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.98))
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.9))
         guard let capa = control.outputImage else { return nil }
 
-        // Screen: el polvo de un negativo se ve blanco, no gris.
+        // Screen: el rayon de un negativo se ve clarito, no negro.
         let mezcla = CIFilter.screenBlendMode()
         mezcla.inputImage = capa
         mezcla.backgroundImage = imagen
