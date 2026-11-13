@@ -6,20 +6,30 @@ import UIKit
 /// Se ve el video con el look puesto y se guarda una copia con sonido.
 struct VideoEditorView: View {
     let url: URL
+    let controles: ControlesLook
     var alGuardar: (FilterPreset) -> Void
 
     @StateObject private var miniaturas = FilterThumbnails()
     @State private var preset: FilterPreset
+    @State private var intensidad: CGFloat
     @State private var reproductor: AVPlayer?
     @State private var guardando = false
     @State private var error: String?
+    @State private var tokenReproductor = 0
 
     @Environment(\.dismiss) private var cerrar
 
-    init(url: URL, preset: FilterPreset, alGuardar: @escaping (FilterPreset) -> Void) {
+    init(
+        url: URL,
+        preset: FilterPreset,
+        controles: ControlesLook = ControlesLook(),
+        alGuardar: @escaping (FilterPreset) -> Void
+    ) {
         self.url = url
+        self.controles = controles
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
+        _intensidad = State(initialValue: controles.intensidad)
     }
 
     var body: some View {
@@ -103,6 +113,22 @@ struct VideoEditorView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
 
+                HStack(spacing: 10) {
+                    Text("INTENSIDAD")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    Slider(value: $intensidad, in: 0...1)
+                        .tint(.white)
+
+                    Text("\(Int((intensidad * 100).rounded()))%")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .monospacedDigit()
+                        .frame(width: 38, alignment: .trailing)
+                }
+                .padding(.horizontal, 18)
+
                 if let error = error {
                     Text(error)
                         .font(.caption)
@@ -144,6 +170,9 @@ struct VideoEditorView: View {
         .onChange(of: preset) { _, _ in
             prepararReproductor()
         }
+        .onChange(of: intensidad) { _, _ in
+            prepararReproductor()
+        }
         .onDisappear {
             reproductor?.pause()
         }
@@ -152,15 +181,32 @@ struct VideoEditorView: View {
     // MARK: - Reproductor con el filtro puesto
 
     private func prepararReproductor() {
+        tokenReproductor += 1
+        let mio = tokenReproductor
+
         reproductor?.pause()
 
-        let asset = AVURLAsset(url: url)
         let look = preset
+        var ajustes = controles
+        ajustes.intensidad = intensidad
 
-        let item = AVPlayerItem(asset: asset)
-        item.videoComposition = VideoBaker.composicion(asset, preset: look)
+        let archivo = url
 
-        reproductor = AVPlayer(playerItem: item)
+        // Espera a que el dedo deje de moverse antes de rehacer el video.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard mio == tokenReproductor else { return }
+
+            let asset = AVURLAsset(url: archivo)
+            let item = AVPlayerItem(asset: asset)
+            item.videoComposition = VideoBaker.composicion(
+                asset,
+                preset: look,
+                controles: ajustes
+            )
+
+            reproductor = AVPlayer(playerItem: item)
+        }
     }
 
     // MARK: - Guardar
@@ -172,10 +218,16 @@ struct VideoEditorView: View {
 
         let archivo = url
         let look = preset
+        var ajustes = controles
+        ajustes.intensidad = intensidad
 
         Task {
             do {
-                let salida = try await VideoBaker.exportar(archivo, preset: look)
+                let salida = try await VideoBaker.exportar(
+                    archivo,
+                    preset: look,
+                    controles: ajustes
+                )
                 try await PhotoLibrarySaver.guardarVideo(salida)
                 try? FileManager.default.removeItem(at: salida)
 

@@ -14,11 +14,15 @@ final class VideoFrameRenderer {
     /// Lado mayor al que se reduce el frame antes de filtrar.
     private let ladoMayor: CGFloat = 1080
 
-    func renderizar(_ buffer: CVPixelBuffer, preset: FilterPreset) -> UIImage? {
+    func renderizar(
+        _ buffer: CVPixelBuffer,
+        preset: FilterPreset,
+        controles: ControlesLook
+    ) -> UIImage? {
         let entrada = CIImage(cvPixelBuffer: buffer)
         let chica = reducir(entrada)
 
-        guard let salida = FilterEngine.cadena(preset, entrada: chica) else {
+        guard let salida = FilterEngine.cadena(preset, entrada: chica, controles: controles) else {
             return nil
         }
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {

@@ -6,10 +6,12 @@ struct PhotoEditorView: View {
     let imagen: UIImage
     let proporcion: Proporcion
     let sello: SelloFecha
+    let controles: ControlesLook
     var alGuardar: (UIImage, FilterPreset) -> Void
 
     @StateObject private var miniaturas = FilterThumbnails()
     @State private var preset: FilterPreset
+    @State private var intensidad: CGFloat
     @State private var vista: UIImage?
     @State private var calculando = false
     @State private var guardando = false
@@ -23,13 +25,16 @@ struct PhotoEditorView: View {
         preset: FilterPreset,
         proporcion: Proporcion,
         sello: SelloFecha,
+        controles: ControlesLook = ControlesLook(),
         alGuardar: @escaping (UIImage, FilterPreset) -> Void
     ) {
         self.imagen = imagen
         self.proporcion = proporcion
         self.sello = sello
+        self.controles = controles
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
+        _intensidad = State(initialValue: controles.intensidad)
     }
 
     var body: some View {
@@ -121,6 +126,22 @@ struct PhotoEditorView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
 
+                HStack(spacing: 10) {
+                    Text("INTENSIDAD")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+
+                    Slider(value: $intensidad, in: 0...1)
+                        .tint(.white)
+
+                    Text("\(Int((intensidad * 100).rounded()))%")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .monospacedDigit()
+                        .frame(width: 38, alignment: .trailing)
+                }
+                .padding(.horizontal, 18)
+
                 if let error = error {
                     Text(error)
                         .font(.caption)
@@ -160,6 +181,9 @@ struct PhotoEditorView: View {
         .onChange(of: preset) { _, _ in
             recalcular()
         }
+        .onChange(of: intensidad) { _, _ in
+            recalcular()
+        }
     }
 
     // MARK: - Procesar
@@ -169,22 +193,33 @@ struct PhotoEditorView: View {
         let elegido = preset
         let relacion = proporcion.relacion
         let marca = sello
+        let fuerza = intensidad
+        let extra = controles
 
         token += 1
         let mio = token
         calculando = true
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            var salida = FilterEngine.aplicar(elegido, a: base)
-            if let relacion = relacion {
-                salida = FilterEngine.recortar(salida, relacion: relacion)
-            }
-            salida = SelloFecha.estampar(salida, modo: marca)
+        // Espera a que el dedo deje de moverse antes de recalcular.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard mio == token else { return }
 
-            DispatchQueue.main.async {
-                guard mio == token else { return }
-                vista = salida
-                calculando = false
+            DispatchQueue.global(qos: .userInitiated).async {
+                var ajustes = extra
+                ajustes.intensidad = fuerza
+
+                var salida = FilterEngine.aplicar(elegido, a: base, controles: ajustes)
+                if let relacion = relacion {
+                    salida = FilterEngine.recortar(salida, relacion: relacion)
+                }
+                salida = SelloFecha.estampar(salida, modo: marca)
+
+                DispatchQueue.main.async {
+                    guard mio == token else { return }
+                    vista = salida
+                    calculando = false
+                }
             }
         }
     }

@@ -13,6 +13,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// Lo cambia la vista cuando el usuario elige otro filtro.
     var preset: FilterPreset = .dazzClassic
 
+    /// Intensidad, puntitos y fugas elegidos por el usuario.
+    var controles = ControlesLook()
+
     let salida = AVCaptureVideoDataOutput()
     private let renderer = VideoFrameRenderer()
     private let cola = DispatchQueue(label: "com.diego.dazzcam.vivo", qos: .userInitiated)
@@ -64,7 +67,11 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         ultimoRender = ahora
 
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        guard let filtrada = renderer.renderizar(buffer, preset: preset) else { return }
+        guard let filtrada = renderer.renderizar(
+            buffer,
+            preset: preset,
+            controles: controles
+        ) else { return }
 
         contadorCuadros += 1
         if ahora - marcaContador >= 1.0 {

@@ -13,7 +13,22 @@ struct AjusteFoto {
     var vineta: CGFloat = 0              // 0 = nada, 1 = esquinas negras
     var grano: CGFloat = 0               // 0 = nada, 0.2 = pelicula sucia
     var polvo: CGFloat = 0               // puntitos blancos de pelicula vieja
+    var fuga: CGFloat = 0                // luz que se cuela por la esquina
+    var fugaEsquina: Int = 0             // 0-3: cual esquina usa la fuga
     var blancoYNegro: Bool = false
+}
+
+/// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
+struct ControlesLook: Equatable {
+    var intensidad: CGFloat = 1
+    var polvo: CGFloat? = nil
+    var fuga: CGFloat? = nil
+    var grano: CGFloat? = nil
+
+    /// true si el usuario no ha tocado nada.
+    var automatico: Bool {
+        abs(intensidad - 1) < 0.001 && polvo == nil && fuga == nil && grano == nil
+    }
 }
 
 /// Aplica los looks de pelicula a fotos y a video.
@@ -23,12 +38,16 @@ enum FilterEngine {
 
     // MARK: - API
 
-    static func aplicar(_ preset: FilterPreset, a imagen: UIImage) -> UIImage {
+    static func aplicar(
+        _ preset: FilterPreset,
+        a imagen: UIImage,
+        controles: ControlesLook = ControlesLook()
+    ) -> UIImage {
         guard preset != .original else { return imagen }
 
         let base = normalizar(imagen)
         guard let entrada = CIImage(image: base) else { return imagen }
-        guard let salida = cadena(preset, entrada: entrada) else { return imagen }
+        guard let salida = cadena(preset, entrada: entrada, controles: controles) else { return imagen }
 
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {
             return imagen
@@ -36,9 +55,35 @@ enum FilterEngine {
         return UIImage(cgImage: cg, scale: base.scale, orientation: .up)
     }
 
-    static func cadena(_ preset: FilterPreset, entrada: CIImage) -> CIImage? {
+    static func cadena(
+        _ preset: FilterPreset,
+        entrada: CIImage,
+        controles: ControlesLook = ControlesLook()
+    ) -> CIImage? {
         guard preset != .original else { return entrada }
-        return aplicar(ajuste(preset), a: entrada)
+
+        var a = ajuste(preset)
+        a.polvo = controles.polvo ?? a.polvo
+        a.fuga = controles.fuga ?? a.fuga
+        a.grano = controles.grano ?? a.grano
+
+        guard let filtrada = aplicar(a, a: entrada) else { return nil }
+        guard controles.intensidad < 0.999 else { return filtrada }
+
+        return mezclar(filtrada, con: entrada, cantidad: controles.intensidad)
+    }
+
+    /// Mezcla el look con la foto original: 0 = original, 1 = look completo.
+    private static func mezclar(
+        _ filtrada: CIImage,
+        con original: CIImage,
+        cantidad: CGFloat
+    ) -> CIImage? {
+        let f = CIFilter.dissolveTransition()
+        f.inputImage = original
+        f.targetImage = filtrada
+        f.time = Float(min(max(cantidad, 0), 1))
+        return f.outputImage
     }
 
     // MARK: - Tabla de looks
@@ -329,6 +374,37 @@ enum FilterEngine {
             a.polvo = 0
         }
 
+        // Fugas de luz: la camara decide donde y cuanto (0 a 100%).
+        switch preset {
+        case .oldRollFlash:
+            a.fuga = 0.65
+        case .disposable:
+            a.fuga = 0.6
+        case .oldRoll8:
+            a.fuga = 0.5
+        case .disco:
+            a.fuga = 0.5
+        case .neonDream:
+            a.fuga = 0.45
+        case .chatarraCCD:
+            a.fuga = 0.35
+        case .framedFade:
+            a.fuga = 0.35
+        case .vhs, .oldRoll35:
+            a.fuga = 0.3
+        case .y2kDigi, .d3d, .tezzaPolaroid, .goldenHour:
+            a.fuga = 0.25
+        case .polaroid600, .sx70, .instColor:
+            a.fuga = 0.2
+        default:
+            a.fuga = 0
+        }
+
+        // Cada camara tiene su esquina de fuga (siempre la misma).
+        a.fugaEsquina = preset.rawValue.unicodeScalars.reduce(0) {
+            $0 + Int($1.value)
+        } % 4
+
         return a
     }
 
@@ -390,7 +466,51 @@ enum FilterEngine {
             actual = conPolvo
         }
 
+        // 8. fuga de luz por una esquina
+        if a.fuga > 0, let conFuga = fuga(actual, cantidad: a.fuga, esquina: a.fugaEsquina) {
+            actual = conFuga
+        }
+
         return actual
+    }
+
+    // MARK: - Fuga de luz
+
+    private static func fuga(_ imagen: CIImage, cantidad: CGFloat, esquina: Int) -> CIImage? {
+        let extent = imagen.extent
+        let ancho = extent.width
+        let alto = extent.height
+        guard ancho > 0, alto > 0 else { return nil }
+
+        let posiciones: [CGPoint] = [
+            CGPoint(x: extent.minX, y: extent.maxY),
+            CGPoint(x: extent.maxX, y: extent.maxY),
+            CGPoint(x: extent.minX, y: extent.minY),
+            CGPoint(x: extent.maxX, y: extent.minY)
+        ]
+        let centro = posiciones[abs(esquina) % posiciones.count]
+
+        let gradiente = CIFilter.radialGradient()
+        gradiente.center = centro
+        gradiente.radius0 = 0
+        gradiente.radius1 = Float(max(ancho, alto) * 0.75)
+        gradiente.color0 = CIColor(red: 1.0, green: 0.62, blue: 0.24, alpha: 1.0)
+        gradiente.color1 = CIColor(red: 0, green: 0, blue: 0, alpha: 1.0)
+
+        guard let crudo = gradiente.outputImage?.cropped(to: extent) else { return nil }
+
+        let control = CIFilter.colorMatrix()
+        control.inputImage = crudo
+        control.rVector = CIVector(x: cantidad, y: 0, z: 0, w: 0)
+        control.gVector = CIVector(x: 0, y: cantidad, z: 0, w: 0)
+        control.bVector = CIVector(x: 0, y: 0, z: cantidad, w: 0)
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+        guard let capa = control.outputImage else { return nil }
+
+        let mezcla = CIFilter.screenBlendMode()
+        mezcla.inputImage = capa
+        mezcla.backgroundImage = imagen
+        return mezcla.outputImage
     }
 
     // MARK: - Grano

@@ -44,15 +44,27 @@ enum VideoBaker {
 
     /// Composicion que aplica el filtro cuadro por cuadro.
     /// Se usa igual para exportar y para verlo en el reproductor.
-    static func composicion(_ asset: AVAsset, preset: FilterPreset) -> AVVideoComposition {
+    static func composicion(
+        _ asset: AVAsset,
+        preset: FilterPreset,
+        controles: ControlesLook = ControlesLook()
+    ) -> AVVideoComposition {
         AVVideoComposition(asset: asset) { peticion in
-            let filtrada = FilterEngine.cadena(preset, entrada: peticion.sourceImage)
+            let filtrada = FilterEngine.cadena(
+                preset,
+                entrada: peticion.sourceImage,
+                controles: controles
+            )
             peticion.finish(with: filtrada ?? peticion.sourceImage, context: nil)
         }
     }
 
     /// Exporta una copia filtrada a un archivo temporal .mp4.
-    static func exportar(_ url: URL, preset: FilterPreset) async throws -> URL {
+    static func exportar(
+        _ url: URL,
+        preset: FilterPreset,
+        controles: ControlesLook = ControlesLook()
+    ) async throws -> URL {
         let asset = AVURLAsset(url: url)
 
         guard let exportador = AVAssetExportSession(
@@ -69,7 +81,7 @@ enum VideoBaker {
 
         exportador.outputURL = destino
         exportador.outputFileType = .mp4
-        exportador.videoComposition = composicion(asset, preset: preset)
+        exportador.videoComposition = composicion(asset, preset: preset, controles: controles)
         exportador.shouldOptimizeForNetworkUse = true
 
         await withCheckedContinuation { (continuacion: CheckedContinuation<Void, Never>) in

@@ -25,6 +25,7 @@ final class MovieRecorder: NSObject, ObservableObject {
     private var entradaAudio: AVCaptureDeviceInput?
     private var pausada: AVCaptureVideoDataOutput?
     private var preset: FilterPreset = .dazzClassic
+    private var controles = ControlesLook()
     private var reloj: Timer?
 
     // MARK: - Preparacion
@@ -47,11 +48,16 @@ final class MovieRecorder: NSObject, ObservableObject {
 
     // MARK: - Grabar
 
-    func empezar(preset: FilterPreset, quitar: AVCaptureVideoDataOutput?) async {
+    func empezar(
+        preset: FilterPreset,
+        controles: ControlesLook = ControlesLook(),
+        quitar: AVCaptureVideoDataOutput?
+    ) async {
         guard !grabando, !procesando, let sesion = sesion else { return }
 
         error = nil
         self.preset = preset
+        self.controles = controles
         pausada = quitar
 
         let conMicro = await pedirMicrofono()
@@ -181,13 +187,18 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
         }
 
         let look = preset
+        let ajustes = controles
         procesando = true
 
         Task {
             defer { procesando = false }
 
             do {
-                let conFiltro = try await VideoBaker.exportar(url, preset: look)
+                let conFiltro = try await VideoBaker.exportar(
+                    url,
+                    preset: look,
+                    controles: ajustes
+                )
                 try await PhotoLibrarySaver.guardarVideo(conFiltro)
                 guardados += 1
                 try? FileManager.default.removeItem(at: url)

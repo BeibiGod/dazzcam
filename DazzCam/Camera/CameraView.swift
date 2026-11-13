@@ -37,7 +37,7 @@ struct CameraView: View {
     @State private var mostrarExposicion = false
     @State private var cuenta: Int?
     @State private var mostrarCuadricula = true
-    @State private var sello: SelloFecha = .apagado
+    @State private var sello: SelloFecha = .dazz
     @State private var destello: Double = 0
     @State private var mostrarImportar = false
     @State private var fotoElegida: PhotosPickerItem?
@@ -45,9 +45,11 @@ struct CameraView: View {
     @State private var mostrarEditor = false
     @State private var videoImportado: URL?
     @State private var mostrarEditorVideo = false
+    @State private var controles = ControlesLook()
+    @State private var mostrarAjustes = false
 
     private var versionTexto: String {
-        "v1.7 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.8 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -177,6 +179,7 @@ struct CameraView: View {
                 _ = vivo.conectar(a: camara.session)
                 video.conectar(a: camara.session)
                 vivo.preset = preset
+                vivo.controles = controles
             }
             await camara.arrancar()
             camara.ponerZoom(1)
@@ -198,7 +201,15 @@ struct CameraView: View {
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
-            aplicarFiltroAUltima()
+            if mostrarCaptura {
+                aplicarFiltroAUltima()
+            }
+        }
+        .onChange(of: controles) { _, nuevo in
+            vivo.controles = nuevo
+            if mostrarCaptura {
+                aplicarFiltroAUltima()
+            }
         }
         .onChange(of: video.grabando) { _, grabando in
             if grabando {
@@ -215,7 +226,7 @@ struct CameraView: View {
                 miniaturas.generar(desde: base)
             }
 
-            var procesada = FilterEngine.aplicar(preset, a: base)
+            var procesada = FilterEngine.aplicar(preset, a: base, controles: controles)
             if let relacion = proporcion.relacion {
                 procesada = FilterEngine.recortar(procesada, relacion: relacion)
             }
@@ -241,6 +252,12 @@ struct CameraView: View {
         }
         .sheet(isPresented: $mostrarTodas) {
             CameraPickerSheet(seleccionado: $preset, muestras: miniaturas.muestras)
+        }
+        .sheet(isPresented: $mostrarAjustes) {
+            AjustesLookView(controles: $controles, preset: preset)
+                .presentationDetents([.height(470)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
         .sheet(isPresented: $mostrarIA) {
             if let analisis = analisis {
@@ -290,7 +307,7 @@ struct CameraView: View {
             videoImportado = nil
         }) {
             if let url = videoImportado {
-                VideoEditorView(url: url, preset: preset) { elegido in
+                VideoEditorView(url: url, preset: preset, controles: controles) { elegido in
                     preset = elegido
                     aviso = "Video guardado con \(elegido.nombre)"
                     Task {
@@ -307,6 +324,7 @@ struct CameraView: View {
                     preset: preset,
                     proporcion: proporcion,
                     sello: sello,
+                    controles: controles,
                     alGuardar: { _, elegido in
                         preset = elegido
                         aviso = "Copia guardada con \(elegido.nombre)"
@@ -449,6 +467,21 @@ struct CameraView: View {
             }
             .buttonStyle(.plain)
             .fixedSize()
+
+            Button {
+                mostrarAjustes = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(controles.automatico ? Color.white.opacity(0.85) : Color.black)
+                    .frame(width: 30, height: 27)
+                    .background(
+                        controles.automatico ? Color.black.opacity(0.45) : Color.yellow,
+                        in: Capsule()
+                    )
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
         }
         .padding(.horizontal, 16)
     }
@@ -510,13 +543,7 @@ struct CameraView: View {
                 mostrarExposicion.toggle()
             }
 
-            herramienta(
-                icono: "calendar",
-                texto: sello.encendido ? sello.etiqueta : nil,
-                activo: sello.encendido
-            ) {
-                sello = sello.siguiente
-            }
+            menuFecha
 
             herramientaIA
 
@@ -546,6 +573,41 @@ struct CameraView: View {
             .background(activo ? Color.yellow : Color.black.opacity(0.5), in: Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Menu del sello: fecha tipo DazzCam o fecha del iPhone.
+    private var menuFecha: some View {
+        Menu {
+            ForEach(SelloFecha.allCases) { modo in
+                Button {
+                    sello = modo
+                } label: {
+                    if sello == modo {
+                        Label(modo.tituloMenu, systemImage: "checkmark")
+                    } else {
+                        Text(modo.tituloMenu)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+
+                if sello.encendido {
+                    Text(sello.etiqueta)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                }
+            }
+            .foregroundStyle(sello.encendido ? Color.black : Color.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                sello.encendido ? Color.yellow : Color.black.opacity(0.5),
+                in: Capsule()
+            )
+        }
+        .fixedSize()
     }
 
     private var controlExposicion: some View {
@@ -692,7 +754,7 @@ struct CameraView: View {
                 video.parar()
             } else {
                 Task {
-                    await video.empezar(preset: preset, quitar: vivo.salida)
+                    await video.empezar(preset: preset, controles: controles, quitar: vivo.salida)
                 }
             }
         }
@@ -797,7 +859,7 @@ struct CameraView: View {
     private func aplicarFiltroAUltima() {
         guard let base = foto.ultimaFoto else { return }
 
-        var procesada = FilterEngine.aplicar(preset, a: base)
+        var procesada = FilterEngine.aplicar(preset, a: base, controles: controles)
         if let relacion = proporcion.relacion {
             procesada = FilterEngine.recortar(procesada, relacion: relacion)
         }
