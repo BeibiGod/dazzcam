@@ -10,10 +10,9 @@ struct AIView: View {
 
     private var colorPuntaje: Color {
         switch analisis.puntaje {
-        case 85...100: return Color(red: 0.35, green: 0.9, blue: 0.5)
-        case 70..<85: return Color(red: 0.75, green: 0.95, blue: 0.35)
-        case 50..<70: return Color(red: 1.0, green: 0.82, blue: 0.3)
-        default: return Color(red: 1.0, green: 0.45, blue: 0.45)
+        case 88...100: return Color(red: 0.35, green: 0.9, blue: 0.5)
+        case 80..<88: return Color(red: 0.75, green: 0.95, blue: 0.35)
+        default: return Color(red: 1.0, green: 0.82, blue: 0.3)
         }
     }
 
@@ -144,7 +143,7 @@ struct AIView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Text("Mira toda la escena, no solo el centro: mide luz, contraste, color, caras y horizonte, y con eso elige las camaras que mejor le quedan. Todo pasa dentro de tu iPhone; no se sube nada a internet.")
+                    Text("Mira toda la escena: luz, contraste, color, caras y horizonte, y elige las camaras que mejor le quedan. No importa si hay mucha o poca luz: siempre busca lo mas aesthetic. Todo pasa dentro de tu iPhone; no se sube nada a internet.")
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.35))
                         .fixedSize(horizontal: false, vertical: true)

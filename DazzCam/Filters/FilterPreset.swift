@@ -84,6 +84,28 @@ enum FilterPreset: String, CaseIterable, Identifiable {
 
     case y2kDigi
 
+    // ---- agregadas en la v1.7: Framed, ISM, OldRoll y Tezza ----
+    case framedSoft
+    case framedFade
+    case ismPastel
+    case ismCream
+    case ismNight
+    case oldRoll35
+    case oldRollFlash
+    case oldRoll8
+    case oldRollInstant
+    case tezzaClean
+    case tezzaWarm
+    case tezzaGrain
+    case tezzaPolaroid
+    case sakura
+    case latte
+    case oceanFade
+    case cinemaTeal
+    case disco
+    case milk
+    case neonDream
+
     var id: String { rawValue }
 
     var nombre: String {
@@ -138,6 +160,27 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .polaroidGo: return "Polaroid Go"
         case .instaxMono: return "Instax Mono"
         case .y2kDigi: return "Y2K Digi"
+
+        case .framedSoft: return "Framed Soft"
+        case .framedFade: return "Framed Fade"
+        case .ismPastel: return "ISM Pastel"
+        case .ismCream: return "ISM Cream"
+        case .ismNight: return "ISM Night"
+        case .oldRoll35: return "OldRoll 35"
+        case .oldRollFlash: return "OldRoll Flash"
+        case .oldRoll8: return "OldRoll 8mm"
+        case .oldRollInstant: return "OldRoll Instant"
+        case .tezzaClean: return "Tezza Clean"
+        case .tezzaWarm: return "Tezza Warm"
+        case .tezzaGrain: return "Tezza Grain"
+        case .tezzaPolaroid: return "Tezza Polaroid"
+        case .sakura: return "Sakura"
+        case .latte: return "Latte"
+        case .oceanFade: return "Ocean Fade"
+        case .cinemaTeal: return "Cinema Teal"
+        case .disco: return "Disco"
+        case .milk: return "Milk"
+        case .neonDream: return "Neon Dream"
         }
     }
 
@@ -163,6 +206,14 @@ enum FilterPreset: String, CaseIterable, Identifiable {
             return "CONTAX"
         case .y2kDigi, .chatarraCCD:
             return "SONY"
+        case .framedSoft, .framedFade:
+            return "FRAMED"
+        case .ismPastel, .ismCream, .ismNight:
+            return "ISM"
+        case .oldRoll35, .oldRollFlash, .oldRoll8, .oldRollInstant:
+            return "OLDROLL"
+        case .tezzaClean, .tezzaWarm, .tezzaGrain, .tezzaPolaroid:
+            return "TEZZA"
         default:
             return "BEIBI"
         }
@@ -172,11 +223,13 @@ enum FilterPreset: String, CaseIterable, Identifiable {
     var familia: FamiliaCamara {
         switch self {
         case .polaroid600, .sx70, .instaxMini, .instaxWide,
-             .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono:
+             .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono,
+             .tezzaPolaroid, .oldRollInstant:
             return .instantanea
         case .hp5, .delta3200, .triX, .tmax:
             return .reflex
-        case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi:
+        case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi,
+             .ismNight, .disco, .neonDream:
             return .digital
         default:
             return .compacta
@@ -186,18 +239,22 @@ enum FilterPreset: String, CaseIterable, Identifiable {
     var categoria: FilterCategoria {
         switch self {
         case .original, .portra, .superia, .kodachrome, .instColor, .dazzClassic,
-             .contaxT2, .goldenHour:
+             .contaxT2, .goldenHour, .tezzaClean, .tezzaWarm, .framedSoft:
             return .clasica
         case .cinestill, .hp5, .lomo, .crossProcess, .bleachBypass,
              .faded90s, .copper, .kodakGold, .ektar100, .fujiPro400,
              .delta3200, .agfaVista, .ultramax, .fujiC200, .provia, .velvia,
-             .triX, .tmax, .cinestill50d, .ektachrome, .disposable, .sepiaViejo:
+             .triX, .tmax, .cinestill50d, .ektachrome, .disposable, .sepiaViejo,
+             .ismPastel, .ismCream, .oldRoll35, .oldRollFlash, .oldRoll8,
+             .tezzaGrain, .sakura, .latte, .oceanFade, .framedFade,
+             .cinemaTeal, .milk:
             return .vintage
         case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio,
-             .polaroidNoir, .polaroidGo, .instaxMono:
+             .polaroidNoir, .polaroidGo, .instaxMono, .tezzaPolaroid,
+             .oldRollInstant:
             return .instantanea
         case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave,
-             .chatarraCCD, .y2kDigi:
+             .chatarraCCD, .y2kDigi, .ismNight, .disco, .neonDream:
             return .underground
         }
     }

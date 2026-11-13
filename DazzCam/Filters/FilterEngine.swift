@@ -12,6 +12,7 @@ struct AjusteFoto {
     var desvanecido: CGFloat = 0         // sube los negros (look viejo)
     var vineta: CGFloat = 0              // 0 = nada, 1 = esquinas negras
     var grano: CGFloat = 0               // 0 = nada, 0.2 = pelicula sucia
+    var polvo: CGFloat = 0               // puntitos blancos de pelicula vieja
     var blancoYNegro: Bool = false
 }
 
@@ -226,6 +227,106 @@ enum FilterEngine {
         case .y2kDigi:
             a.temperatura = 6400; a.tinte = 3; a.saturacion = 1.25
             a.contraste = 1.05; a.grano = 0.12; a.vineta = 0.2
+
+        // ---- v1.7: Framed, ISM, OldRoll y Tezza ----
+        case .framedSoft:
+            a.temperatura = 6900; a.saturacion = 0.92; a.contraste = 0.92
+            a.desvanecido = 0.07; a.grano = 0.05; a.vineta = 0.18
+
+        case .framedFade:
+            a.temperatura = 7000; a.saturacion = 0.78; a.contraste = 0.85
+            a.desvanecido = 0.12; a.grano = 0.09; a.vineta = 0.3
+
+        case .ismPastel:
+            a.temperatura = 7200; a.tinte = 6; a.saturacion = 0.85
+            a.contraste = 0.9; a.desvanecido = 0.09; a.grano = 0.06; a.vineta = 0.2
+
+        case .ismCream:
+            a.temperatura = 7700; a.saturacion = 0.9; a.contraste = 0.94
+            a.desvanecido = 0.06; a.grano = 0.06; a.vineta = 0.22
+
+        case .ismNight:
+            a.temperatura = 5600; a.tinte = -10; a.saturacion = 1.15
+            a.contraste = 1.15; a.grano = 0.14; a.vineta = 0.55
+
+        case .oldRoll35:
+            a.temperatura = 7500; a.saturacion = 1.06; a.contraste = 1.06
+            a.desvanecido = 0.04; a.grano = 0.1; a.vineta = 0.32
+
+        case .oldRollFlash:
+            a.temperatura = 8200; a.saturacion = 1.05; a.contraste = 1.1
+            a.brillo = 0.04; a.grano = 0.08; a.vineta = 0.45
+
+        case .oldRoll8:
+            a.temperatura = 7800; a.saturacion = 0.85; a.contraste = 0.95
+            a.desvanecido = 0.08; a.grano = 0.2; a.vineta = 0.6
+
+        case .oldRollInstant:
+            a.temperatura = 7000; a.tinte = -4; a.saturacion = 0.92
+            a.contraste = 0.9; a.desvanecido = 0.07; a.grano = 0.07; a.vineta = 0.45
+
+        case .tezzaClean:
+            a.temperatura = 7400; a.saturacion = 1.02; a.contraste = 1.04
+            a.desvanecido = 0.03; a.grano = 0.03; a.vineta = 0.15
+
+        case .tezzaWarm:
+            a.temperatura = 8000; a.saturacion = 1.08; a.contraste = 1.02
+            a.desvanecido = 0.04; a.grano = 0.05; a.vineta = 0.2
+
+        case .tezzaGrain:
+            a.temperatura = 7200; a.saturacion = 1.0; a.contraste = 1.0
+            a.desvanecido = 0.06; a.grano = 0.18; a.vineta = 0.35
+
+        case .tezzaPolaroid:
+            a.temperatura = 7800; a.saturacion = 0.9; a.contraste = 0.9
+            a.desvanecido = 0.08; a.vineta = 0.5; a.grano = 0.06
+
+        case .sakura:
+            a.temperatura = 7300; a.tinte = 12; a.saturacion = 1.05
+            a.contraste = 0.92; a.desvanecido = 0.07; a.grano = 0.05; a.vineta = 0.18
+
+        case .latte:
+            a.temperatura = 7900; a.tinte = 4; a.saturacion = 0.88
+            a.contraste = 0.9; a.desvanecido = 0.08; a.grano = 0.06; a.vineta = 0.2
+
+        case .oceanFade:
+            a.temperatura = 6000; a.tinte = -8; a.saturacion = 0.95
+            a.contraste = 0.92; a.desvanecido = 0.08; a.grano = 0.05; a.vineta = 0.25
+
+        case .cinemaTeal:
+            a.temperatura = 6400; a.tinte = -6; a.saturacion = 1.1
+            a.contraste = 1.18; a.desvanecido = 0.02; a.grano = 0.06; a.vineta = 0.3
+
+        case .disco:
+            a.temperatura = 6800; a.tinte = 18; a.saturacion = 1.35
+            a.contraste = 1.15; a.grano = 0.1; a.vineta = 0.35
+
+        case .milk:
+            a.temperatura = 7500; a.saturacion = 0.8; a.contraste = 0.82
+            a.brillo = 0.03; a.desvanecido = 0.14; a.grano = 0.04; a.vineta = 0.15
+
+        case .neonDream:
+            a.temperatura = 6200; a.tinte = 22; a.saturacion = 1.4
+            a.contraste = 1.1; a.desvanecido = 0.05; a.grano = 0.12; a.vineta = 0.35
+        }
+
+        // Puntitos blancos y rayones de pelicula vieja.
+        switch preset {
+        case .dazzClassic, .disposable, .faded90s, .sepiaViejo, .chatarraCCD,
+             .vhs, .oldRoll8, .framedFade:
+            a.polvo = 0.75
+
+        case .sx70, .polaroid600, .polaroidGo, .polaroidFrio, .instaxWide,
+             .oldRoll35, .oldRollFlash, .oldRollInstant, .tezzaGrain,
+             .tezzaPolaroid:
+            a.polvo = 0.55
+
+        case .kodakGold, .ultramax, .agfaVista, .superia, .fujiC200, .portra,
+             .hp5, .triX, .delta3200, .tmax, .tezzaClean, .tezzaWarm:
+            a.polvo = 0.4
+
+        default:
+            a.polvo = 0
         }
 
         return a
@@ -284,6 +385,11 @@ enum FilterEngine {
             actual = conGrano
         }
 
+        // 7. puntitos blancos y rayones de pelicula
+        if a.polvo > 0, let conPolvo = polvo(actual, cantidad: a.polvo) {
+            actual = conPolvo
+        }
+
         return actual
     }
 
@@ -313,6 +419,78 @@ enum FilterEngine {
         guard let capa = transparencia.outputImage else { return nil }
 
         let mezcla = CIFilter.softLightBlendMode()
+        mezcla.inputImage = capa
+        mezcla.backgroundImage = imagen
+        return mezcla.outputImage
+    }
+
+    // MARK: - Polvo de pelicula
+
+    /// Puntitos blancos y rayones, como el polvo de un negativo viejo.
+    private static let polvoTile: CIImage? = {
+        let lado = 512
+        let espacio = CGColorSpaceCreateDeviceRGB()
+
+        guard let contexto = CGContext(
+            data: nil,
+            width: lado,
+            height: lado,
+            bitsPerComponent: 8,
+            bytesPerRow: lado * 4,
+            space: espacio,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        contexto.clear(CGRect(x: 0, y: 0, width: lado, height: lado))
+
+        for _ in 0..<260 {
+            let radio = CGFloat.random(in: 0.4...1.5)
+            let x = CGFloat.random(in: 0..<CGFloat(lado))
+            let y = CGFloat.random(in: 0..<CGFloat(lado))
+            let alfa = CGFloat.random(in: 0.15...0.8)
+
+            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+                contexto.setFillColor(color)
+                contexto.fillEllipse(
+                    in: CGRect(x: x, y: y, width: radio * 2, height: radio * 2)
+                )
+            }
+        }
+
+        for _ in 0..<10 {
+            let x = CGFloat.random(in: 0..<CGFloat(lado))
+            let y = CGFloat.random(in: 0..<CGFloat(lado))
+            let alto = CGFloat.random(in: 8...34)
+            let alfa = CGFloat.random(in: 0.1...0.3)
+
+            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+                contexto.setFillColor(color)
+                contexto.fill(CGRect(x: x, y: y, width: 0.7, height: alto))
+            }
+        }
+
+        guard let cg = contexto.makeImage() else { return nil }
+        return CIImage(cgImage: cg)
+    }()
+
+    private static func polvo(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
+        guard let azulejo = polvoTile else { return nil }
+
+        let escala = max(imagen.extent.width / 900.0, 0.3)
+
+        let repetir = CIFilter.affineTile()
+        repetir.inputImage = azulejo
+        repetir.transform = CGAffineTransform(scaleX: escala, y: escala)
+        guard let infinito = repetir.outputImage else { return nil }
+
+        let control = CIFilter.colorMatrix()
+        control.inputImage = infinito.cropped(to: imagen.extent)
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: cantidad)
+        guard let capa = control.outputImage else { return nil }
+
+        let mezcla = CIFilter.screenBlendMode()
         mezcla.inputImage = capa
         mezcla.backgroundImage = imagen
         return mezcla.outputImage

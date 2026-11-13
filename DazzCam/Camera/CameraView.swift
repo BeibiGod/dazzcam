@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import UIKit
 import PhotosUI
+import UniformTypeIdentifiers
 
 /// Pantalla de camara completa: visor, lentes, zoom de pellizco, enfoque,
 /// temporizador, exposicion, flash, proporcion, video e IA.
@@ -12,6 +13,7 @@ struct CameraView: View {
     @StateObject private var miniaturas = FilterThumbnails()
     @StateObject private var video = MovieRecorder()
     @StateObject private var nivel = Nivel()
+    @Environment(\.scenePhase) private var fase
 
     @State private var preparado = false
     @State private var mostrarCaptura = false
@@ -30,7 +32,7 @@ struct CameraView: View {
     @State private var zoomBase: CGFloat = 1
     @State private var flashEncendido = false
     @State private var temporizador: Temporizador = .apagado
-    @State private var proporcion: Proporcion = .completa
+    @State private var proporcion: Proporcion = .dieciseisNueve
     @State private var exposicion: Double = 0
     @State private var mostrarExposicion = false
     @State private var cuenta: Int?
@@ -41,9 +43,11 @@ struct CameraView: View {
     @State private var fotoElegida: PhotosPickerItem?
     @State private var fotoImportada: UIImage?
     @State private var mostrarEditor = false
+    @State private var videoImportado: URL?
+    @State private var mostrarEditorVideo = false
 
     private var versionTexto: String {
-        "v1.6 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.7 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -175,6 +179,7 @@ struct CameraView: View {
                 vivo.preset = preset
             }
             await camara.arrancar()
+            camara.ponerZoom(1)
             zoomBase = camara.zoom
             if mostrarCuadricula {
                 nivel.empezar()
@@ -183,6 +188,13 @@ struct CameraView: View {
         .onDisappear {
             nivel.parar()
             camara.detener()
+        }
+        .onChange(of: fase) { _, nueva in
+            // Al volver a entrar a la app siempre arranca en 1x y 16:9.
+            guard nueva == .active else { return }
+            camara.ponerZoom(1)
+            zoomBase = camara.zoom
+            proporcion = .dieciseisNueve
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
@@ -245,19 +257,47 @@ struct CameraView: View {
                 )
             }
         }
-        .photosPicker(isPresented: $mostrarImportar, selection: $fotoElegida, matching: .images)
+        .photosPicker(
+            isPresented: $mostrarImportar,
+            selection: $fotoElegida,
+            matching: .any(of: [.images, .videos])
+        )
         .onChange(of: fotoElegida) { _, item in
             guard let item = item else { return }
 
             Task {
-                if let datos = try? await item.loadTransferable(type: Data.self),
-                   let imagen = UIImage(data: datos) {
+                if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                    if let archivo = try? await item.loadTransferable(type: VideoFile.self) {
+                        videoImportado = archivo.url
+                        mostrarEditorVideo = true
+                    } else {
+                        aviso = "No pude abrir ese video"
+                    }
+                } else if let datos = try? await item.loadTransferable(type: Data.self),
+                          let imagen = UIImage(data: datos) {
                     fotoImportada = imagen
                     mostrarEditor = true
                 } else {
                     aviso = "No pude abrir esa foto"
                 }
                 fotoElegida = nil
+            }
+        }
+        .sheet(isPresented: $mostrarEditorVideo, onDismiss: {
+            if let url = videoImportado {
+                try? FileManager.default.removeItem(at: url)
+            }
+            videoImportado = nil
+        }) {
+            if let url = videoImportado {
+                VideoEditorView(url: url, preset: preset) { elegido in
+                    preset = elegido
+                    aviso = "Video guardado con \(elegido.nombre)"
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        aviso = nil
+                    }
+                }
             }
         }
         .sheet(isPresented: $mostrarEditor) {

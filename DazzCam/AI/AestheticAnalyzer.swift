@@ -87,43 +87,27 @@ enum AestheticAnalyzer {
         var puntos = 0
         var consejos: [String] = []
 
-        // 1. luz (30)
-        switch luz {
-        case 0.45...0.72:
-            puntos += 30
-        case 0.32..<0.45:
-            puntos += 20
-            consejos.append("Esta algo oscura: gira hacia una ventana o enciende una luz.")
-        case 0.72...0.86:
-            puntos += 18
-            consejos.append("Hay zonas muy claras: toca la parte brillante para bajar la exposicion.")
-        case ..<0.32:
-            puntos += 8
-            consejos.append("Muy oscura: sin luz no hay detalle, busca otra zona.")
-        default:
-            puntos += 6
-            consejos.append("Esta quemada: busca una sombra o baja la exposicion tocando lo claro.")
-        }
+        // 1. luz: no se juzga. Como en Framed, con poca o mucha luz siempre
+        //    se puede sacar algo aesthetic; lo unico que cambia es la camara
+        //    que conviene, no el puntaje. Por eso la luz solo se mide.
+        puntos += 28
 
         // 2. contraste (20)
         if contraste >= 0.18 {
             puntos += 20
-        } else if contraste >= 0.10 {
-            puntos += 12
-            consejos.append("Le falta contraste: mete algo oscuro y algo claro en el mismo cuadro.")
+        } else if contraste >= 0.08 {
+            puntos += 18
         } else {
-            puntos += 5
-            consejos.append("Se ve plana y gris. Busca una sombra o un color fuerte cerca.")
+            puntos += 16
         }
 
-        // 3. color (20)
+        // 3. color (20): una escena sin color tambien es aesthetic en B y N
         if color >= 0.22 {
             puntos += 20
-        } else if color >= 0.12 {
-            puntos += 12
+        } else if color >= 0.10 {
+            puntos += 19
         } else {
-            puntos += 6
-            consejos.append("Colores apagados: acerca algo con color fuerte al cuadro.")
+            puntos += 17
         }
 
         // 4. composicion (20) usando el objeto que mas llama la atencion
@@ -145,31 +129,30 @@ enum AestheticAnalyzer {
             if distancia <= 0.12 {
                 puntos += 20
             } else if distancia <= 0.22 {
-                puntos += 13
+                puntos += 18
                 consejos.append("Mueve el sujeto un poco para que caiga en un cruce de tercios.")
             } else {
-                puntos += 7
+                puntos += 16
                 consejos.append("El sujeto esta centrado: recorrelo a un tercio del cuadro.")
             }
         } else {
-            puntos += 9
-            consejos.append("No encontre un sujeto claro: llena el cuadro con algo.")
+            puntos += 17
         }
 
         // 5. personas (10)
         if (1...2).contains(caras.count) {
             puntos += 10
         } else if caras.isEmpty {
-            puntos += 6
+            puntos += 9
         } else {
-            puntos += 4
+            puntos += 8
             consejos.append("Hay varias caras: acerca o enfoca a una sola.")
         }
 
-        // 6. horizonte torcido: resta hasta 8 puntos
+        // 6. horizonte torcido: resta poco, solo para avisar del nivel
         let inclinacion = horizonte ?? 0
         if inclinacion > 1.5 {
-            puntos -= min(8, Int(inclinacion * 1.4))
+            puntos -= min(5, Int(inclinacion))
             consejos.append(String(
                 format: "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula.",
                 inclinacion
@@ -177,7 +160,7 @@ enum AestheticAnalyzer {
         }
 
         if consejos.isEmpty {
-            consejos.append("Se ve bien. Dispara ahora, la luz es la correcta.")
+            consejos.append("Todo bien: dispara y elige el look que mas te guste.")
         }
 
         let puntaje = min(max(puntos, 0), 100)
@@ -205,10 +188,9 @@ enum AestheticAnalyzer {
 
     private static func resumenPara(_ puntaje: Int) -> String {
         switch puntaje {
-        case 85...100: return "Muy aesthetic. Dispara ya."
-        case 70..<85: return "Va bien, solo un ajuste y queda."
-        case 50..<70: return "Se puede arreglar moviendote un poco."
-        default: return "Mejor cambia de lugar antes de disparar."
+        case 88...100: return "Muy aesthetic. Dispara ya."
+        case 78..<88: return "Buen cuadro. Elige una de estas camaras."
+        default: return "Listo para disparar. Cualquiera de estas le queda."
         }
     }
 

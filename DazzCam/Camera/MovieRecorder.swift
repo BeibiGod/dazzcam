@@ -187,7 +187,7 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
             defer { procesando = false }
 
             do {
-                let conFiltro = try await aplicarFiltro(a: url, preset: look)
+                let conFiltro = try await VideoBaker.exportar(url, preset: look)
                 try await PhotoLibrarySaver.guardarVideo(conFiltro)
                 guardados += 1
                 try? FileManager.default.removeItem(at: url)
@@ -196,51 +196,5 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
                 self.error = "No se pudo guardar el video: \(error.localizedDescription)"
             }
         }
-    }
-
-    // MARK: - Filtro horneado
-
-    private func aplicarFiltro(a url: URL, preset: FilterPreset) async throws -> URL {
-        let asset = AVURLAsset(url: url)
-
-        let composicion = AVVideoComposition(asset: asset) { peticion in
-            let filtrada = FilterEngine.cadena(preset, entrada: peticion.sourceImage)
-            peticion.finish(with: filtrada ?? peticion.sourceImage, context: nil)
-        }
-
-        guard let exportador = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetHighestQuality
-        ) else {
-            throw NSError(
-                domain: "beibi",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "No pude preparar el video"]
-            )
-        }
-
-        let destino = FileManager.default.temporaryDirectory
-            .appendingPathComponent("beibi-listo-\(UUID().uuidString).mp4")
-
-        exportador.outputURL = destino
-        exportador.outputFileType = .mp4
-        exportador.videoComposition = composicion
-        exportador.shouldOptimizeForNetworkUse = true
-
-        await withCheckedContinuation { (continuacion: CheckedContinuation<Void, Never>) in
-            exportador.exportAsynchronously {
-                continuacion.resume()
-            }
-        }
-
-        if exportador.status != .completed {
-            throw exportador.error ?? NSError(
-                domain: "beibi",
-                code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "El video no se pudo procesar"]
-            )
-        }
-
-        return destino
     }
 }
