@@ -13,8 +13,7 @@ struct AjusteFoto {
     var vineta: CGFloat = 0              // 0 = nada, 1 = esquinas negras
     var grano: CGFloat = 0               // 0 = nada, 0.2 = pelicula sucia
     var rayones: CGFloat = 0             // rayones finos de pelicula vieja
-    var fuga: CGFloat = 0                // luz que se cuela por la esquina
-    var fugaEsquina: Int = 0             // 0-3: cual esquina usa la fuga
+    var fuga: CGFloat = 0                // luz que se cuela por el borde
     var blancoYNegro: Bool = false
 }
 
@@ -432,11 +431,6 @@ enum FilterEngine {
             a.fuga = 0
         }
 
-        // Cada camara tiene su esquina de fuga (siempre la misma).
-        a.fugaEsquina = preset.rawValue.unicodeScalars.reduce(0) {
-            $0 + Int($1.value)
-        } % 4
-
         return a
     }
 
@@ -499,51 +493,74 @@ enum FilterEngine {
             actual = conGrano
         }
 
-        // 7. rayones finos de pelicula: cada toma tiene su patron y en video
-        //    se mueven un poco cuadro a cuadro, como en un negativo real.
+        // 7. Pelos y polvo del negativo. Cada toma estrena patron. En video
+        //    los pelos saltan, parpadean y a veces desaparecen, como cuando
+        //    el negativo va suelto dentro de una camara vieja.
         if a.rayones > 0 {
-            let fuerzaBase = min(max(a.rayones * azar.valor(0.75...1.2), 0), 1)
+            let fuerzaBase = min(max(a.rayones * azar.valor(0.8...1.25), 0), 1)
             let desfaseBase = CGPoint(
                 x: azar.valor(0...2048),
                 y: azar.valor(0...2048)
             )
             let espejo = azar.entero(2) == 1
 
-            // En video el patron salta y parpadea como una camara vieja: el
-            // rayón se corre de lado, cambia de fuerza y a veces casi
-            // desaparece. En foto se queda quieto.
-            let cuadro = momento / 2
-            let fase = Double(cuadro % 1200) / 24.0
-            var temblor = Azar(semilla &+ (cuadro &* 0x9E37_79B9_7F4A_7C15))
-            let salto = CGPoint(
-                x: CGFloat(sin(fase * 1.3)) * 20
-                    + temblor.valor(-38...38),
-                y: CGFloat(cos(fase * 0.9)) * 5
-                    + temblor.valor(-7...7)
-            )
-            let parpadeo = temblor.valor(0.45...1.12)
-            let apagado: CGFloat = (
-                momento > 0 && temblor.valor(0...1) < 0.08
-            ) ? 0.25 : 1
-            let fuerza = min(max(fuerzaBase * parpadeo * apagado, 0), 1)
+            if momento == 0 {
+                // Foto: un solo patron, quieto.
+                if let capa = rayones(
+                    actual,
+                    cantidad: fuerzaBase,
+                    desfase: desfaseBase,
+                    espejo: espejo
+                ) {
+                    actual = capa
+                }
+            } else {
+                // Video: el negativo se sacude. Salto vertical fuerte (como
+                // el arrastre de una camara vieja), temblor lateral, y la
+                // fuerza cambia cuadro a cuadro.
+                let cuadro = momento / 3
+                var temblor = Azar(semilla &+ (cuadro &* 0x9E37_79B9_7F4A_7C15))
+                let salto = CGPoint(
+                    x: temblor.valor(-26...26),
+                    y: temblor.valor(-95...95)
+                )
+                let parpadeo = temblor.valor(0.35...1.15)
+                let apagado: CGFloat = temblor.valor(0...1) < 0.10 ? 0.2 : 1
+                let fuerza = min(max(fuerzaBase * parpadeo * apagado, 0), 1)
 
-            if let conRayones = rayones(
-                actual,
-                cantidad: fuerza,
-                desfase: CGPoint(
-                    x: desfaseBase.x + salto.x,
-                    y: desfaseBase.y + salto.y
-                ),
-                espejo: espejo
-            ) {
-                actual = conRayones
+                if let capa = rayones(
+                    actual,
+                    cantidad: fuerza,
+                    desfase: CGPoint(
+                        x: desfaseBase.x + salto.x,
+                        y: desfaseBase.y + salto.y
+                    ),
+                    espejo: espejo
+                ) {
+                    actual = capa
+                }
+
+                // Segunda capa de otra zona del mismo negativo. Es la que
+                // hace que unos pelos se vayan y entren otros.
+                let segunda = temblor.valor(0.10...0.60)
+                if segunda > 0.16, let capa = rayones(
+                    actual,
+                    cantidad: segunda * min(a.rayones * 1.3, 1),
+                    desfase: CGPoint(
+                        x: desfaseBase.x + temblor.valor(-600...600),
+                        y: desfaseBase.y + temblor.valor(-1300...1300)
+                    ),
+                    espejo: !espejo
+                ) {
+                    actual = capa
+                }
             }
         }
 
-        // 8. fuga de luz: cada foto elige forma, color, esquina y fuerza.
+        // 8. fuga de luz: cada foto elige punto de entrada, forma, color y fuerza.
         if a.fuga > 0 {
             let tipo = azar.entero(3)
-            let esquina = (a.fugaEsquina + azar.entero(4)) % 4
+            let posicion = azar.valor(0...1)
             let pulso = momento > 0
                 ? 0.88 + 0.12 * CGFloat(sin(Double(momento / 2) * 0.9))
                 : 1
@@ -551,29 +568,30 @@ enum FilterEngine {
                 max(a.fuga * azar.valor(0.75...1.15) * pulso, 0),
                 1
             )
-            let radio = azar.valor(0.45...1.05)
-            let respira = momento > 0
-                ? CGPoint(
-                    x: CGFloat(sin(Double(momento / 2) * 0.7)) * 0.015,
-                    y: CGFloat(cos(Double(momento / 2) * 1.1)) * 0.01
-                )
-                : .zero
+            let radio = azar.valor(0.32...0.95)
             let corrimiento = CGPoint(
-                x: azar.valor(-0.18...0.18) + respira.x,
-                y: azar.valor(-0.18...0.18) + respira.y
+                x: azar.valor(-0.18...0.18),
+                y: azar.valor(-0.18...0.18)
             )
             let color = azar.entero(coloresFuga.count)
-            let inclinacion = azar.valor(-0.9...0.9)
+            let inclinacion = azar.valor(-1.0...1.0)
+
+            // En video la luz se pasea despacio por el borde, como cuando
+            // mueves la camara. En foto se queda donde le toco.
+            let desvio = momento > 0
+                ? CGFloat(sin(Double(momento) * 0.012)) * 0.05
+                : 0
 
             if let conFuga = fuga(
                 actual,
                 cantidad: fuerza,
                 tipo: tipo,
-                esquina: esquina,
+                posicion: posicion,
                 radio: radio,
                 corrimiento: corrimiento,
                 color: color,
-                inclinacion: inclinacion
+                inclinacion: inclinacion,
+                desvio: desvio
             ) {
                 actual = conFuga
             }
@@ -594,15 +612,18 @@ enum FilterEngine {
         CIColor(red: 1.0, green: 0.84, blue: 0.58)
     ]
 
+    /// La luz entra por cualquier punto del borde, no solo por las esquinas.
+    /// Asi dos fotos seguidas nunca tienen la fuga en el mismo lugar.
     private static func fuga(
         _ imagen: CIImage,
         cantidad: CGFloat,
         tipo: Int,
-        esquina: Int,
+        posicion: CGFloat,
         radio: CGFloat,
         corrimiento: CGPoint,
         color: Int,
-        inclinacion: CGFloat
+        inclinacion: CGFloat,
+        desvio: CGFloat
     ) -> CIImage? {
         let extent = imagen.extent
         let ancho = extent.width
@@ -612,25 +633,48 @@ enum FilterEngine {
         let tono = coloresFuga[abs(color) % coloresFuga.count]
         let fuerza = min(max(cantidad, 0), 1)
         let mayor = max(ancho, alto)
-        let borde = abs(esquina) % 4
 
-        let posiciones: [CGPoint] = [
-            CGPoint(x: extent.minX, y: extent.maxY),
-            CGPoint(x: extent.maxX, y: extent.maxY),
-            CGPoint(x: extent.minX, y: extent.minY),
-            CGPoint(x: extent.maxX, y: extent.minY)
-        ]
-        let base = posiciones[borde]
+        // Recorrido continuo por el borde: 0 = empieza arriba a la izquierda.
+        var vuelta = posicion + desvio
+        vuelta -= floor(vuelta)
+        let perimetro = 2 * (ancho + alto)
+        var recorrido = vuelta * perimetro
+
+        var punto = CGPoint.zero
+        var adentro = CGPoint.zero
+
+        if recorrido < ancho {
+            punto = CGPoint(x: extent.minX + recorrido, y: extent.maxY)
+            adentro = CGPoint(x: 0, y: -1)
+        } else if recorrido < ancho + alto {
+            recorrido -= ancho
+            punto = CGPoint(x: extent.maxX, y: extent.maxY - recorrido)
+            adentro = CGPoint(x: -1, y: 0)
+        } else if recorrido < 2 * ancho + alto {
+            recorrido -= ancho + alto
+            punto = CGPoint(x: extent.maxX - recorrido, y: extent.minY)
+            adentro = CGPoint(x: 0, y: 1)
+        } else {
+            recorrido -= 2 * ancho + alto
+            punto = CGPoint(x: extent.minX, y: extent.minY + recorrido)
+            adentro = CGPoint(x: 1, y: 0)
+        }
+
+        punto.x += corrimiento.x * ancho * 0.12
+        punto.y += corrimiento.y * alto * 0.12
+
+        // El centro queda un poco afuera de la foto, para que la luz se
+        // derrame hacia adentro.
         let centro = CGPoint(
-            x: base.x + corrimiento.x * ancho,
-            y: base.y + corrimiento.y * alto
+            x: punto.x - adentro.x * mayor * 0.08,
+            y: punto.y - adentro.y * mayor * 0.08
         )
 
         var crudo: CIImage?
 
         switch abs(tipo) % 3 {
         case 0:
-            // Resplandor que entra por una esquina.
+            // Resplandor que entra por un punto del borde.
             let gradiente = CIFilter.radialGradient()
             gradiente.center = centro
             gradiente.radius0 = 0
@@ -640,66 +684,32 @@ enum FilterEngine {
             crudo = gradiente.outputImage?.cropped(to: extent)
 
         case 1:
-            // Franja ancha que entra por uno de los cuatro bordes.
+            // Franja ancha que entra desde ese punto hacia adentro.
             let gradiente = CIFilter.linearGradient()
-            let banda = mayor * (0.22 + radio * 0.55)
-            let desvioX = corrimiento.x * ancho
-            let desvioY = corrimiento.y * alto
-
-            switch borde {
-            case 0:
-                gradiente.point0 = CGPoint(
-                    x: extent.midX + desvioX,
-                    y: extent.maxY + alto * 0.12
-                )
-                gradiente.point1 = CGPoint(
-                    x: extent.midX + desvioX,
-                    y: extent.maxY - banda
-                )
-            case 1:
-                gradiente.point0 = CGPoint(
-                    x: extent.maxX + ancho * 0.12,
-                    y: extent.midY + desvioY
-                )
-                gradiente.point1 = CGPoint(
-                    x: extent.maxX - banda,
-                    y: extent.midY + desvioY
-                )
-            case 2:
-                gradiente.point0 = CGPoint(
-                    x: extent.midX + desvioX,
-                    y: extent.minY - alto * 0.12
-                )
-                gradiente.point1 = CGPoint(
-                    x: extent.midX + desvioX,
-                    y: extent.minY + banda
-                )
-            default:
-                gradiente.point0 = CGPoint(
-                    x: extent.minX - ancho * 0.12,
-                    y: extent.midY + desvioY
-                )
-                gradiente.point1 = CGPoint(
-                    x: extent.minX + banda,
-                    y: extent.midY + desvioY
-                )
-            }
-
+            let banda = mayor * (0.18 + radio * 0.55)
+            gradiente.point0 = CGPoint(
+                x: punto.x - adentro.x * mayor * 0.14,
+                y: punto.y - adentro.y * mayor * 0.14
+            )
+            gradiente.point1 = CGPoint(
+                x: punto.x + adentro.x * banda,
+                y: punto.y + adentro.y * banda
+            )
             gradiente.color0 = tono
             gradiente.color1 = CIColor(red: 0, green: 0, blue: 0)
             crudo = gradiente.outputImage?.cropped(to: extent)
 
         default:
-            // Banda diagonal suave, como cuando la luz cruza el objetivo.
+            // Banda diagonal, como cuando la luz cruza el objetivo.
             let gradiente = CIFilter.linearGradient()
-            let y0 = extent.minY + alto * radio
+            let y0 = extent.minY + alto * vuelta
             gradiente.point0 = CGPoint(
-                x: extent.minX - ancho * 0.3,
-                y: y0
+                x: extent.minX - ancho * 0.25,
+                y: y0 + alto * inclinacion * 0.5
             )
             gradiente.point1 = CGPoint(
-                x: extent.maxX + ancho * 0.3,
-                y: y0 + alto * inclinacion
+                x: extent.maxX + ancho * 0.25,
+                y: y0 - alto * inclinacion * 0.5
             )
             gradiente.color0 = tono
             gradiente.color1 = CIColor(red: 0, green: 0, blue: 0)
@@ -755,9 +765,10 @@ enum FilterEngine {
 
     // MARK: - Rayones de pelicula
 
-    /// Rayones de una foto revelada de verdad: lineas verticales muy finas
-    /// que se cortan solas, pelusas y polvo alargado. Nada de rayas largas
-    /// parejas ni puntitos redondos: eso se nota hecho a computadora.
+    /// El dano de una foto revelada de verdad, como el de la foto de
+    /// referencia: filamentos blancos rizados (como pelos), hebras oscuras
+    /// largas y polvo alargado. Nada de lineas verticales parejas ni
+    /// puntitos redondos: eso se nota hecho a computadora.
     private static let rayonesTile: CIImage? = {
         let lado = 2048
         let espacio = CGColorSpaceCreateDeviceRGB()
@@ -777,131 +788,127 @@ enum FilterEngine {
         contexto.clear(CGRect(x: 0, y: 0, width: lado, height: lado))
         contexto.setShouldAntialias(true)
         contexto.setLineCap(.round)
+        contexto.setLineJoin(.round)
 
         let ancho = CGFloat(lado)
         let alto = CGFloat(lado)
 
-        func tinta(_ alfa: CGFloat) -> CGColor? {
+        func claro(_ alfa: CGFloat) -> CGColor? {
             CGColor(
                 colorSpace: espacio,
-                components: [1, 0.985, 0.96, alfa]
+                components: [1, 0.985, 0.95, alfa]
             )
         }
 
-        // 1. Rayones de arrastre: verticales, finos y cortados en tramos.
-        //    Cada tramo cambia de fuerza, como cuando el negativo se raya.
-        for _ in 0..<5 {
-            let x = CGFloat.random(in: 0..<ancho)
-            let yInicio = CGFloat.random(in: 0..<alto)
-            let largo = CGFloat.random(in: 60...280)
-            var y = yInicio
-            var xActual = x
-
-            while y < yInicio + largo {
-                let tramo = CGFloat.random(in: 5...26)
-                let alfa = CGFloat.random(in: 0.05...0.17)
-                let grosor = CGFloat.random(in: 0.5...1.05)
-
-                if CGFloat.random(in: 0...1) > 0.22, let color = tinta(alfa) {
-                    contexto.setStrokeColor(color)
-                    contexto.setLineWidth(grosor)
-
-                    let fin = min(y + tramo, yInicio + largo)
-                    let desvio = CGFloat.random(in: -1.4...1.4)
-
-                    contexto.move(to: CGPoint(x: xActual, y: y))
-                    contexto.addLine(to: CGPoint(x: xActual + desvio, y: fin))
-                    contexto.strokePath()
-
-                    xActual += CGFloat.random(in: -0.35...0.35)
-                }
-
-                y += tramo + CGFloat.random(in: 2...14)
-            }
+        func oscuro(_ alfa: CGFloat) -> CGColor? {
+            CGColor(
+                colorSpace: espacio,
+                components: [0.03, 0.02, 0.02, alfa]
+            )
         }
 
-        // 2. Rayitas cortas de emulsion, agrupadas, casi verticales.
-        for _ in 0..<3 {
-            let centroX = CGFloat.random(in: 0..<ancho)
-            let centroY = CGFloat.random(in: 0..<alto)
+        /// Camina torciendose, como un pelo. Devuelve los puntos del trazo.
+        func paseo(
+            desde inicio: CGPoint,
+            angulo inicial: CGFloat,
+            pasos: Int,
+            largo: ClosedRange<CGFloat>,
+            giro: ClosedRange<CGFloat>
+        ) -> [CGPoint] {
+            var puntos: [CGPoint] = [inicio]
+            var punto = inicio
+            var angulo = inicial
 
-            for _ in 0..<Int.random(in: 6...12) {
-                let x = centroX + CGFloat.random(in: -14...14)
-                let y = centroY + CGFloat.random(in: -30...30)
-                let altoRaya = CGFloat.random(in: 4...18)
-                let alfa = CGFloat.random(in: 0.05...0.14)
-
-                if let color = tinta(alfa) {
-                    contexto.setStrokeColor(color)
-                    contexto.setLineWidth(CGFloat.random(in: 0.45...1.0))
-                    contexto.move(to: CGPoint(x: x, y: y))
-                    contexto.addLine(to: CGPoint(
-                        x: x + CGFloat.random(in: -1.2...1.2),
-                        y: y + altoRaya
-                    ))
-                    contexto.strokePath()
-                }
+            for _ in 0..<pasos {
+                angulo += CGFloat.random(in: giro)
+                punto.x += cos(angulo) * CGFloat.random(in: largo)
+                punto.y += sin(angulo) * CGFloat.random(in: largo)
+                puntos.append(punto)
             }
+
+            return puntos
         }
 
-        // 3. Pelusas: pocas, torcidas y suaves.
-        for _ in 0..<3 {
+        func trazar(_ puntos: [CGPoint], color: CGColor, grosor: CGFloat) {
+            guard let primero = puntos.first else { return }
+
+            contexto.setStrokeColor(color)
+            contexto.setLineWidth(grosor)
+            contexto.beginPath()
+            contexto.move(to: primero)
+
+            for punto in puntos.dropFirst() {
+                contexto.addLine(to: punto)
+            }
+
+            contexto.strokePath()
+        }
+
+        // 1. Pelos blancos rizados: el dano mas visible del negativo. Van en
+        //    dos pasadas, un halo suave y el filamento, para que se vean como
+        //    pelo y no como una linea dibujada.
+        for _ in 0..<9 {
             let inicio = CGPoint(
                 x: CGFloat.random(in: 0..<ancho),
                 y: CGFloat.random(in: 0..<alto)
             )
-            let largo = CGFloat.random(in: 26...110)
-            let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let fin = CGPoint(
-                x: inicio.x + cos(angulo) * largo,
-                y: inicio.y + sin(angulo) * largo
+            let puntos = paseo(
+                desde: inicio,
+                angulo: CGFloat.random(in: 0...(2 * .pi)),
+                pasos: Int.random(in: 18...70),
+                largo: 3...10,
+                giro: -0.85...0.85
             )
-            let control = CGPoint(
-                x: (inicio.x + fin.x) / 2 + CGFloat.random(in: -12...12),
-                y: (inicio.y + fin.y) / 2 + CGFloat.random(in: -12...12)
-            )
+            let alfa = CGFloat.random(in: 0.05...0.15)
+            let grosor = CGFloat.random(in: 0.8...1.9)
 
-            if let color = tinta(CGFloat.random(in: 0.03...0.08)) {
-                contexto.setStrokeColor(color)
-                contexto.setLineWidth(CGFloat.random(in: 0.4...0.8))
-                contexto.move(to: inicio)
-                contexto.addQuadCurve(to: fin, control: control)
-                contexto.strokePath()
+            if let color = claro(alfa * 0.30) {
+                trazar(puntos, color: color, grosor: grosor * 2.8)
+            }
+            if let color = claro(alfa) {
+                trazar(puntos, color: color, grosor: grosor)
             }
         }
 
-        // 4. Polvo: motas alargadas, nunca circulos perfectos.
-        for _ in 0..<24 {
+        // 2. Hebras oscuras, largas y con curva suave. Son las que se ven
+        //    como un pelo encima de la foto.
+        for _ in 0..<4 {
+            let inicio = CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
+            )
+            let puntos = paseo(
+                desde: inicio,
+                angulo: CGFloat.random(in: 0...(2 * .pi)),
+                pasos: Int.random(in: 40...95),
+                largo: 5...12,
+                giro: -0.22...0.22
+            )
+
+            if let color = oscuro(CGFloat.random(in: 0.05...0.14)) {
+                trazar(
+                    puntos,
+                    color: color,
+                    grosor: CGFloat.random(in: 0.6...1.3)
+                )
+            }
+        }
+
+        // 3. Polvo alargado, nunca circulos.
+        for _ in 0..<26 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
-            let largo = CGFloat.random(in: 1.0...4.0)
+            let largo = CGFloat.random(in: 1.2...4.5)
             let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let grosor = CGFloat.random(in: 0.4...1.1)
 
-            if let color = tinta(CGFloat.random(in: 0.06...0.20)) {
+            if let color = claro(CGFloat.random(in: 0.07...0.22)) {
                 contexto.setStrokeColor(color)
-                contexto.setLineWidth(grosor)
+                contexto.setLineWidth(CGFloat.random(in: 0.4...1.1))
+                contexto.beginPath()
                 contexto.move(to: CGPoint(x: x, y: y))
                 contexto.addLine(to: CGPoint(
                     x: x + cos(angulo) * largo,
                     y: y + sin(angulo) * largo
-                ))
-                contexto.strokePath()
-            }
-        }
-
-        // 5. Un velo ancho y muy suave, como cuando el negativo roza la
-        //    guia de la camara.
-        for _ in 0..<1 {
-            let x = CGFloat.random(in: 0..<ancho)
-
-            if let color = tinta(CGFloat.random(in: 0.015...0.03)) {
-                contexto.setStrokeColor(color)
-                contexto.setLineWidth(CGFloat.random(in: 3...8))
-                contexto.move(to: CGPoint(x: x, y: 0))
-                contexto.addLine(to: CGPoint(
-                    x: x + CGFloat.random(in: -6...6),
-                    y: alto
                 ))
                 contexto.strokePath()
             }
@@ -914,7 +921,7 @@ enum FilterEngine {
         // Un desenfoque chiquito para que no parezcan lineas de paint.
         let suave = CIFilter.gaussianBlur()
         suave.inputImage = imagen
-        suave.radius = 0.55
+        suave.radius = 0.5
         if let salida = suave.outputImage?.cropped(to: imagen.extent) {
             imagen = salida
         }
@@ -933,7 +940,7 @@ enum FilterEngine {
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
 
-        // Mover el azulejo cambia cuales rayones caen en la foto.
+        // Mover el azulejo cambia cuales pelos caen en la foto.
         var transformacion = CGAffineTransform(
             translationX: desfase.x,
             y: desfase.y
@@ -946,13 +953,19 @@ enum FilterEngine {
         repetir.transform = transformacion
         guard let infinito = repetir.outputImage else { return nil }
 
+        // El negativo tiene pelos claros y oscuros. Los claros suman luz y
+        // los oscuros la quitan, asi que va encima con transparencia en vez
+        // de en modo screen: si no, los oscuros desaparecen.
+        let escala = min(max(cantidad, 0), 1)
         let control = CIFilter.colorMatrix()
         control.inputImage = infinito.cropped(to: imagen.extent)
-        control.aVector = CIVector(x: 0, y: 0, z: 0, w: min(cantidad, 0.9))
+        control.rVector = CIVector(x: escala, y: 0, z: 0, w: 0)
+        control.gVector = CIVector(x: 0, y: escala, z: 0, w: 0)
+        control.bVector = CIVector(x: 0, y: 0, z: escala, w: 0)
+        control.aVector = CIVector(x: 0, y: 0, z: 0, w: escala)
         guard let capa = control.outputImage else { return nil }
 
-        // Screen: el rayon de un negativo se ve clarito, no negro.
-        let mezcla = CIFilter.screenBlendMode()
+        let mezcla = CIFilter.sourceOverCompositing()
         mezcla.inputImage = capa
         mezcla.backgroundImage = imagen
         return mezcla.outputImage
