@@ -443,7 +443,11 @@ enum FilterEngine {
         momento: UInt64
     ) -> CIImage? {
         var actual = imagen
-        var azar = Azar(semilla)
+
+        // Cada efecto trae su propio dado. Asi mover los rayones no cambia
+        // donde sale la fuga, ni al reves.
+        var azarRayones = Azar(semilla ^ 0x9E37_79B9_7F4A_7C15)
+        var azarFuga = Azar(semilla ^ 0xD1B5_4A32_D192_ED03)
 
         // 1. balance de blancos
         if a.temperatura != 6500 || a.tinte != 0 {
@@ -497,12 +501,15 @@ enum FilterEngine {
         //    los pelos saltan, parpadean y a veces desaparecen, como cuando
         //    el negativo va suelto dentro de una camara vieja.
         if a.rayones > 0 {
-            let fuerzaBase = min(max(a.rayones * azar.valor(0.8...1.25), 0), 1)
-            let desfaseBase = CGPoint(
-                x: azar.valor(0...2048),
-                y: azar.valor(0...2048)
+            let fuerzaBase = min(
+                max(a.rayones * azarRayones.valor(0.8...1.25), 0),
+                1
             )
-            let espejo = azar.entero(2) == 1
+            let desfaseBase = CGPoint(
+                x: azarRayones.valor(0...2048),
+                y: azarRayones.valor(0...2048)
+            )
+            let espejo = azarRayones.entero(2) == 1
 
             if momento == 0 {
                 // Foto: un solo patron, quieto.
@@ -559,22 +566,22 @@ enum FilterEngine {
 
         // 8. fuga de luz: cada foto elige punto de entrada, forma, color y fuerza.
         if a.fuga > 0 {
-            let tipo = azar.entero(3)
-            let posicion = azar.valor(0...1)
+            let tipo = azarFuga.entero(3)
+            let posicion = azarFuga.valor(0...1)
             let pulso = momento > 0
                 ? 0.88 + 0.12 * CGFloat(sin(Double(momento / 2) * 0.9))
                 : 1
             let fuerza = min(
-                max(a.fuga * azar.valor(0.75...1.15) * pulso, 0),
+                max(a.fuga * azarFuga.valor(0.75...1.15) * pulso, 0),
                 1
             )
-            let radio = azar.valor(0.32...0.95)
+            let radio = azarFuga.valor(0.32...0.95)
             let corrimiento = CGPoint(
-                x: azar.valor(-0.18...0.18),
-                y: azar.valor(-0.18...0.18)
+                x: azarFuga.valor(-0.18...0.18),
+                y: azarFuga.valor(-0.18...0.18)
             )
-            let color = azar.entero(coloresFuga.count)
-            let inclinacion = azar.valor(-1.0...1.0)
+            let color = azarFuga.entero(coloresFuga.count)
+            let inclinacion = azarFuga.valor(-1.0...1.0)
 
             // En video la luz se pasea despacio por el borde, como cuando
             // mueves la camara. En foto se queda donde le toco.
@@ -859,10 +866,10 @@ enum FilterEngine {
                 largo: 3...10,
                 giro: -0.85...0.85
             )
-            let alfa = CGFloat.random(in: 0.05...0.15)
-            let grosor = CGFloat.random(in: 0.8...1.9)
+            let alfa = CGFloat.random(in: 0.08...0.22)
+            let grosor = CGFloat.random(in: 0.8...2.0)
 
-            if let color = claro(alfa * 0.30) {
+            if let color = claro(alfa * 0.40) {
                 trazar(puntos, color: color, grosor: grosor * 2.8)
             }
             if let color = claro(alfa) {
