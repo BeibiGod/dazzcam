@@ -19,7 +19,7 @@ struct VideoEditorView: View {
     @State private var guardando = false
     @State private var error: String?
     @State private var tokenReproductor = 0
-    @State private var semilla = UInt64.random(in: 1...UInt64.max)
+    @State private var semilla: UInt64
     @State private var mostrarAjustes = false
 
     @Environment(\.dismiss) private var cerrar
@@ -30,6 +30,7 @@ struct VideoEditorView: View {
         controles: ControlesLook = ControlesLook(),
         sello: SelloFecha = .apagado,
         fecha: Date = Date(),
+        semilla: UInt64? = nil,
         esRevision: Bool = false,
         alGuardar: @escaping (FilterPreset) -> Void
     ) {
@@ -40,6 +41,7 @@ struct VideoEditorView: View {
         _ajustes = State(initialValue: controles)
         _sello = State(initialValue: sello)
         _fecha = State(initialValue: fecha)
+        _semilla = State(initialValue: semilla ?? UInt64.random(in: 1...UInt64.max))
     }
 
     var body: some View {

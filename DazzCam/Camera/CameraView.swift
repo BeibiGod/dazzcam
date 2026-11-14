@@ -57,9 +57,10 @@ struct CameraView: View {
     @State private var guardandoFoto = false
     @State private var semillaCaptura: UInt64 = 0
     @State private var semillaVivo = UInt64.random(in: 1...UInt64.max)
+    @State private var semillaVideo: UInt64 = 0
 
     private var versionTexto: String {
-        "v1.12 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.13 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -288,6 +289,10 @@ struct CameraView: View {
             camara.ponerZoom(1)
             zoomBase = camara.zoom
             proporcion = .dieciseisNueve
+
+            // Cada vez que entras, la fuga y el rayado del visor son otros.
+            semillaVivo = UInt64.random(in: 1...UInt64.max)
+            vivo.semilla = semillaVivo
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
@@ -338,6 +343,10 @@ struct CameraView: View {
                 semilla: semillaCaptura
             )
             mostrarCaptura = true
+
+            // La siguiente foto y el visor estrenan fuga y rayado.
+            semillaVivo = UInt64.random(in: 1...UInt64.max)
+            vivo.semilla = semillaVivo
         }
         .onReceive(vivo.$imagen) { imagen in
             guard let imagen = imagen, !miniaturas.lista else { return }
@@ -420,6 +429,10 @@ struct CameraView: View {
                 try? FileManager.default.removeItem(at: url)
             }
             videoGrabado = nil
+
+            // Al volver al visor, estrena fuga y rayado.
+            semillaVivo = UInt64.random(in: 1...UInt64.max)
+            vivo.semilla = semillaVivo
         }) {
             if let url = videoGrabado {
                 VideoEditorView(
@@ -428,6 +441,7 @@ struct CameraView: View {
                     controles: controles,
                     sello: sello,
                     fecha: fechaVideoGrabado,
+                    semilla: semillaVideo,
                     esRevision: true
                 ) { elegido in
                     preset = elegido
@@ -845,6 +859,7 @@ struct CameraView: View {
                 let azar = UInt64.random(in: 1...UInt64.max)
                 semillaVivo = azar
                 vivo.semilla = azar
+                semillaVideo = azar
 
                 Task {
                     await video.empezar(quitar: vivo.salida)
