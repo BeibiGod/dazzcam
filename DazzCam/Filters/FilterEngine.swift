@@ -815,46 +815,6 @@ enum FilterEngine {
             )
         }
 
-        /// Una hebra ondulada. Avanza siempre hacia adelante y se va
-        /// meciendo de lado, como un pelo: nunca se cierra ni se enreda.
-        func hebraOndulada(
-            largo: ClosedRange<CGFloat>,
-            amplitud: ClosedRange<CGFloat>,
-            ondas: ClosedRange<CGFloat>
-        ) -> [CGPoint] {
-            let inicio = CGPoint(
-                x: CGFloat.random(in: 0..<ancho),
-                y: CGFloat.random(in: 0..<alto)
-            )
-            let distancia = CGFloat.random(in: largo)
-            let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let vaiven = CGFloat.random(in: amplitud)
-            let ciclos = CGFloat.random(in: ondas)
-            let fase = CGFloat.random(in: 0...(2 * .pi))
-
-            let avanceX = cos(angulo)
-            let avanceY = sin(angulo)
-            let ladoX = -avanceY
-            let ladoY = avanceX
-            let pasos = 56
-
-            var puntos: [CGPoint] = []
-            puntos.reserveCapacity(pasos + 1)
-
-            for paso in 0...pasos {
-                let t = CGFloat(paso) / CGFloat(pasos)
-                let recorrido = t * distancia
-                let desvio = sin(t * ciclos * 2 * .pi + fase) * vaiven
-
-                puntos.append(CGPoint(
-                    x: inicio.x + avanceX * recorrido + ladoX * desvio,
-                    y: inicio.y + avanceY * recorrido + ladoY * desvio
-                ))
-            }
-
-            return puntos
-        }
-
         func trazar(_ puntos: [CGPoint], color: CGColor, grosor: CGFloat) {
             guard let primero = puntos.first else { return }
 
@@ -870,74 +830,98 @@ enum FilterEngine {
             contexto.strokePath()
         }
 
-        /// Pelusa blanca como la de la foto: hilo corto con zigzag
-        /// apretado. Siempre avanza hacia adelante, asi que no se cierra.
-        func pelusa(
+        func paseo(
+            pasos: ClosedRange<Int>,
             largo: ClosedRange<CGFloat>,
-            amplitud: ClosedRange<CGFloat>,
-            pasos: ClosedRange<Int>
+            giro: ClosedRange<CGFloat>
         ) -> [CGPoint] {
-            let inicio = CGPoint(
+            var puntos: [CGPoint] = [CGPoint(
                 x: CGFloat.random(in: 0..<ancho),
                 y: CGFloat.random(in: 0..<alto)
-            )
-            let distancia = CGFloat.random(in: largo)
-            let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let avanceX = cos(angulo)
-            let avanceY = sin(angulo)
-            let ladoX = -avanceY
-            let ladoY = avanceX
+            )]
+            var angulo = CGFloat.random(in: 0...(2 * .pi))
             let cantidad = Int.random(in: pasos)
-            let vaiven = CGFloat.random(in: amplitud)
+            let separacion: CGFloat = 12
 
-            var puntos: [CGPoint] = [inicio]
+            for _ in 0..<cantidad {
+                var colocado = false
 
-            for paso in 1...cantidad {
-                let t = CGFloat(paso) / CGFloat(cantidad)
-                // Cada tramo brinca de un lado al otro del hilo.
-                let signo: CGFloat = paso % 2 == 0 ? 1 : -1
-                let pico = signo * vaiven * CGFloat.random(in: 0.5...1.0)
+                // Prueba varios rumbos. Si todos se acercan al camino o se
+                // salen del cuadro, la hebra termina ahi con la punta
+                // abierta: nunca se cierra sobre si misma.
+                for _ in 0..<10 {
+                    let rumbo = angulo + CGFloat.random(in: giro)
+                    let paso = CGFloat.random(in: largo)
+                    let candidato = CGPoint(
+                        x: puntos[puntos.count - 1].x + cos(rumbo) * paso,
+                        y: puntos[puntos.count - 1].y + sin(rumbo) * paso
+                    )
 
-                puntos.append(CGPoint(
-                    x: inicio.x + avanceX * distancia * t + ladoX * pico,
-                    y: inicio.y + avanceY * distancia * t + ladoY * pico
-                ))
+                    if candidato.x < 0 || candidato.x > ancho
+                        || candidato.y < 0 || candidato.y > alto {
+                        continue
+                    }
+
+                    var choca = false
+                    let limite = puntos.count - 4
+
+                    if limite > 0 {
+                        for i in 0..<limite {
+                            let dx = candidato.x - puntos[i].x
+                            let dy = candidato.y - puntos[i].y
+
+                            if dx * dx + dy * dy < separacion * separacion {
+                                choca = true
+                                break
+                            }
+                        }
+                    }
+
+                    if !choca {
+                        puntos.append(candidato)
+                        angulo = rumbo
+                        colocado = true
+                        break
+                    }
+                }
+
+                if !colocado { break }
             }
 
             return puntos
         }
 
-        // 1. Pelusas blancas: cortas y con zigzag, como la de la foto.
-        for _ in 0..<4 {
-            let hebra = pelusa(
-                largo: 60...170,
-                amplitud: 4...13,
-                pasos: 7...13
+        // 1. Hebras blancas: rizadas y con curvas, como las de la foto.
+        for _ in 0..<9 {
+            let hebra = paseo(
+                pasos: 18...70,
+                largo: 3...10,
+                giro: -0.85...0.85
             )
-            let alfa = CGFloat.random(in: 0.20...0.45)
-            let grosor = CGFloat.random(in: 1.3...2.6)
+            let alfa = CGFloat.random(in: 0.09...0.24)
+            let grosor = CGFloat.random(in: 0.8...1.9)
 
-            if let color = claro(alfa * 0.35) {
-                trazar(hebra, color: color, grosor: grosor * 2.2)
+            if let color = claro(alfa * 0.40) {
+                trazar(hebra, color: color, grosor: grosor * 2.6)
             }
             if let color = claro(alfa) {
                 trazar(hebra, color: color, grosor: grosor)
             }
         }
 
-        // 2. Hebras oscuras: largas, finas y con un solo arco suave.
-        for _ in 0..<3 {
-            let hebra = hebraOndulada(
-                largo: 600...1500,
-                amplitud: 40...140,
-                ondas: 0.45...0.85
+        // 2. Hebras oscuras: largas, finas y apenas torcidas.
+        for _ in 0..<4 {
+            let hebra = paseo(
+                pasos: 40...95,
+                largo: 5...12,
+                giro: -0.22...0.22
             )
 
-            if let color = oscuro(CGFloat.random(in: 0.10...0.20)) {
+            if let color = oscuro(CGFloat.random(in: 0.07...0.16)) {
                 trazar(
                     hebra,
                     color: color,
-                    grosor: CGFloat.random(in: 0.9...1.8)
+                    grosor: CGFloat.random(in: 0.6...1.2)
                 )
             }
         }
