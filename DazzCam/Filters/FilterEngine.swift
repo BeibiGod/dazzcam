@@ -815,77 +815,90 @@ enum FilterEngine {
             )
         }
 
-        /// Una hebra: curva suave de un punto a otro con un solo vaiven.
-        /// Devuelve inicio, control 1, control 2 y fin.
-        func nuevaHebra(
+        /// Una hebra ondulada. Avanza siempre hacia adelante y se va
+        /// meciendo de lado, como un pelo: nunca se cierra ni se enreda.
+        func hebraOndulada(
             largo: ClosedRange<CGFloat>,
-            curva: ClosedRange<CGFloat>
-        ) -> (CGPoint, CGPoint, CGPoint, CGPoint) {
+            amplitud: ClosedRange<CGFloat>,
+            ondas: ClosedRange<CGFloat>
+        ) -> [CGPoint] {
             let inicio = CGPoint(
                 x: CGFloat.random(in: 0..<ancho),
                 y: CGFloat.random(in: 0..<alto)
             )
             let distancia = CGFloat.random(in: largo)
             let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let fin = CGPoint(
-                x: inicio.x + cos(angulo) * distancia,
-                y: inicio.y + sin(angulo) * distancia
-            )
+            let vaiven = CGFloat.random(in: amplitud)
+            let ciclos = CGFloat.random(in: ondas)
+            let fase = CGFloat.random(in: 0...(2 * .pi))
 
-            // Los controles se separan de la recta hacia lados opuestos, asi
-            // la hebra hace una curva sencilla en vez de un garabato.
-            let desvio = CGFloat.random(in: curva)
-            let normal = CGPoint(x: -sin(angulo), y: cos(angulo))
-            let control1 = CGPoint(
-                x: inicio.x + (fin.x - inicio.x) * 0.33 + normal.x * desvio,
-                y: inicio.y + (fin.y - inicio.y) * 0.33 + normal.y * desvio
-            )
-            let control2 = CGPoint(
-                x: inicio.x + (fin.x - inicio.x) * 0.66 - normal.x * desvio,
-                y: inicio.y + (fin.y - inicio.y) * 0.66 - normal.y * desvio
-            )
+            let avanceX = cos(angulo)
+            let avanceY = sin(angulo)
+            let ladoX = -avanceY
+            let ladoY = avanceX
+            let pasos = 56
 
-            return (inicio, control1, control2, fin)
+            var puntos: [CGPoint] = []
+            puntos.reserveCapacity(pasos + 1)
+
+            for paso in 0...pasos {
+                let t = CGFloat(paso) / CGFloat(pasos)
+                let recorrido = t * distancia
+                let desvio = sin(t * ciclos * 2 * .pi + fase) * vaiven
+
+                puntos.append(CGPoint(
+                    x: inicio.x + avanceX * recorrido + ladoX * desvio,
+                    y: inicio.y + avanceY * recorrido + ladoY * desvio
+                ))
+            }
+
+            return puntos
         }
 
-        func trazar(
-            _ curva: (CGPoint, CGPoint, CGPoint, CGPoint),
-            color: CGColor,
-            grosor: CGFloat
-        ) {
+        func trazar(_ puntos: [CGPoint], color: CGColor, grosor: CGFloat) {
+            guard let primero = puntos.first else { return }
+
             contexto.setStrokeColor(color)
             contexto.setLineWidth(grosor)
             contexto.beginPath()
-            contexto.move(to: curva.0)
-            contexto.addCurve(
-                to: curva.3,
-                control1: curva.1,
-                control2: curva.2
-            )
+            contexto.move(to: primero)
+
+            for punto in puntos.dropFirst() {
+                contexto.addLine(to: punto)
+            }
+
             contexto.strokePath()
         }
 
-        // 1. Hebras blancas: pocas, largas y con una curva simple.
+        // 1. Hebras blancas: onduladas y simples, sin enredarse.
         for _ in 0..<7 {
-            let curva = nuevaHebra(largo: 240...760, curva: 50...150)
+            let hebra = hebraOndulada(
+                largo: 240...760,
+                amplitud: 12...42,
+                ondas: 1.5...3.5
+            )
             let alfa = CGFloat.random(in: 0.09...0.22)
             let grosor = CGFloat.random(in: 0.9...2.0)
 
             if let color = claro(alfa * 0.40) {
-                trazar(curva, color: color, grosor: grosor * 2.4)
+                trazar(hebra, color: color, grosor: grosor * 2.4)
             }
             if let color = claro(alfa) {
-                trazar(curva, color: color, grosor: grosor)
+                trazar(hebra, color: color, grosor: grosor)
             }
         }
 
-        // 2. Hebras oscuras, mas largas y apenas curvadas.
+        // 2. Hebras oscuras, mas largas y con menos vaiven.
         for _ in 0..<4 {
-            let curva = nuevaHebra(largo: 420...1100, curva: 40...110)
+            let hebra = hebraOndulada(
+                largo: 420...1100,
+                amplitud: 10...30,
+                ondas: 1.0...2.2
+            )
 
             if let color = oscuro(CGFloat.random(in: 0.06...0.15)) {
                 trazar(
-                    curva,
+                    hebra,
                     color: color,
                     grosor: CGFloat.random(in: 0.6...1.2)
                 )
