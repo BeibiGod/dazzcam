@@ -571,8 +571,11 @@ enum FilterEngine {
             let pulso = momento > 0
                 ? 0.88 + 0.12 * CGFloat(sin(Double(momento / 2) * 0.9))
                 : 1
+            // El control responde suave abajo: al 10% apenas se insinua y
+            // hasta arriba se pone fuerte, como una fuga de verdad.
+            let curva = CGFloat(pow(Double(a.fuga), 1.8))
             let fuerza = min(
-                max(a.fuga * azarFuga.valor(0.75...1.15) * pulso, 0),
+                max(curva * azarFuga.valor(0.75...1.15) * pulso, 0),
                 1
             )
             let radio = azarFuga.valor(0.32...0.95)
@@ -772,10 +775,8 @@ enum FilterEngine {
 
     // MARK: - Rayones de pelicula
 
-    /// El dano de una foto revelada de verdad, como el de la foto de
-    /// referencia: filamentos blancos rizados (como pelos), hebras oscuras
-    /// largas y polvo alargado. Nada de lineas verticales parejas ni
-    /// puntitos redondos: eso se nota hecho a computadora.
+    /// El dano de una foto revelada: hebras blancas y oscuras con curvas
+    /// simples, y polvo alargado. Formas sencillas, como un pelo de verdad.
     private static let rayonesTile: CIImage? = {
         let lado = 2048
         let espacio = CGColorSpaceCreateDeviceRGB()
@@ -814,95 +815,85 @@ enum FilterEngine {
             )
         }
 
-        /// Camina torciendose, como un pelo. Devuelve los puntos del trazo.
-        func paseo(
-            desde inicio: CGPoint,
-            angulo inicial: CGFloat,
-            pasos: Int,
+        /// Una hebra: curva suave de un punto a otro con un solo vaiven.
+        /// Devuelve inicio, control 1, control 2 y fin.
+        func nuevaHebra(
             largo: ClosedRange<CGFloat>,
-            giro: ClosedRange<CGFloat>
-        ) -> [CGPoint] {
-            var puntos: [CGPoint] = [inicio]
-            var punto = inicio
-            var angulo = inicial
+            curva: ClosedRange<CGFloat>
+        ) -> (CGPoint, CGPoint, CGPoint, CGPoint) {
+            let inicio = CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
+            )
+            let distancia = CGFloat.random(in: largo)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let fin = CGPoint(
+                x: inicio.x + cos(angulo) * distancia,
+                y: inicio.y + sin(angulo) * distancia
+            )
 
-            for _ in 0..<pasos {
-                angulo += CGFloat.random(in: giro)
-                punto.x += cos(angulo) * CGFloat.random(in: largo)
-                punto.y += sin(angulo) * CGFloat.random(in: largo)
-                puntos.append(punto)
-            }
+            // Los controles se separan de la recta hacia lados opuestos, asi
+            // la hebra hace una curva sencilla en vez de un garabato.
+            let desvio = CGFloat.random(in: curva)
+            let normal = CGPoint(x: -sin(angulo), y: cos(angulo))
+            let control1 = CGPoint(
+                x: inicio.x + (fin.x - inicio.x) * 0.33 + normal.x * desvio,
+                y: inicio.y + (fin.y - inicio.y) * 0.33 + normal.y * desvio
+            )
+            let control2 = CGPoint(
+                x: inicio.x + (fin.x - inicio.x) * 0.66 - normal.x * desvio,
+                y: inicio.y + (fin.y - inicio.y) * 0.66 - normal.y * desvio
+            )
 
-            return puntos
+            return (inicio, control1, control2, fin)
         }
 
-        func trazar(_ puntos: [CGPoint], color: CGColor, grosor: CGFloat) {
-            guard let primero = puntos.first else { return }
-
+        func trazar(
+            _ curva: (CGPoint, CGPoint, CGPoint, CGPoint),
+            color: CGColor,
+            grosor: CGFloat
+        ) {
             contexto.setStrokeColor(color)
             contexto.setLineWidth(grosor)
             contexto.beginPath()
-            contexto.move(to: primero)
-
-            for punto in puntos.dropFirst() {
-                contexto.addLine(to: punto)
-            }
-
+            contexto.move(to: curva.0)
+            contexto.addCurve(
+                to: curva.3,
+                control1: curva.1,
+                control2: curva.2
+            )
             contexto.strokePath()
         }
 
-        // 1. Pelos blancos rizados: el dano mas visible del negativo. Van en
-        //    dos pasadas, un halo suave y el filamento, para que se vean como
-        //    pelo y no como una linea dibujada.
-        for _ in 0..<9 {
-            let inicio = CGPoint(
-                x: CGFloat.random(in: 0..<ancho),
-                y: CGFloat.random(in: 0..<alto)
-            )
-            let puntos = paseo(
-                desde: inicio,
-                angulo: CGFloat.random(in: 0...(2 * .pi)),
-                pasos: Int.random(in: 18...70),
-                largo: 3...10,
-                giro: -0.85...0.85
-            )
-            let alfa = CGFloat.random(in: 0.08...0.22)
-            let grosor = CGFloat.random(in: 0.8...2.0)
+        // 1. Hebras blancas: pocas, largas y con una curva simple.
+        for _ in 0..<7 {
+            let curva = nuevaHebra(largo: 240...760, curva: 50...150)
+            let alfa = CGFloat.random(in: 0.09...0.22)
+            let grosor = CGFloat.random(in: 0.9...2.0)
 
             if let color = claro(alfa * 0.40) {
-                trazar(puntos, color: color, grosor: grosor * 2.8)
+                trazar(curva, color: color, grosor: grosor * 2.4)
             }
             if let color = claro(alfa) {
-                trazar(puntos, color: color, grosor: grosor)
+                trazar(curva, color: color, grosor: grosor)
             }
         }
 
-        // 2. Hebras oscuras, largas y con curva suave. Son las que se ven
-        //    como un pelo encima de la foto.
+        // 2. Hebras oscuras, mas largas y apenas curvadas.
         for _ in 0..<4 {
-            let inicio = CGPoint(
-                x: CGFloat.random(in: 0..<ancho),
-                y: CGFloat.random(in: 0..<alto)
-            )
-            let puntos = paseo(
-                desde: inicio,
-                angulo: CGFloat.random(in: 0...(2 * .pi)),
-                pasos: Int.random(in: 40...95),
-                largo: 5...12,
-                giro: -0.22...0.22
-            )
+            let curva = nuevaHebra(largo: 420...1100, curva: 40...110)
 
-            if let color = oscuro(CGFloat.random(in: 0.05...0.14)) {
+            if let color = oscuro(CGFloat.random(in: 0.06...0.15)) {
                 trazar(
-                    puntos,
+                    curva,
                     color: color,
-                    grosor: CGFloat.random(in: 0.6...1.3)
+                    grosor: CGFloat.random(in: 0.6...1.2)
                 )
             }
         }
 
         // 3. Polvo alargado, nunca circulos.
-        for _ in 0..<26 {
+        for _ in 0..<22 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
             let largo = CGFloat.random(in: 1.2...4.5)
@@ -947,7 +938,7 @@ enum FilterEngine {
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
 
-        // Mover el azulejo cambia cuales pelos caen en la foto.
+        // Mover el azulejo cambia cuales hebras caen en la foto.
         var transformacion = CGAffineTransform(
             translationX: desfase.x,
             y: desfase.y
@@ -960,9 +951,9 @@ enum FilterEngine {
         repetir.transform = transformacion
         guard let infinito = repetir.outputImage else { return nil }
 
-        // El negativo tiene pelos claros y oscuros. Los claros suman luz y
-        // los oscuros la quitan, asi que va encima con transparencia en vez
-        // de en modo screen: si no, los oscuros desaparecen.
+        // El negativo tiene hebras claras y oscuras. Las claras suman luz y
+        // las oscuras la quitan, asi que va encima con transparencia en vez
+        // de en modo screen: si no, las oscuras desaparecen.
         let escala = min(max(cantidad, 0), 1)
         let control = CIFilter.colorMatrix()
         control.inputImage = infinito.cropped(to: imagen.extent)
