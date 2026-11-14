@@ -49,7 +49,8 @@ enum VideoBaker {
         preset: FilterPreset,
         controles: ControlesLook = ControlesLook(),
         sello: SelloFecha = .apagado,
-        fecha: Date = Date()
+        fecha: Date = Date(),
+        semilla: UInt64 = 0
     ) -> AVVideoComposition {
         let capa = CapaFecha(modo: sello, fecha: fecha)
 
@@ -57,7 +58,8 @@ enum VideoBaker {
             let filtrada = FilterEngine.cadena(
                 preset,
                 entrada: peticion.sourceImage,
-                controles: controles
+                controles: controles,
+                semilla: semilla
             )
 
             let base = filtrada ?? peticion.sourceImage
@@ -71,7 +73,8 @@ enum VideoBaker {
         preset: FilterPreset,
         controles: ControlesLook = ControlesLook(),
         sello: SelloFecha = .apagado,
-        fecha: Date = Date()
+        fecha: Date = Date(),
+        semilla: UInt64 = 0
     ) async throws -> URL {
         let asset = AVURLAsset(url: url)
 
@@ -94,7 +97,8 @@ enum VideoBaker {
             preset: preset,
             controles: controles,
             sello: sello,
-            fecha: fecha
+            fecha: fecha,
+            semilla: semilla
         )
         exportador.shouldOptimizeForNetworkUse = true
 

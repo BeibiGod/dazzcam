@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Control del look: que tan fuerte se ve el filtro, cuanta pelicula sucia
-/// (puntitos y grano) y cuanta fuga de luz. Se aplica a todas las camaras.
+/// Control del look: que tan fuerte se ve el filtro, cuantos rayones, fuga
+/// de luz, grano y que fecha se quema. Se aplica a todas las camaras.
 struct AjustesLookView: View {
     @Binding var controles: ControlesLook
+    @Binding var sello: SelloFecha
     let preset: FilterPreset
 
     @Environment(\.dismiss) private var cerrar
@@ -51,6 +52,8 @@ struct AjustesLookView: View {
                     maximo: 0.35
                 )
 
+                filaFecha
+
                 HStack {
                     Button {
                         controles = ControlesLook()
@@ -81,6 +84,49 @@ struct AjustesLookView: View {
                         .foregroundStyle(.white)
                 }
             }
+        }
+    }
+
+    /// Fila para elegir la fecha que se quema en la foto o el video.
+    private var filaFecha: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("FECHA")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Menu {
+                    ForEach(SelloFecha.allCases) { modo in
+                        Button {
+                            sello = modo
+                        } label: {
+                            if sello == modo {
+                                Label(modo.tituloMenu, systemImage: "checkmark")
+                            } else {
+                                Text(modo.tituloMenu)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(sello.tituloMenu)
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.12), in: Capsule())
+                }
+            }
+
+            Text("La hora sale de tu iPhone")
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.35))
         }
     }
 
@@ -129,6 +175,7 @@ struct AjustesLookView_Previews: PreviewProvider {
     static var previews: some View {
         AjustesLookView(
             controles: .constant(ControlesLook()),
+            sello: .constant(.dazz),
             preset: .disposable
         )
     }

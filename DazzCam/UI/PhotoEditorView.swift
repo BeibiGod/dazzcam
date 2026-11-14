@@ -17,6 +17,7 @@ struct PhotoEditorView: View {
     @State private var guardando = false
     @State private var error: String?
     @State private var token = 0
+    @State private var semilla = UInt64.random(in: 1...UInt64.max)
 
     @Environment(\.dismiss) private var cerrar
 
@@ -195,6 +196,7 @@ struct PhotoEditorView: View {
         let marca = sello
         let fuerza = intensidad
         let extra = controles
+        let azar = semilla
 
         token += 1
         let mio = token
@@ -209,7 +211,12 @@ struct PhotoEditorView: View {
                 var ajustes = extra
                 ajustes.intensidad = fuerza
 
-                var salida = FilterEngine.aplicar(elegido, a: base, controles: ajustes)
+                var salida = FilterEngine.aplicar(
+                    elegido,
+                    a: base,
+                    controles: ajustes,
+                    semilla: azar
+                )
                 if let relacion = relacion {
                     salida = FilterEngine.recortar(salida, relacion: relacion)
                 }

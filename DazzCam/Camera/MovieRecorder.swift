@@ -27,6 +27,7 @@ final class MovieRecorder: NSObject, ObservableObject {
     private var preset: FilterPreset = .dazzClassic
     private var controles = ControlesLook()
     private var sello: SelloFecha = .apagado
+    private var semilla: UInt64 = 0
     private var fechaInicio = Date()
     private var reloj: Timer?
 
@@ -54,6 +55,7 @@ final class MovieRecorder: NSObject, ObservableObject {
         preset: FilterPreset,
         controles: ControlesLook = ControlesLook(),
         sello: SelloFecha = .apagado,
+        semilla: UInt64 = 0,
         quitar: AVCaptureVideoDataOutput?
     ) async {
         guard !grabando, !procesando, let sesion = sesion else { return }
@@ -62,6 +64,7 @@ final class MovieRecorder: NSObject, ObservableObject {
         self.preset = preset
         self.controles = controles
         self.sello = sello
+        self.semilla = semilla
         pausada = quitar
 
         let conMicro = await pedirMicrofono()
@@ -195,6 +198,7 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
         let ajustes = controles
         let marca = sello
         let cuando = fechaInicio
+        let azar = semilla
         procesando = true
 
         Task {
@@ -206,7 +210,8 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
                     preset: look,
                     controles: ajustes,
                     sello: marca,
-                    fecha: cuando
+                    fecha: cuando,
+                    semilla: azar
                 )
                 try await PhotoLibrarySaver.guardarVideo(conFiltro)
                 guardados += 1

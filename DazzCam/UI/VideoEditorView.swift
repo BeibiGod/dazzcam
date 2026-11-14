@@ -18,6 +18,7 @@ struct VideoEditorView: View {
     @State private var guardando = false
     @State private var error: String?
     @State private var tokenReproductor = 0
+    @State private var semilla = UInt64.random(in: 1...UInt64.max)
 
     @Environment(\.dismiss) private var cerrar
 
@@ -199,6 +200,7 @@ struct VideoEditorView: View {
         let archivo = url
         let marca = sello
         let cuando = fecha
+        let azar = semilla
 
         // Espera a que el dedo deje de moverse antes de rehacer el video.
         Task { @MainActor in
@@ -212,7 +214,8 @@ struct VideoEditorView: View {
                 preset: look,
                 controles: ajustes,
                 sello: marca,
-                fecha: cuando
+                fecha: cuando,
+                semilla: azar
             )
 
             reproductor = AVPlayer(playerItem: item)
@@ -232,6 +235,7 @@ struct VideoEditorView: View {
         ajustes.intensidad = intensidad
         let marca = sello
         let cuando = fecha
+        let azar = semilla
 
         Task {
             do {
@@ -240,7 +244,8 @@ struct VideoEditorView: View {
                     preset: look,
                     controles: ajustes,
                     sello: marca,
-                    fecha: cuando
+                    fecha: cuando,
+                    semilla: azar
                 )
                 try await PhotoLibrarySaver.guardarVideo(salida)
                 try? FileManager.default.removeItem(at: salida)

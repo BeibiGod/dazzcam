@@ -34,7 +34,7 @@ struct CameraView: View {
     @State private var temporizador: Temporizador = .apagado
     @State private var proporcion: Proporcion = .dieciseisNueve
     @State private var exposicion: Double = 0
-    @State private var mostrarExposicion = false
+    @State private var exposicionInicioArrastre: Double?
     @State private var cuenta: Int?
     @State private var mostrarCuadricula = true
     @State private var sello: SelloFecha = .dazz
@@ -52,9 +52,11 @@ struct CameraView: View {
     @State private var tokenExposicion = 0
     @State private var tokenAjuste = 0
     @State private var guardandoFoto = false
+    @State private var semillaCaptura: UInt64 = 0
+    @State private var semillaVivo = UInt64.random(in: 1...UInt64.max)
 
     private var versionTexto: String {
-        "v1.10.1 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.11 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -101,12 +103,6 @@ struct CameraView: View {
                     barraHerramientas
                         .padding(.horizontal, 16)
                         .padding(.bottom, 6)
-
-                    if mostrarExposicion {
-                        controlExposicion
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 6)
-                    }
 
                     if let texto = aviso {
                         Text(texto)
@@ -270,6 +266,7 @@ struct CameraView: View {
                 video.conectar(a: camara.session)
                 vivo.preset = preset
                 vivo.controles = controles
+                vivo.semilla = semillaVivo
             }
             await camara.arrancar()
             camara.ponerZoom(1)
@@ -301,6 +298,11 @@ struct CameraView: View {
                 programarRecalculo()
             }
         }
+        .onChange(of: sello) { _, _ in
+            if mostrarCaptura {
+                programarRecalculo()
+            }
+        }
         .onChange(of: video.grabando) { _, grabando in
             if grabando {
                 vivoAntesDeGrabar = modoVivo
@@ -316,12 +318,15 @@ struct CameraView: View {
                 miniaturas.generar(desde: base)
             }
 
+            semillaCaptura = UInt64.random(in: 1...UInt64.max)
+
             fotoFiltrada = Self.componer(
                 base,
                 look: preset,
                 ajustes: controles,
                 relacion: proporcion.relacion,
-                marca: sello
+                marca: sello,
+                semilla: semillaCaptura
             )
             mostrarCaptura = true
         }
@@ -333,8 +338,8 @@ struct CameraView: View {
             CameraPickerSheet(seleccionado: $preset, muestras: miniaturas.muestras)
         }
         .sheet(isPresented: $mostrarAjustes) {
-            AjustesLookView(controles: $controles, preset: preset)
-                .presentationDetents([.height(470)])
+            AjustesLookView(controles: $controles, sello: $sello, preset: preset)
+                .presentationDetents([.height(560)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
@@ -474,20 +479,12 @@ struct CameraView: View {
             }
 
             if let punto = puntoExposicion, barraExposicionVisible {
-                BarraExposicion(
-                    valor: Binding(
-                        get: { exposicion },
-                        set: { nuevo in
-                            exposicion = nuevo
-                            camara.fijarExposicion(Float(nuevo))
-                        }
+                BarraExposicion(valor: exposicion)
+                    .position(
+                        x: min(max(punto.x + 66, 40), geo.size.width - 40),
+                        y: min(max(punto.y, barra + 100), geo.size.height - barra - 100)
                     )
-                )
-                .position(
-                    x: min(max(punto.x + 66, 40), geo.size.width - 40),
-                    y: min(max(punto.y, barra + 100), geo.size.height - barra - 100)
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
         .contentShape(Rectangle())
@@ -498,6 +495,32 @@ struct CameraView: View {
                 }
                 .onEnded { _ in
                     zoomBase = camara.zoom
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 6)
+                .onChanged { gesto in
+                    guard barraExposicionVisible, cuenta == nil, !mostrarCaptura else { return }
+                    guard abs(gesto.translation.height) >= abs(gesto.translation.width) else { return }
+
+                    if exposicionInicioArrastre == nil {
+                        exposicionInicioArrastre = exposicion
+                        // Mientras arrastras, la barrita no se esconde.
+                        tokenExposicion += 1
+                    }
+
+                    let inicio = exposicionInicioArrastre ?? exposicion
+                    let recorrido = max(Double(geo.size.height) * 0.42, 220)
+                    let cambio = -Double(gesto.translation.height) / recorrido * 3.0
+                    let nuevo = min(max(inicio + cambio, -2), 2)
+
+                    exposicion = nuevo
+                    camara.fijarExposicion(Float(nuevo))
+                }
+                .onEnded { _ in
+                    guard exposicionInicioArrastre != nil else { return }
+                    exposicionInicioArrastre = nil
+                    mantenerBarraExposicion()
                 }
         )
     }
@@ -622,16 +645,6 @@ struct CameraView: View {
                 }
             }
 
-            herramienta(
-                icono: "sun.max.fill",
-                texto: abs(exposicion) > 0.05 ? String(format: "%+.1f", exposicion) : nil,
-                activo: abs(exposicion) > 0.05
-            ) {
-                mostrarExposicion.toggle()
-            }
-
-            menuFecha
-
             // En video no hay revision despues de grabar, asi que el look se
             // ajusta antes. En foto se ajusta despues de disparar.
             if modo == .video {
@@ -672,62 +685,6 @@ struct CameraView: View {
             .background(activo ? Color.yellow : Color.black.opacity(0.5), in: Capsule())
         }
         .buttonStyle(.plain)
-    }
-
-    /// Menu del sello: fecha tipo DazzCam o fecha del iPhone.
-    private var menuFecha: some View {
-        Menu {
-            ForEach(SelloFecha.allCases) { modo in
-                Button {
-                    sello = modo
-                } label: {
-                    if sello == modo {
-                        Label(modo.tituloMenu, systemImage: "checkmark")
-                    } else {
-                        Text(modo.tituloMenu)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12, weight: .semibold))
-
-                if sello.encendido {
-                    Text(sello.etiqueta)
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                }
-            }
-            .foregroundStyle(sello.encendido ? Color.black : Color.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                sello.encendido ? Color.yellow : Color.black.opacity(0.5),
-                in: Capsule()
-            )
-        }
-        .fixedSize()
-    }
-
-    private var controlExposicion: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sun.min")
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.6))
-
-            Slider(value: $exposicion, in: -2...2, step: 0.1)
-                .tint(.yellow)
-                .onChange(of: exposicion) { _, nuevo in
-                    camara.fijarExposicion(Float(nuevo))
-                }
-
-            Image(systemName: "sun.max")
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(Color.black.opacity(0.5), in: Capsule())
     }
 
     // MARK: - Lentes y modo
@@ -852,11 +809,16 @@ struct CameraView: View {
             if video.grabando {
                 video.parar()
             } else {
+                let azar = UInt64.random(in: 1...UInt64.max)
+                semillaVivo = azar
+                vivo.semilla = azar
+
                 Task {
                     await video.empezar(
                         preset: preset,
                         controles: controles,
                         sello: sello,
+                        semilla: azar,
                         quitar: vivo.salida
                     )
                 }
@@ -964,15 +926,22 @@ struct CameraView: View {
     /// camara del iPhone. Se esconde sola a los 5 segundos.
     private func mostrarBarraExposicion(en punto: CGPoint) {
         puntoExposicion = punto
-        tokenExposicion += 1
-        let mio = tokenExposicion
 
         withAnimation(.easeOut(duration: 0.18)) {
             barraExposicionVisible = true
         }
 
+        mantenerBarraExposicion()
+    }
+
+    /// Reinicia el reloj que esconde la barrita. Se llama al soltar el dedo
+    /// despues de subir o bajar la exposicion.
+    private func mantenerBarraExposicion() {
+        tokenExposicion += 1
+        let mio = tokenExposicion
+
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard mio == tokenExposicion else { return }
             withAnimation(.easeIn(duration: 0.25)) {
                 barraExposicionVisible = false
@@ -1003,7 +972,8 @@ struct CameraView: View {
             look: preset,
             ajustes: controles,
             relacion: proporcion.relacion,
-            marca: sello
+            marca: sello,
+            semilla: semillaCaptura
         )
         fotoFiltrada = final
 
@@ -1032,6 +1002,7 @@ struct CameraView: View {
         let ajustes = controles
         let relacion = proporcion.relacion
         let marca = sello
+        let azar = semillaCaptura
 
         tokenAjuste += 1
         let mio = tokenAjuste
@@ -1046,7 +1017,8 @@ struct CameraView: View {
                     look: look,
                     ajustes: ajustes,
                     relacion: relacion,
-                    marca: marca
+                    marca: marca,
+                    semilla: azar
                 )
 
                 DispatchQueue.main.async {
@@ -1064,9 +1036,15 @@ struct CameraView: View {
         look: FilterPreset,
         ajustes: ControlesLook,
         relacion: CGFloat?,
-        marca: SelloFecha
+        marca: SelloFecha,
+        semilla: UInt64
     ) -> UIImage {
-        var procesada = FilterEngine.aplicar(look, a: base, controles: ajustes)
+        var procesada = FilterEngine.aplicar(
+            look,
+            a: base,
+            controles: ajustes,
+            semilla: semilla
+        )
 
         if let relacion = relacion {
             procesada = FilterEngine.recortar(procesada, relacion: relacion)
@@ -1089,55 +1067,59 @@ struct CameraView: View {
     }
 }
 
-/// Barrita vertical de exposicion que sale al tocar para enfocar.
+/// Barrita vertical de exposicion, como la del iPhone. Despues de tocar para
+/// enfocar, se sube o se baja deslizando el dedo en cualquier parte del visor.
 private struct BarraExposicion: View {
-    @Binding var valor: Double
+    let valor: Double
 
-    private let alto: CGFloat = 112
+    private let alto: CGFloat = 116
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 6) {
             Image(systemName: "sun.max.fill")
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.yellow)
 
-            ZStack(alignment: .bottom) {
+            ZStack {
                 Capsule()
-                    .fill(Color.white.opacity(0.22))
-                    .frame(width: 3, height: alto)
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 2, height: alto)
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: 12, height: 1)
 
                 Capsule()
                     .fill(Color.yellow)
-                    .frame(width: 3, height: max(4, progreso * alto))
+                    .frame(width: 2, height: abs(desplazamiento))
+                    .offset(y: desplazamiento / 2)
 
-                Circle()
+                RoundedRectangle(cornerRadius: 1.5)
                     .fill(Color.white)
-                    .frame(width: 15, height: 15)
-                    .shadow(color: .black.opacity(0.5), radius: 2)
-                    .offset(y: -(progreso * alto) + 7.5)
+                    .frame(width: 22, height: 3)
+                    .shadow(color: .black.opacity(0.45), radius: 2)
+                    .offset(y: desplazamiento)
             }
-            .frame(width: 26, height: alto)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesto in
-                        let y = min(max(gesto.location.y, 0), alto)
-                        let t = 1 - Double(y / alto)
-                        valor = -1.5 + t * 3.0
-                    }
-            )
+            .frame(width: 30, height: alto)
 
-            Image(systemName: "sun.min")
-                .font(.system(size: 9))
-                .foregroundStyle(.white.opacity(0.55))
+            Text(String(format: "%+.1f", valor))
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.85))
+                .monospacedDigit()
         }
         .padding(.vertical, 9)
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 7)
         .background(.black.opacity(0.45), in: Capsule())
+        .allowsHitTesting(false)
     }
 
+    /// 0 = centro de la barra, arriba es mas luz.
     private var progreso: CGFloat {
-        CGFloat((min(max(valor, -1.5), 1.5) + 1.5) / 3.0)
+        CGFloat((min(max(valor, -2), 2) + 2) / 4)
+    }
+
+    private var desplazamiento: CGFloat {
+        (0.5 - progreso) * alto
     }
 }
 

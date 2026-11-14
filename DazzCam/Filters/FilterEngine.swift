@@ -31,6 +31,35 @@ struct ControlesLook: Equatable {
     }
 }
 
+/// Generador chiquito y repetible. La misma semilla da el mismo patron, asi
+/// cada foto o video tiene sus propios rayones y su propia fuga, pero al mover
+/// la intensidad no se mueven de lugar.
+private struct Azar {
+    private var estado: UInt64
+
+    init(_ semilla: UInt64) {
+        estado = semilla &+ 0x9E37_79B9_7F4A_7C15
+    }
+
+    mutating func siguiente() -> UInt64 {
+        estado = estado &+ 0x9E37_79B9_7F4A_7C15
+        var z = estado
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
+
+    mutating func valor(_ rango: ClosedRange<CGFloat>) -> CGFloat {
+        let unidad = CGFloat(siguiente() % 10_000) / 10_000
+        return rango.lowerBound + (rango.upperBound - rango.lowerBound) * unidad
+    }
+
+    mutating func entero(_ limite: Int) -> Int {
+        guard limite > 0 else { return 0 }
+        return Int(siguiente() % UInt64(limite))
+    }
+}
+
 /// Aplica los looks de pelicula a fotos y a video.
 enum FilterEngine {
 
@@ -41,13 +70,19 @@ enum FilterEngine {
     static func aplicar(
         _ preset: FilterPreset,
         a imagen: UIImage,
-        controles: ControlesLook = ControlesLook()
+        controles: ControlesLook = ControlesLook(),
+        semilla: UInt64 = 0
     ) -> UIImage {
         guard preset != .original else { return imagen }
 
         let base = normalizar(imagen)
         guard let entrada = CIImage(image: base) else { return imagen }
-        guard let salida = cadena(preset, entrada: entrada, controles: controles) else { return imagen }
+        guard let salida = cadena(
+            preset,
+            entrada: entrada,
+            controles: controles,
+            semilla: semilla
+        ) else { return imagen }
 
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {
             return imagen
@@ -58,7 +93,8 @@ enum FilterEngine {
     static func cadena(
         _ preset: FilterPreset,
         entrada: CIImage,
-        controles: ControlesLook = ControlesLook()
+        controles: ControlesLook = ControlesLook(),
+        semilla: UInt64 = 0
     ) -> CIImage? {
         guard preset != .original else { return entrada }
 
@@ -67,7 +103,7 @@ enum FilterEngine {
         a.fuga = controles.fuga ?? a.fuga
         a.grano = controles.grano ?? a.grano
 
-        guard let filtrada = aplicar(a, a: entrada) else { return nil }
+        guard let filtrada = aplicar(a, a: entrada, semilla: semilla) else { return nil }
         guard controles.intensidad < 0.999 else { return filtrada }
 
         return mezclar(filtrada, con: entrada, cantidad: controles.intensidad)
@@ -395,8 +431,9 @@ enum FilterEngine {
 
     // MARK: - Cadena generica
 
-    private static func aplicar(_ a: AjusteFoto, a imagen: CIImage) -> CIImage? {
+    private static func aplicar(_ a: AjusteFoto, a imagen: CIImage, semilla: UInt64) -> CIImage? {
         var actual = imagen
+        var azar = Azar(semilla)
 
         // 1. balance de blancos
         if a.temperatura != 6500 || a.tinte != 0 {
@@ -446,14 +483,44 @@ enum FilterEngine {
             actual = conGrano
         }
 
-        // 7. rayones finos de pelicula
-        if a.rayones > 0, let conRayones = rayones(actual, cantidad: a.rayones) {
-            actual = conRayones
+        // 7. rayones finos de pelicula: cambian de lugar y de fuerza en cada toma
+        if a.rayones > 0 {
+            let fuerza = min(max(a.rayones * azar.valor(0.75...1.2), 0), 1)
+            let desfase = CGPoint(
+                x: azar.valor(0...2048),
+                y: azar.valor(0...2048)
+            )
+            let espejo = azar.entero(2) == 1
+
+            if let conRayones = rayones(
+                actual,
+                cantidad: fuerza,
+                desfase: desfase,
+                espejo: espejo
+            ) {
+                actual = conRayones
+            }
         }
 
-        // 8. fuga de luz por una esquina
-        if a.fuga > 0, let conFuga = fuga(actual, cantidad: a.fuga, esquina: a.fugaEsquina) {
-            actual = conFuga
+        // 8. fuga de luz: cada foto elige su esquina y su fuerza
+        if a.fuga > 0 {
+            let esquina = (a.fugaEsquina + azar.entero(4)) % 4
+            let fuerza = min(max(a.fuga * azar.valor(0.8...1.15), 0), 1)
+            let radio = azar.valor(0.62...0.92)
+            let corrimiento = CGPoint(
+                x: azar.valor(-0.05...0.05),
+                y: azar.valor(-0.05...0.05)
+            )
+
+            if let conFuga = fuga(
+                actual,
+                cantidad: fuerza,
+                esquina: esquina,
+                radio: radio,
+                corrimiento: corrimiento
+            ) {
+                actual = conFuga
+            }
         }
 
         return actual
@@ -461,7 +528,13 @@ enum FilterEngine {
 
     // MARK: - Fuga de luz
 
-    private static func fuga(_ imagen: CIImage, cantidad: CGFloat, esquina: Int) -> CIImage? {
+    private static func fuga(
+        _ imagen: CIImage,
+        cantidad: CGFloat,
+        esquina: Int,
+        radio: CGFloat = 0.75,
+        corrimiento: CGPoint = .zero
+    ) -> CIImage? {
         let extent = imagen.extent
         let ancho = extent.width
         let alto = extent.height
@@ -473,12 +546,16 @@ enum FilterEngine {
             CGPoint(x: extent.minX, y: extent.minY),
             CGPoint(x: extent.maxX, y: extent.minY)
         ]
-        let centro = posiciones[abs(esquina) % posiciones.count]
+        let base = posiciones[abs(esquina) % posiciones.count]
+        let centro = CGPoint(
+            x: base.x + corrimiento.x * ancho,
+            y: base.y + corrimiento.y * alto
+        )
 
         let gradiente = CIFilter.radialGradient()
         gradiente.center = centro
         gradiente.radius0 = 0
-        gradiente.radius1 = Float(max(ancho, alto) * 0.75)
+        gradiente.radius1 = Float(max(ancho, alto) * radio)
         gradiente.color0 = CIColor(red: 1.0, green: 0.62, blue: 0.24, alpha: 1.0)
         gradiente.color1 = CIColor(red: 0, green: 0, blue: 0, alpha: 1.0)
 
@@ -653,12 +730,28 @@ enum FilterEngine {
         return imagen
     }()
 
-    private static func rayones(_ imagen: CIImage, cantidad: CGFloat) -> CIImage? {
+    private static func rayones(
+        _ imagen: CIImage,
+        cantidad: CGFloat,
+        desfase: CGPoint = .zero,
+        espejo: Bool = false
+    ) -> CIImage? {
         guard let azulejo = rayonesTile, cantidad > 0.001 else { return nil }
 
         let repetir = CIFilter.affineTile()
         repetir.inputImage = azulejo
-        repetir.transform = .identity
+
+        // Mover el azulejo cambia cuales rayones caen en la foto.
+        var transformacion = CGAffineTransform(
+            translationX: desfase.x,
+            y: desfase.y
+        )
+        if espejo {
+            transformacion = transformacion.concatenating(
+                CGAffineTransform(scaleX: -1, y: 1)
+            )
+        }
+        repetir.transform = transformacion
         guard let infinito = repetir.outputImage else { return nil }
 
         let control = CIFilter.colorMatrix()

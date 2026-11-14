@@ -17,12 +17,18 @@ final class VideoFrameRenderer {
     func renderizar(
         _ buffer: CVPixelBuffer,
         preset: FilterPreset,
-        controles: ControlesLook
+        controles: ControlesLook,
+        semilla: UInt64 = 0
     ) -> UIImage? {
         let entrada = CIImage(cvPixelBuffer: buffer)
         let chica = reducir(entrada)
 
-        guard let salida = FilterEngine.cadena(preset, entrada: chica, controles: controles) else {
+        guard let salida = FilterEngine.cadena(
+            preset,
+            entrada: chica,
+            controles: controles,
+            semilla: semilla
+        ) else {
             return nil
         }
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {

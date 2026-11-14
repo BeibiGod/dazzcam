@@ -13,8 +13,12 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// Lo cambia la vista cuando el usuario elige otro filtro.
     var preset: FilterPreset = .dazzClassic
 
-    /// Intensidad, puntitos y fugas elegidos por el usuario.
+    /// Intensidad, rayones y fugas elegidos por el usuario.
     var controles = ControlesLook()
+
+    /// Semilla del preview. Se cambia al empezar cada grabacion para que el
+    /// video guardado tenga el mismo patron que estabas viendo.
+    var semilla: UInt64 = 0
 
     let salida = AVCaptureVideoDataOutput()
     private let renderer = VideoFrameRenderer()
@@ -70,7 +74,8 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         guard let filtrada = renderer.renderizar(
             buffer,
             preset: preset,
-            controles: controles
+            controles: controles,
+            semilla: semilla
         ) else { return }
 
         contadorCuadros += 1
