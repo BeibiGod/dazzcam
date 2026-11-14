@@ -870,37 +870,74 @@ enum FilterEngine {
             contexto.strokePath()
         }
 
-        // 1. Hebras blancas: onduladas y simples, sin enredarse.
-        for _ in 0..<7 {
-            let hebra = hebraOndulada(
-                largo: 240...760,
-                amplitud: 12...42,
-                ondas: 1.5...3.5
+        /// Pelusa blanca como la de la foto: hilo corto con zigzag
+        /// apretado. Siempre avanza hacia adelante, asi que no se cierra.
+        func pelusa(
+            largo: ClosedRange<CGFloat>,
+            amplitud: ClosedRange<CGFloat>,
+            pasos: ClosedRange<Int>
+        ) -> [CGPoint] {
+            let inicio = CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
             )
-            let alfa = CGFloat.random(in: 0.09...0.22)
-            let grosor = CGFloat.random(in: 0.9...2.0)
+            let distancia = CGFloat.random(in: largo)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let avanceX = cos(angulo)
+            let avanceY = sin(angulo)
+            let ladoX = -avanceY
+            let ladoY = avanceX
+            let cantidad = Int.random(in: pasos)
+            let vaiven = CGFloat.random(in: amplitud)
 
-            if let color = claro(alfa * 0.40) {
-                trazar(hebra, color: color, grosor: grosor * 2.4)
+            var puntos: [CGPoint] = [inicio]
+
+            for paso in 1...cantidad {
+                let t = CGFloat(paso) / CGFloat(cantidad)
+                // Cada tramo brinca de un lado al otro del hilo.
+                let signo: CGFloat = paso % 2 == 0 ? 1 : -1
+                let pico = signo * vaiven * CGFloat.random(in: 0.5...1.0)
+
+                puntos.append(CGPoint(
+                    x: inicio.x + avanceX * distancia * t + ladoX * pico,
+                    y: inicio.y + avanceY * distancia * t + ladoY * pico
+                ))
+            }
+
+            return puntos
+        }
+
+        // 1. Pelusas blancas: cortas y con zigzag, como la de la foto.
+        for _ in 0..<4 {
+            let hebra = pelusa(
+                largo: 60...170,
+                amplitud: 4...13,
+                pasos: 7...13
+            )
+            let alfa = CGFloat.random(in: 0.20...0.45)
+            let grosor = CGFloat.random(in: 1.3...2.6)
+
+            if let color = claro(alfa * 0.35) {
+                trazar(hebra, color: color, grosor: grosor * 2.2)
             }
             if let color = claro(alfa) {
                 trazar(hebra, color: color, grosor: grosor)
             }
         }
 
-        // 2. Hebras oscuras, mas largas y con menos vaiven.
-        for _ in 0..<4 {
+        // 2. Hebras oscuras: largas, finas y con un solo arco suave.
+        for _ in 0..<3 {
             let hebra = hebraOndulada(
-                largo: 420...1100,
-                amplitud: 10...30,
-                ondas: 1.0...2.2
+                largo: 600...1500,
+                amplitud: 40...140,
+                ondas: 0.45...0.85
             )
 
-            if let color = oscuro(CGFloat.random(in: 0.06...0.15)) {
+            if let color = oscuro(CGFloat.random(in: 0.10...0.20)) {
                 trazar(
                     hebra,
                     color: color,
-                    grosor: CGFloat.random(in: 0.6...1.2)
+                    grosor: CGFloat.random(in: 0.9...1.8)
                 )
             }
         }
