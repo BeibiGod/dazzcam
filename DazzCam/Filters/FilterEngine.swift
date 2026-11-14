@@ -71,7 +71,8 @@ enum FilterEngine {
         _ preset: FilterPreset,
         a imagen: UIImage,
         controles: ControlesLook = ControlesLook(),
-        semilla: UInt64 = 0
+        semilla: UInt64 = 0,
+        momento: UInt64 = 0
     ) -> UIImage {
         guard preset != .original else { return imagen }
 
@@ -81,7 +82,8 @@ enum FilterEngine {
             preset,
             entrada: entrada,
             controles: controles,
-            semilla: semilla
+            semilla: semilla,
+            momento: momento
         ) else { return imagen }
 
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {
@@ -90,11 +92,15 @@ enum FilterEngine {
         return UIImage(cgImage: cg, scale: base.scale, orientation: .up)
     }
 
+    /// `momento` es el numero de cuadro. En foto vale 0 y el patron queda
+    /// quieto; en video cambia cuadro a cuadro para que los rayones se muevan
+    /// como en un negativo de verdad.
     static func cadena(
         _ preset: FilterPreset,
         entrada: CIImage,
         controles: ControlesLook = ControlesLook(),
-        semilla: UInt64 = 0
+        semilla: UInt64 = 0,
+        momento: UInt64 = 0
     ) -> CIImage? {
         guard preset != .original else { return entrada }
 
@@ -103,7 +109,12 @@ enum FilterEngine {
         a.fuga = controles.fuga ?? a.fuga
         a.grano = controles.grano ?? a.grano
 
-        guard let filtrada = aplicar(a, a: entrada, semilla: semilla) else { return nil }
+        guard let filtrada = aplicar(
+            a,
+            a: entrada,
+            semilla: semilla,
+            momento: momento
+        ) else { return nil }
         guard controles.intensidad < 0.999 else { return filtrada }
 
         return mezclar(filtrada, con: entrada, cantidad: controles.intensidad)
@@ -431,7 +442,12 @@ enum FilterEngine {
 
     // MARK: - Cadena generica
 
-    private static func aplicar(_ a: AjusteFoto, a imagen: CIImage, semilla: UInt64) -> CIImage? {
+    private static func aplicar(
+        _ a: AjusteFoto,
+        a imagen: CIImage,
+        semilla: UInt64,
+        momento: UInt64
+    ) -> CIImage? {
         var actual = imagen
         var azar = Azar(semilla)
 
@@ -483,19 +499,39 @@ enum FilterEngine {
             actual = conGrano
         }
 
-        // 7. rayones finos de pelicula: cambian de lugar y de fuerza en cada toma
+        // 7. rayones finos de pelicula: cada toma tiene su patron y en video
+        //    se mueven un poco cuadro a cuadro, como en un negativo real.
         if a.rayones > 0 {
-            let fuerza = min(max(a.rayones * azar.valor(0.75...1.2), 0), 1)
-            let desfase = CGPoint(
+            let fuerzaBase = min(max(a.rayones * azar.valor(0.75...1.2), 0), 1)
+            let desfaseBase = CGPoint(
                 x: azar.valor(0...2048),
                 y: azar.valor(0...2048)
             )
             let espejo = azar.entero(2) == 1
 
+            // Movimiento suave mas un temblor chiquito, para que no parezca
+            // un patron pegado encima de la imagen.
+            let fase = Double(momento % 2400) / 24.0
+            var temblor = Azar(semilla &+ (momento &* 0x9E37_79B9_7F4A_7C15))
+            let deriva = CGPoint(
+                x: CGFloat(sin(fase * 1.7)) * 9
+                    + CGFloat(cos(fase * 4.3)) * 3
+                    + temblor.valor(-1.5...1.5),
+                y: CGFloat(cos(fase * 1.1)) * 4
+                    + temblor.valor(-1...1)
+            )
+            let parpadeo = 0.9
+                + CGFloat(sin(fase * 6.5)) * 0.07
+                + temblor.valor(0...0.06)
+            let fuerza = min(max(fuerzaBase * parpadeo, 0), 1)
+
             if let conRayones = rayones(
                 actual,
                 cantidad: fuerza,
-                desfase: desfase,
+                desfase: CGPoint(
+                    x: desfaseBase.x + deriva.x,
+                    y: desfaseBase.y + deriva.y
+                ),
                 espejo: espejo
             ) {
                 actual = conRayones
@@ -608,9 +644,9 @@ enum FilterEngine {
 
     // MARK: - Rayones de pelicula
 
-    /// Solo rayones y pelusas finas, como un negativo que se raspo un poco.
-    /// Nada de puntitos redondos: se ven a computadora y quedan falsos.
-    /// Al 100% se notan discretos; al 0% desaparecen por completo.
+    /// Rayones de una foto revelada de verdad: lineas verticales muy finas
+    /// que se cortan solas, pelusas y polvo alargado. Nada de rayas largas
+    /// parejas ni puntitos redondos: eso se nota hecho a computadora.
     private static let rayonesTile: CIImage? = {
         let lado = 2048
         let espacio = CGColorSpaceCreateDeviceRGB()
@@ -634,83 +670,128 @@ enum FilterEngine {
         let ancho = CGFloat(lado)
         let alto = CGFloat(lado)
 
-        func punto() -> CGPoint {
-            CGPoint(
-                x: CGFloat.random(in: 0..<ancho),
-                y: CGFloat.random(in: 0..<alto)
+        func tinta(_ alfa: CGFloat) -> CGColor? {
+            CGColor(
+                colorSpace: espacio,
+                components: [1, 0.985, 0.96, alfa]
             )
         }
 
-        // 1. Rayones largos y casi verticales, como los del arrastre del rollo.
-        for _ in 0..<16 {
-            let inicio = punto()
-            let largo = CGFloat.random(in: 40...170)
-            let desvio = CGFloat.random(in: -10...10)
-            let anchoLinea = CGFloat.random(in: 0.8...2.2)
-            let alfa = CGFloat.random(in: 0.05...0.15)
+        // 1. Rayones de arrastre: verticales, finos y cortados en tramos.
+        //    Cada tramo cambia de fuerza, como cuando el negativo se raya.
+        for _ in 0..<7 {
+            let x = CGFloat.random(in: 0..<ancho)
+            let yInicio = CGFloat.random(in: 0..<alto)
+            let largo = CGFloat.random(in: 180...900)
+            var y = yInicio
+            var xActual = x
 
-            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+            while y < yInicio + largo {
+                let tramo = CGFloat.random(in: 8...46)
+                let alfa = CGFloat.random(in: 0.06...0.26)
+                let grosor = CGFloat.random(in: 0.55...1.5)
+
+                if CGFloat.random(in: 0...1) > 0.22, let color = tinta(alfa) {
+                    contexto.setStrokeColor(color)
+                    contexto.setLineWidth(grosor)
+
+                    let fin = min(y + tramo, yInicio + largo)
+                    let desvio = CGFloat.random(in: -1.4...1.4)
+
+                    contexto.move(to: CGPoint(x: xActual, y: y))
+                    contexto.addLine(to: CGPoint(x: xActual + desvio, y: fin))
+                    contexto.strokePath()
+
+                    xActual += CGFloat.random(in: -0.35...0.35)
+                }
+
+                y += tramo + CGFloat.random(in: 2...18)
+            }
+        }
+
+        // 2. Rayitas cortas de emulsion, agrupadas, casi verticales.
+        for _ in 0..<4 {
+            let centroX = CGFloat.random(in: 0..<ancho)
+            let centroY = CGFloat.random(in: 0..<alto)
+
+            for _ in 0..<Int.random(in: 10...24) {
+                let x = centroX + CGFloat.random(in: -14...14)
+                let y = centroY + CGFloat.random(in: -30...30)
+                let altoRaya = CGFloat.random(in: 4...22)
+                let alfa = CGFloat.random(in: 0.06...0.20)
+
+                if let color = tinta(alfa) {
+                    contexto.setStrokeColor(color)
+                    contexto.setLineWidth(CGFloat.random(in: 0.45...1.0))
+                    contexto.move(to: CGPoint(x: x, y: y))
+                    contexto.addLine(to: CGPoint(
+                        x: x + CGFloat.random(in: -1.2...1.2),
+                        y: y + altoRaya
+                    ))
+                    contexto.strokePath()
+                }
+            }
+        }
+
+        // 3. Pelusas: pocas, torcidas y suaves.
+        for _ in 0..<5 {
+            let inicio = CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
+            )
+            let largo = CGFloat.random(in: 26...110)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let fin = CGPoint(
+                x: inicio.x + cos(angulo) * largo,
+                y: inicio.y + sin(angulo) * largo
+            )
+            let control = CGPoint(
+                x: (inicio.x + fin.x) / 2 + CGFloat.random(in: -12...12),
+                y: (inicio.y + fin.y) / 2 + CGFloat.random(in: -12...12)
+            )
+
+            if let color = tinta(CGFloat.random(in: 0.04...0.11)) {
                 contexto.setStrokeColor(color)
-                contexto.setLineWidth(anchoLinea)
-
-                let control = CGPoint(
-                    x: inicio.x + desvio * 0.35,
-                    y: inicio.y + largo * 0.55
-                )
-                let fin = CGPoint(x: inicio.x + desvio, y: inicio.y + largo)
-
+                contexto.setLineWidth(CGFloat.random(in: 0.4...0.8))
                 contexto.move(to: inicio)
                 contexto.addQuadCurve(to: fin, control: control)
                 contexto.strokePath()
             }
         }
 
-        // 2. Rayones cortos en cualquier direccion, de tanto manipular la foto.
-        for _ in 0..<10 {
-            let inicio = punto()
-            let largo = CGFloat.random(in: 15...60)
+        // 4. Polvo: motas alargadas, nunca circulos perfectos.
+        for _ in 0..<36 {
+            let x = CGFloat.random(in: 0..<ancho)
+            let y = CGFloat.random(in: 0..<alto)
+            let largo = CGFloat.random(in: 1.2...5.5)
             let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let anchoLinea = CGFloat.random(in: 0.7...1.6)
-            let alfa = CGFloat.random(in: 0.05...0.13)
+            let grosor = CGFloat.random(in: 0.4...1.1)
 
-            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+            if let color = tinta(CGFloat.random(in: 0.08...0.30)) {
                 contexto.setStrokeColor(color)
-                contexto.setLineWidth(anchoLinea)
-
-                let fin = CGPoint(
-                    x: inicio.x + cos(angulo) * largo,
-                    y: inicio.y + sin(angulo) * largo
-                )
-
-                contexto.move(to: inicio)
-                contexto.addLine(to: fin)
+                contexto.setLineWidth(grosor)
+                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.addLine(to: CGPoint(
+                    x: x + cos(angulo) * largo,
+                    y: y + sin(angulo) * largo
+                ))
                 contexto.strokePath()
             }
         }
 
-        // 3. Pelusas muy finas y torcidas.
-        for _ in 0..<10 {
-            let inicio = punto()
-            let largo = CGFloat.random(in: 20...70)
-            let angulo = CGFloat.random(in: 0...(2 * .pi))
-            let anchoLinea = CGFloat.random(in: 0.6...1.1)
-            let alfa = CGFloat.random(in: 0.04...0.10)
+        // 5. Un par de velos anchos y muy suaves, como cuando el negativo
+        //    roza la guia de la camara.
+        for _ in 0..<2 {
+            let x = CGFloat.random(in: 0..<ancho)
 
-            if let color = CGColor(colorSpace: espacio, components: [1, 1, 1, alfa]) {
+            if let color = tinta(CGFloat.random(in: 0.02...0.05)) {
                 contexto.setStrokeColor(color)
-                contexto.setLineWidth(anchoLinea)
-
-                let control = CGPoint(
-                    x: inicio.x + cos(angulo) * largo * 0.5 + CGFloat.random(in: -8...8),
-                    y: inicio.y + sin(angulo) * largo * 0.5 + CGFloat.random(in: -8...8)
-                )
-                let fin = CGPoint(
-                    x: inicio.x + cos(angulo) * largo,
-                    y: inicio.y + sin(angulo) * largo
-                )
-
-                contexto.move(to: inicio)
-                contexto.addQuadCurve(to: fin, control: control)
+                contexto.setLineWidth(CGFloat.random(in: 3...9))
+                contexto.move(to: CGPoint(x: x, y: 0))
+                contexto.addLine(to: CGPoint(
+                    x: x + CGFloat.random(in: -6...6),
+                    y: alto
+                ))
                 contexto.strokePath()
             }
         }
@@ -722,7 +803,7 @@ enum FilterEngine {
         // Un desenfoque chiquito para que no parezcan lineas de paint.
         let suave = CIFilter.gaussianBlur()
         suave.inputImage = imagen
-        suave.radius = 0.35
+        suave.radius = 0.4
         if let salida = suave.outputImage?.cropped(to: imagen.extent) {
             imagen = salida
         }

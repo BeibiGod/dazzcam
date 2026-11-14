@@ -18,7 +18,8 @@ final class VideoFrameRenderer {
         _ buffer: CVPixelBuffer,
         preset: FilterPreset,
         controles: ControlesLook,
-        semilla: UInt64 = 0
+        semilla: UInt64 = 0,
+        momento: UInt64 = 0
     ) -> UIImage? {
         let entrada = CIImage(cvPixelBuffer: buffer)
         let chica = reducir(entrada)
@@ -27,7 +28,8 @@ final class VideoFrameRenderer {
             preset,
             entrada: chica,
             controles: controles,
-            semilla: semilla
+            semilla: semilla,
+            momento: momento
         ) else {
             return nil
         }

@@ -45,6 +45,9 @@ struct CameraView: View {
     @State private var mostrarEditor = false
     @State private var videoImportado: URL?
     @State private var mostrarEditorVideo = false
+    @State private var videoGrabado: URL?
+    @State private var fechaVideoGrabado = Date()
+    @State private var mostrarRevisionVideo = false
     @State private var controles = ControlesLook()
     @State private var mostrarAjustes = false
     @State private var puntoExposicion: CGPoint?
@@ -56,7 +59,7 @@ struct CameraView: View {
     @State private var semillaVivo = UInt64.random(in: 1...UInt64.max)
 
     private var versionTexto: String {
-        "v1.11 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.12 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -311,6 +314,12 @@ struct CameraView: View {
                 modoVivo = true
             }
         }
+        .onChange(of: video.grabacionLista) { _, lista in
+            guard let lista = lista else { return }
+            videoGrabado = lista
+            fechaVideoGrabado = video.fechaGrabacion
+            mostrarRevisionVideo = true
+        }
         .onChange(of: foto.capturas) { _, _ in
             guard let base = foto.ultimaFoto else { return }
 
@@ -396,6 +405,30 @@ struct CameraView: View {
                     preset: preset,
                     controles: controles,
                     sello: sello
+                ) { elegido in
+                    preset = elegido
+                    aviso = "Video guardado con \(elegido.nombre)"
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        aviso = nil
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $mostrarRevisionVideo, onDismiss: {
+            if let url = videoGrabado {
+                try? FileManager.default.removeItem(at: url)
+            }
+            videoGrabado = nil
+        }) {
+            if let url = videoGrabado {
+                VideoEditorView(
+                    url: url,
+                    preset: preset,
+                    controles: controles,
+                    sello: sello,
+                    fecha: fechaVideoGrabado,
+                    esRevision: true
                 ) { elegido in
                     preset = elegido
                     aviso = "Video guardado con \(elegido.nombre)"
@@ -814,13 +847,7 @@ struct CameraView: View {
                 vivo.semilla = azar
 
                 Task {
-                    await video.empezar(
-                        preset: preset,
-                        controles: controles,
-                        sello: sello,
-                        semilla: azar,
-                        quitar: vivo.salida
-                    )
+                    await video.empezar(quitar: vivo.salida)
                 }
             }
         }

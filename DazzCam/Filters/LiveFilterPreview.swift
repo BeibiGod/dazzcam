@@ -20,6 +20,10 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// video guardado tenga el mismo patron que estabas viendo.
     var semilla: UInt64 = 0
 
+    /// Numero de cuadro. Sirve para que los rayones se muevan en el visor,
+    /// igual que se van a mover en el video guardado.
+    private var momento: UInt64 = 0
+
     let salida = AVCaptureVideoDataOutput()
     private let renderer = VideoFrameRenderer()
     private let cola = DispatchQueue(label: "com.diego.dazzcam.vivo", qos: .userInitiated)
@@ -71,11 +75,15 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         ultimoRender = ahora
 
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        momento &+= 1
+
         guard let filtrada = renderer.renderizar(
             buffer,
             preset: preset,
             controles: controles,
-            semilla: semilla
+            semilla: semilla,
+            momento: momento
         ) else { return }
 
         contadorCuadros += 1

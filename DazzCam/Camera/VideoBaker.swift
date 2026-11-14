@@ -55,11 +55,17 @@ enum VideoBaker {
         let capa = CapaFecha(modo: sello, fecha: fecha)
 
         return AVVideoComposition(asset: asset) { peticion in
+            let segundos = peticion.compositionTime.seconds
+            let momento = segundos.isFinite
+                ? UInt64(max(0, segundos) * 24)
+                : 0
+
             let filtrada = FilterEngine.cadena(
                 preset,
                 entrada: peticion.sourceImage,
                 controles: controles,
-                semilla: semilla
+                semilla: semilla,
+                momento: momento
             )
 
             let base = filtrada ?? peticion.sourceImage

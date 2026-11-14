@@ -2,23 +2,25 @@ import AVKit
 import SwiftUI
 import UIKit
 
-/// Editor para ponerle filtro a un video que ya tenias en el carrete.
-/// Se ve el video con el look puesto y se guarda una copia con sonido.
+/// Editor de video. Sirve para dos cosas:
+/// - Revisar el video que acabas de grabar, con el mismo panel que las fotos.
+/// - Ponerle filtro a un video que ya tenias en el carrete.
 struct VideoEditorView: View {
     let url: URL
-    let controles: ControlesLook
-    let sello: SelloFecha
-    let fecha: Date
+    let esRevision: Bool
     var alGuardar: (FilterPreset) -> Void
 
     @StateObject private var miniaturas = FilterThumbnails()
     @State private var preset: FilterPreset
-    @State private var intensidad: CGFloat
+    @State private var ajustes: ControlesLook
+    @State private var sello: SelloFecha
+    @State private var fecha: Date
     @State private var reproductor: AVPlayer?
     @State private var guardando = false
     @State private var error: String?
     @State private var tokenReproductor = 0
     @State private var semilla = UInt64.random(in: 1...UInt64.max)
+    @State private var mostrarAjustes = false
 
     @Environment(\.dismiss) private var cerrar
 
@@ -28,15 +30,16 @@ struct VideoEditorView: View {
         controles: ControlesLook = ControlesLook(),
         sello: SelloFecha = .apagado,
         fecha: Date = Date(),
+        esRevision: Bool = false,
         alGuardar: @escaping (FilterPreset) -> Void
     ) {
         self.url = url
-        self.controles = controles
-        self.sello = sello
-        self.fecha = fecha
+        self.esRevision = esRevision
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
-        _intensidad = State(initialValue: controles.intensidad)
+        _ajustes = State(initialValue: controles)
+        _sello = State(initialValue: sello)
+        _fecha = State(initialValue: fecha)
     }
 
     var body: some View {
@@ -45,7 +48,7 @@ struct VideoEditorView: View {
 
             VStack(spacing: 12) {
                 HStack {
-                    Text("PONER FILTRO AL VIDEO")
+                    Text(esRevision ? "REVISAR VIDEO" : "PONER FILTRO AL VIDEO")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.7))
 
@@ -77,64 +80,85 @@ struct VideoEditorView: View {
                 }
                 .frame(maxHeight: .infinity)
 
-                ScrollViewReader { proxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(FilterPreset.allCases) { opcion in
-                                Button {
-                                    preset = opcion
-                                } label: {
-                                    ZStack {
-                                        Circle().fill(Color.white.opacity(0.12))
+                if !esRevision {
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(FilterPreset.allCases) { opcion in
+                                    Button {
+                                        preset = opcion
+                                    } label: {
+                                        ZStack {
+                                            Circle().fill(Color.white.opacity(0.12))
 
-                                        if let muestra = miniaturas.muestras[opcion] {
-                                            Image(uiImage: muestra)
-                                                .resizable()
-                                                .scaledToFill()
+                                            if let muestra = miniaturas.muestras[opcion] {
+                                                Image(uiImage: muestra)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            }
                                         }
-                                    }
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(Circle())
-                                    .overlay(
-                                        Circle().strokeBorder(
-                                            preset == opcion ? Color.white : Color.white.opacity(0.2),
-                                            lineWidth: preset == opcion ? 3 : 1
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle().strokeBorder(
+                                                preset == opcion ? Color.white : Color.white.opacity(0.2),
+                                                lineWidth: preset == opcion ? 3 : 1
+                                            )
                                         )
-                                    )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .id(opcion)
                                 }
-                                .buttonStyle(.plain)
-                                .id(opcion)
+                            }
+                            .padding(.horizontal, 18)
+                        }
+                        .frame(height: 56)
+                        .onChange(of: preset) { _, nuevo in
+                            withAnimation(.easeOut(duration: 0.22)) {
+                                proxy.scrollTo(nuevo, anchor: .center)
                             }
                         }
-                        .padding(.horizontal, 18)
                     }
-                    .frame(height: 56)
-                    .onChange(of: preset) { _, nuevo in
-                        withAnimation(.easeOut(duration: 0.22)) {
-                            proxy.scrollTo(nuevo, anchor: .center)
-                        }
-                    }
-                }
 
-                Text(preset.nombre.uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.5))
+                    Text(preset.nombre.uppercased())
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
 
                 HStack(spacing: 10) {
                     Text("INTENSIDAD")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.5))
 
-                    Slider(value: $intensidad, in: 0...1)
+                    Slider(value: $ajustes.intensidad, in: 0...1)
                         .tint(.white)
 
-                    Text("\(Int((intensidad * 100).rounded()))%")
+                    Text("\(Int((ajustes.intensidad * 100).rounded()))%")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.7))
                         .monospacedDigit()
                         .frame(width: 38, alignment: .trailing)
                 }
                 .padding(.horizontal, 18)
+
+                if esRevision {
+                    Button {
+                        mostrarAjustes = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("MÁS AJUSTES")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.14), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 18)
+                }
 
                 if let error = error {
                     Text(error)
@@ -154,7 +178,7 @@ struct VideoEditorView: View {
                                 .tint(.black)
                         }
 
-                        Text(guardando ? "GUARDANDO" : "GUARDAR COPIA")
+                        Text(textoGuardar)
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
                     }
                     .foregroundStyle(.black)
@@ -165,11 +189,15 @@ struct VideoEditorView: View {
                 .buttonStyle(.plain)
                 .disabled(guardando)
                 .padding(.horizontal, 18)
-                .padding(.bottom, 18)
+
+                Text(esRevision ? "GUARDAR la manda a tu fototeca" : "Se guarda una copia, el original queda igual")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.bottom, 18)
             }
         }
         .task {
-            if let cuadro = await VideoBaker.cuadro(de: url) {
+            if !esRevision, let cuadro = await VideoBaker.cuadro(de: url) {
                 miniaturas.generar(desde: cuadro)
             }
             prepararReproductor()
@@ -177,12 +205,31 @@ struct VideoEditorView: View {
         .onChange(of: preset) { _, _ in
             prepararReproductor()
         }
-        .onChange(of: intensidad) { _, _ in
+        .onChange(of: ajustes) { _, _ in
+            prepararReproductor()
+        }
+        .onChange(of: sello) { _, _ in
+            prepararReproductor()
+        }
+        .onChange(of: fecha) { _, _ in
             prepararReproductor()
         }
         .onDisappear {
             reproductor?.pause()
         }
+        .sheet(isPresented: $mostrarAjustes) {
+            AjustesLookView(controles: $ajustes, sello: $sello, preset: preset)
+                .presentationDetents([.height(560)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
+        }
+    }
+
+    private var textoGuardar: String {
+        if guardando {
+            return "GUARDANDO"
+        }
+        return esRevision ? "GUARDAR" : "GUARDAR COPIA"
     }
 
     // MARK: - Reproductor con el filtro puesto
@@ -194,9 +241,7 @@ struct VideoEditorView: View {
         reproductor?.pause()
 
         let look = preset
-        var ajustes = controles
-        ajustes.intensidad = intensidad
-
+        let ajustesActuales = ajustes
         let archivo = url
         let marca = sello
         let cuando = fecha
@@ -212,7 +257,7 @@ struct VideoEditorView: View {
             item.videoComposition = VideoBaker.composicion(
                 asset,
                 preset: look,
-                controles: ajustes,
+                controles: ajustesActuales,
                 sello: marca,
                 fecha: cuando,
                 semilla: azar
@@ -231,8 +276,7 @@ struct VideoEditorView: View {
 
         let archivo = url
         let look = preset
-        var ajustes = controles
-        ajustes.intensidad = intensidad
+        let ajustesActuales = ajustes
         let marca = sello
         let cuando = fecha
         let azar = semilla
@@ -242,7 +286,7 @@ struct VideoEditorView: View {
                 let salida = try await VideoBaker.exportar(
                     archivo,
                     preset: look,
-                    controles: ajustes,
+                    controles: ajustesActuales,
                     sello: marca,
                     fecha: cuando,
                     semilla: azar

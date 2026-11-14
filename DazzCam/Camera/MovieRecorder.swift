@@ -9,7 +9,8 @@ enum ModoCaptura: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Graba video con sonido y despues le hornea el look elegido.
+/// Graba video con sonido y entrega el archivo tal cual para que lo revises
+/// con el look puesto antes de guardarlo.
 @MainActor
 final class MovieRecorder: NSObject, ObservableObject {
 
@@ -19,15 +20,15 @@ final class MovieRecorder: NSObject, ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var guardados = 0
 
+    /// Video crudo listo para revisar. La vista lo abre en el editor.
+    @Published private(set) var grabacionLista: URL?
+    @Published private(set) var fechaGrabacion = Date()
+
     let salida = AVCaptureMovieFileOutput()
 
     private var sesion: AVCaptureSession?
     private var entradaAudio: AVCaptureDeviceInput?
     private var pausada: AVCaptureVideoDataOutput?
-    private var preset: FilterPreset = .dazzClassic
-    private var controles = ControlesLook()
-    private var sello: SelloFecha = .apagado
-    private var semilla: UInt64 = 0
     private var fechaInicio = Date()
     private var reloj: Timer?
 
@@ -51,20 +52,11 @@ final class MovieRecorder: NSObject, ObservableObject {
 
     // MARK: - Grabar
 
-    func empezar(
-        preset: FilterPreset,
-        controles: ControlesLook = ControlesLook(),
-        sello: SelloFecha = .apagado,
-        semilla: UInt64 = 0,
-        quitar: AVCaptureVideoDataOutput?
-    ) async {
+    func empezar(quitar: AVCaptureVideoDataOutput?) async {
         guard !grabando, !procesando, let sesion = sesion else { return }
 
         error = nil
-        self.preset = preset
-        self.controles = controles
-        self.sello = sello
-        self.semilla = semilla
+        grabacionLista = nil
         pausada = quitar
 
         let conMicro = await pedirMicrofono()
@@ -190,36 +182,14 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
             let terminoBien = ns.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool ?? false
             if !terminoBien {
                 self.error = "Fallo el video: \(error.localizedDescription)"
+                try? FileManager.default.removeItem(at: url)
                 return
             }
         }
 
-        let look = preset
-        let ajustes = controles
-        let marca = sello
-        let cuando = fechaInicio
-        let azar = semilla
-        procesando = true
-
-        Task {
-            defer { procesando = false }
-
-            do {
-                let conFiltro = try await VideoBaker.exportar(
-                    url,
-                    preset: look,
-                    controles: ajustes,
-                    sello: marca,
-                    fecha: cuando,
-                    semilla: azar
-                )
-                try await PhotoLibrarySaver.guardarVideo(conFiltro)
-                guardados += 1
-                try? FileManager.default.removeItem(at: url)
-                try? FileManager.default.removeItem(at: conFiltro)
-            } catch {
-                self.error = "No se pudo guardar el video: \(error.localizedDescription)"
-            }
-        }
+        // Se entrega el archivo crudo: la revision decide el look y si se
+        // guarda o se descarta.
+        fechaGrabacion = fechaInicio
+        grabacionLista = url
     }
 }
