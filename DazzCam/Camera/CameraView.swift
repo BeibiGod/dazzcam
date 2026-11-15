@@ -60,7 +60,7 @@ struct CameraView: View {
     @State private var semillaVideo: UInt64 = 0
 
     private var versionTexto: String {
-        "v1.14.5 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.14.6 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {

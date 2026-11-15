@@ -143,24 +143,22 @@ struct VideoEditorView: View {
                 }
                 .padding(.horizontal, 18)
 
-                if esRevision {
-                    Button {
-                        mostrarAjustes = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text("MÁS AJUSTES")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.white.opacity(0.14), in: Capsule())
+                Button {
+                    mostrarAjustes = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("RAYONES, FUGAS Y GRANO")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
                     }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 18)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.14), in: Capsule())
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
 
                 if let error = error {
                     Text(error)

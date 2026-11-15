@@ -5,13 +5,13 @@ import SwiftUI
 struct PhotoEditorView: View {
     let imagen: UIImage
     let proporcion: Proporcion
-    let sello: SelloFecha
-    let controles: ControlesLook
     var alGuardar: (UIImage, FilterPreset) -> Void
 
     @StateObject private var miniaturas = FilterThumbnails()
     @State private var preset: FilterPreset
-    @State private var intensidad: CGFloat
+    @State private var sello: SelloFecha
+    @State private var controles: ControlesLook
+    @State private var mostrarAjustes = false
     @State private var vista: UIImage?
     @State private var calculando = false
     @State private var guardando = false
@@ -31,11 +31,10 @@ struct PhotoEditorView: View {
     ) {
         self.imagen = imagen
         self.proporcion = proporcion
-        self.sello = sello
-        self.controles = controles
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
-        _intensidad = State(initialValue: controles.intensidad)
+        _sello = State(initialValue: sello)
+        _controles = State(initialValue: controles)
     }
 
     var body: some View {
@@ -132,15 +131,32 @@ struct PhotoEditorView: View {
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.5))
 
-                    Slider(value: $intensidad, in: 0...1)
+                    Slider(value: $controles.intensidad, in: 0...1)
                         .tint(.white)
 
-                    Text("\(Int((intensidad * 100).rounded()))%")
+                    Text("\(Int((controles.intensidad * 100).rounded()))%")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.7))
                         .monospacedDigit()
                         .frame(width: 38, alignment: .trailing)
                 }
+                .padding(.horizontal, 18)
+
+                Button {
+                    mostrarAjustes = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("RAYONES, FUGAS Y GRANO")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.14), in: Capsule())
+                }
+                .buttonStyle(.plain)
                 .padding(.horizontal, 18)
 
                 if let error = error {
@@ -182,8 +198,17 @@ struct PhotoEditorView: View {
         .onChange(of: preset) { _, _ in
             recalcular()
         }
-        .onChange(of: intensidad) { _, _ in
+        .onChange(of: controles) { _, _ in
             recalcular()
+        }
+        .onChange(of: sello) { _, _ in
+            recalcular()
+        }
+        .sheet(isPresented: $mostrarAjustes) {
+            AjustesLookView(controles: $controles, sello: $sello, preset: preset)
+                .presentationDetents([.height(560)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
     }
 
@@ -194,8 +219,7 @@ struct PhotoEditorView: View {
         let elegido = preset
         let relacion = proporcion.relacion
         let marca = sello
-        let fuerza = intensidad
-        let extra = controles
+        let ajustes = controles
         let azar = semilla
 
         token += 1
@@ -208,9 +232,6 @@ struct PhotoEditorView: View {
             guard mio == token else { return }
 
             DispatchQueue.global(qos: .userInitiated).async {
-                var ajustes = extra
-                ajustes.intensidad = fuerza
-
                 var salida = FilterEngine.aplicar(
                     elegido,
                     a: base,

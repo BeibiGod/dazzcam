@@ -522,17 +522,17 @@ enum FilterEngine {
                     actual = capa
                 }
             } else {
-                // Video: el negativo se sacude. Salto vertical fuerte (como
-                // el arrastre de una camara vieja), temblor lateral, y la
-                // fuerza cambia cuadro a cuadro.
+                // Video: el negativo se sacude de verdad. Salto vertical
+                // fuerte, temblor lateral y tres capas de otras zonas del
+                // patron: asi entran pelos nuevos en lugares distintos.
                 let cuadro = momento / 3
                 var temblor = Azar(semilla &+ (cuadro &* 0x9E37_79B9_7F4A_7C15))
                 let salto = CGPoint(
-                    x: temblor.valor(-26...26),
-                    y: temblor.valor(-95...95)
+                    x: temblor.valor(-70...70),
+                    y: temblor.valor(-320...320)
                 )
-                let parpadeo = temblor.valor(0.35...1.15)
-                let apagado: CGFloat = temblor.valor(0...1) < 0.10 ? 0.2 : 1
+                let parpadeo = temblor.valor(0.45...1.15)
+                let apagado: CGFloat = temblor.valor(0...1) < 0.08 ? 0.2 : 1
                 let fuerza = min(max(fuerzaBase * parpadeo * apagado, 0), 1)
 
                 if let capa = rayones(
@@ -547,19 +547,23 @@ enum FilterEngine {
                     actual = capa
                 }
 
-                // Segunda capa de otra zona del mismo negativo. Es la que
-                // hace que unos pelos se vayan y entren otros.
-                let segunda = temblor.valor(0.10...0.60)
-                if segunda > 0.16, let capa = rayones(
-                    actual,
-                    cantidad: segunda * min(a.rayones * 1.3, 1),
-                    desfase: CGPoint(
-                        x: desfaseBase.x + temblor.valor(-600...600),
-                        y: desfaseBase.y + temblor.valor(-1300...1300)
-                    ),
-                    espejo: !espejo
-                ) {
-                    actual = capa
+                // Dos capas mas, cada una con su propia zona y su propio
+                // parpadeo, para que no se vean siempre los mismos pelos.
+                for indice in 0..<2 {
+                    let extra = temblor.valor(0.15...0.50)
+                    guard extra > 0.18 else { continue }
+
+                    if let capa = rayones(
+                        actual,
+                        cantidad: min(extra * fuerzaBase, 1),
+                        desfase: CGPoint(
+                            x: desfaseBase.x + temblor.valor(-1100...1100),
+                            y: desfaseBase.y + temblor.valor(-2000...2000)
+                        ),
+                        espejo: indice == 0 ? !espejo : espejo
+                    ) {
+                        actual = capa
+                    }
                 }
             }
         }
@@ -578,7 +582,10 @@ enum FilterEngine {
                 max(curva * azarFuga.valor(0.75...1.15) * pulso, 0),
                 1
             )
-            let radio = azarFuga.valor(0.32...0.95)
+            let radioBase = azarFuga.valor(0.32...0.95)
+            let radio = momento > 0
+                ? radioBase * (0.90 + 0.10 * CGFloat(sin(Double(momento) * 0.031)))
+                : radioBase
             let corrimiento = CGPoint(
                 x: azarFuga.valor(-0.18...0.18),
                 y: azarFuga.valor(-0.18...0.18)
@@ -586,10 +593,10 @@ enum FilterEngine {
             let color = azarFuga.entero(coloresFuga.count)
             let inclinacion = azarFuga.valor(-1.0...1.0)
 
-            // En video la luz se pasea despacio por el borde, como cuando
-            // mueves la camara. En foto se queda donde le toco.
+            // En video la luz recorre el borde, como cuando mueves la
+            // camara. En foto se queda donde le toco.
             let desvio = momento > 0
-                ? CGFloat(sin(Double(momento) * 0.012)) * 0.05
+                ? CGFloat(sin(Double(momento) * 0.02)) * 0.18
                 : 0
 
             if let conFuga = fuga(
@@ -816,15 +823,25 @@ enum FilterEngine {
         }
 
         func trazar(_ puntos: [CGPoint], color: CGColor, grosor: CGFloat) {
-            guard let primero = puntos.first else { return }
+            guard puntos.count > 1 else { return }
 
             contexto.setStrokeColor(color)
             contexto.setLineWidth(grosor)
             contexto.beginPath()
-            contexto.move(to: primero)
+            contexto.move(to: puntos[0])
 
-            for punto in puntos.dropFirst() {
-                contexto.addLine(to: punto)
+            if puntos.count == 2 {
+                contexto.addLine(to: puntos[1])
+            } else {
+                // Curva suave por los puntos medios: nada de esquinas.
+                for i in 1..<(puntos.count - 1) {
+                    let medio = CGPoint(
+                        x: (puntos[i].x + puntos[i + 1].x) / 2,
+                        y: (puntos[i].y + puntos[i + 1].y) / 2
+                    )
+                    contexto.addQuadCurve(to: medio, control: puntos[i])
+                }
+                contexto.addLine(to: puntos[puntos.count - 1])
             }
 
             contexto.strokePath()
@@ -894,7 +911,7 @@ enum FilterEngine {
         // 1. Hebras blancas: rizadas y con curvas, como las de la foto.
         for _ in 0..<9 {
             let hebra = paseo(
-                pasos: 18...70,
+                pasos: 8...70,
                 largo: 3...10,
                 giro: -0.85...0.85
             )
