@@ -51,7 +51,7 @@ struct CameraBar: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
+                    LazyHStack(spacing: 12) {
                         ForEach(FilterPreset.allCases) { preset in
                             Button {
                                 seleccionado = preset

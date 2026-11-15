@@ -23,10 +23,12 @@ struct ControlesLook: Equatable {
     var rayones: CGFloat? = nil
     var fuga: CGFloat? = nil
     var grano: CGFloat? = nil
+    var estiloFecha: EstiloFecha = .dazz
 
     /// true si el usuario no ha tocado nada.
     var automatico: Bool {
-        abs(intensidad - 1) < 0.001 && rayones == nil && fuga == nil && grano == nil
+        abs(intensidad - 1) < 0.001 && rayones == nil && fuga == nil
+            && grano == nil && estiloFecha == .dazz
     }
 }
 
@@ -159,8 +161,11 @@ enum FilterEngine {
             a.desvanecido = 0.03; a.vineta = 0.3
 
         case .dazzClassic:
-            a.temperatura = 7100; a.saturacion = 1.04; a.contraste = 0.99
-            a.desvanecido = 0.025; a.grano = 0.04; a.vineta = 0.2
+            // D Classic: crema calida, negros levantados y grano grueso,
+            // como el revelado de DazzCam.
+            a.temperatura = 7000; a.tinte = 2; a.saturacion = 1.0
+            a.contraste = 0.95; a.brillo = 0.012
+            a.desvanecido = 0.045; a.grano = 0.085; a.vineta = 0.22
 
         // ---- vintage ----
         case .cinestill:
@@ -399,6 +404,25 @@ enum FilterEngine {
         case .neonDream:
             a.temperatura = 6200; a.tinte = 22; a.saturacion = 1.4
             a.contraste = 1.1; a.desvanecido = 0.05; a.grano = 0.12; a.vineta = 0.35
+
+        // ---- v1.15: SWAG, Jackboys y Riviera ----
+        case .swagLive:
+            // Flash directo de noche, calido y un poco pasado de luz.
+            a.temperatura = 7900; a.tinte = 6; a.saturacion = 1.02
+            a.contraste = 0.92; a.brillo = 0.05
+            a.desvanecido = 0.055; a.grano = 0.11; a.vineta = 0.38
+
+        case .jackboys:
+            // Noche cerrada, sombras frias y rojos apagados. Sucio y oscuro.
+            a.temperatura = 5700; a.tinte = -9; a.saturacion = 0.82
+            a.contraste = 1.28; a.brillo = -0.03
+            a.desvanecido = 0.02; a.grano = 0.17; a.vineta = 0.62
+
+        case .riviera92:
+            // Revista de vacaciones de los 90: crema, lavado y suave.
+            a.temperatura = 7600; a.tinte = 3; a.saturacion = 0.86
+            a.contraste = 0.88; a.brillo = 0.02
+            a.desvanecido = 0.1; a.grano = 0.07; a.vineta = 0.3
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -417,6 +441,14 @@ enum FilterEngine {
             a.fuga = 0.5
         case .neonDream:
             a.fuga = 0.45
+        case .swagLive:
+            a.fuga = 0.35
+        case .jackboys:
+            a.fuga = 0.28
+        case .riviera92:
+            a.fuga = 0.22
+        case .dazzClassic:
+            a.fuga = 0.18
         case .chatarraCCD:
             a.fuga = 0.35
         case .framedFade:
@@ -943,22 +975,135 @@ enum FilterEngine {
             }
         }
 
-        // 3. Polvo alargado, nunca circulos.
-        for _ in 0..<22 {
+        // 3. Rayones: tramos cortos y quebrados, casi verticales. Nunca de
+        //    lado a lado: en un negativo real el roce viene por partes.
+        for _ in 0..<8 {
+            let alfa = CGFloat.random(in: 0.05...0.19)
+            let grosor = CGFloat.random(in: 0.5...1.3)
+            let tramos = Int.random(in: 1...3)
+            var punto = CGPoint(
+                x: CGFloat.random(in: 0..<ancho),
+                y: CGFloat.random(in: 0..<alto)
+            )
+            var angulo = .pi / 2 + CGFloat.random(in: -0.22...0.22)
+
+            for _ in 0..<tramos {
+                // A veces el rayon se corta y sigue mas arriba.
+                if CGFloat.random(in: 0...1) < 0.2 { continue }
+
+                let largo = CGFloat.random(in: 40...150)
+                let fin = CGPoint(
+                    x: punto.x + cos(angulo) * largo,
+                    y: punto.y + sin(angulo) * largo
+                )
+
+                if let color = claro(alfa) {
+                    contexto.setStrokeColor(color)
+                    contexto.setLineWidth(grosor)
+                    contexto.beginPath()
+                    contexto.move(to: punto)
+                    contexto.addLine(to: fin)
+                    contexto.strokePath()
+                }
+
+                punto = fin
+                angulo += CGFloat.random(in: -0.09...0.09)
+            }
+        }
+
+        // 4. Polvo. Motas chiquitas, pelusas cortas, motas oscuras y alguna
+        //    hebra fina de tela. Todo alargado: nunca circulos.
+
+        // 4a. Motas finas de polvo claro.
+        for _ in 0..<46 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
-            let largo = CGFloat.random(in: 1.2...4.5)
+            let largo = CGFloat.random(in: 0.8...2.6)
             let angulo = CGFloat.random(in: 0...(2 * .pi))
 
-            if let color = claro(CGFloat.random(in: 0.07...0.22)) {
+            if let color = claro(CGFloat.random(in: 0.05...0.18)) {
                 contexto.setStrokeColor(color)
-                contexto.setLineWidth(CGFloat.random(in: 0.4...1.1))
+                contexto.setLineWidth(CGFloat.random(in: 0.4...0.9))
                 contexto.beginPath()
                 contexto.move(to: CGPoint(x: x, y: y))
                 contexto.addLine(to: CGPoint(
                     x: x + cos(angulo) * largo,
                     y: y + sin(angulo) * largo
                 ))
+                contexto.strokePath()
+            }
+        }
+
+        // 4b. Pelusas cortas con una curva suave.
+        for _ in 0..<20 {
+            let x = CGFloat.random(in: 0..<ancho)
+            let y = CGFloat.random(in: 0..<alto)
+            let largo = CGFloat.random(in: 3...11)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let curva = CGFloat.random(in: -3...3)
+
+            if let color = claro(CGFloat.random(in: 0.10...0.26)) {
+                let fin = CGPoint(
+                    x: x + cos(angulo) * largo,
+                    y: y + sin(angulo) * largo
+                )
+                let control = CGPoint(
+                    x: (x + fin.x) / 2 - sin(angulo) * curva,
+                    y: (y + fin.y) / 2 + cos(angulo) * curva
+                )
+
+                contexto.setStrokeColor(color)
+                contexto.setLineWidth(CGFloat.random(in: 0.5...1.2))
+                contexto.beginPath()
+                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.addQuadCurve(to: fin, control: control)
+                contexto.strokePath()
+            }
+        }
+
+        // 4c. Motas oscuras: polvo que tapa un poquito la luz.
+        for _ in 0..<12 {
+            let x = CGFloat.random(in: 0..<ancho)
+            let y = CGFloat.random(in: 0..<alto)
+            let largo = CGFloat.random(in: 1.5...5)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+
+            if let color = oscuro(CGFloat.random(in: 0.04...0.12)) {
+                contexto.setStrokeColor(color)
+                contexto.setLineWidth(CGFloat.random(in: 0.5...1.1))
+                contexto.beginPath()
+                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.addLine(to: CGPoint(
+                    x: x + cos(angulo) * largo,
+                    y: y + sin(angulo) * largo
+                ))
+                contexto.strokePath()
+            }
+        }
+
+        // 4d. Hebras largas y finitas, como pelos de tela.
+        for _ in 0..<7 {
+            let x = CGFloat.random(in: 0..<ancho)
+            let y = CGFloat.random(in: 0..<alto)
+            let angulo = CGFloat.random(in: 0...(2 * .pi))
+            let largo = CGFloat.random(in: 14...46)
+            let curva = CGFloat.random(in: -6...6)
+
+            if let color = claro(CGFloat.random(in: 0.06...0.15)) {
+                let fin = CGPoint(
+                    x: x + cos(angulo) * largo,
+                    y: y + sin(angulo) * largo
+                )
+                let control = CGPoint(
+                    x: (x + fin.x) / 2 - sin(angulo) * curva,
+                    y: (y + fin.y) / 2 + cos(angulo) * curva
+                )
+
+                contexto.setStrokeColor(color)
+                contexto.setLineWidth(CGFloat.random(in: 0.4...0.8))
+                contexto.beginPath()
+                contexto.move(to: CGPoint(x: x, y: y))
+                contexto.addQuadCurve(to: fin, control: control)
                 contexto.strokePath()
             }
         }

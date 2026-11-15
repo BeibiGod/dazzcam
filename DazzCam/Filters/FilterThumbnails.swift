@@ -20,12 +20,18 @@ final class FilterThumbnails: ObservableObject {
             guard let self = self else { return }
 
             var resultado: [FilterPreset: UIImage] = [:]
-            for preset in FilterPreset.allCases {
-                resultado[preset] = FilterEngine.aplicar(preset, a: chica)
-            }
 
-            DispatchQueue.main.async {
-                self.muestras = resultado
+            for (indice, preset) in FilterPreset.allCases.enumerated() {
+                resultado[preset] = FilterEngine.aplicar(preset, a: chica)
+
+                // Se van publicando por tandas para que la tira se llene
+                // rapido en vez de esperar a las 50 camaras.
+                if indice % 6 == 5 || indice == FilterPreset.allCases.count - 1 {
+                    let parcial = resultado
+                    DispatchQueue.main.async {
+                        self.muestras = parcial
+                    }
+                }
             }
         }
     }

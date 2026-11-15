@@ -219,7 +219,7 @@ struct VideoEditorView: View {
         }
         .sheet(isPresented: $mostrarAjustes) {
             AjustesLookView(controles: $ajustes, sello: $sello, preset: preset)
-                .presentationDetents([.height(560)])
+                .presentationDetents([.height(660)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }

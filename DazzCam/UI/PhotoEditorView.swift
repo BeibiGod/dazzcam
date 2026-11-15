@@ -206,7 +206,7 @@ struct PhotoEditorView: View {
         }
         .sheet(isPresented: $mostrarAjustes) {
             AjustesLookView(controles: $controles, sello: $sello, preset: preset)
-                .presentationDetents([.height(560)])
+                .presentationDetents([.height(660)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
@@ -241,7 +241,11 @@ struct PhotoEditorView: View {
                 if let relacion = relacion {
                     salida = FilterEngine.recortar(salida, relacion: relacion)
                 }
-                salida = SelloFecha.estampar(salida, modo: marca)
+                salida = SelloFecha.estampar(
+                    salida,
+                    modo: marca,
+                    estilo: ajustes.estiloFecha
+                )
 
                 DispatchQueue.main.async {
                     guard mio == token else { return }

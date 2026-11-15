@@ -60,7 +60,7 @@ struct CameraView: View {
     @State private var semillaVideo: UInt64 = 0
 
     private var versionTexto: String {
-        "v1.14.6 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.15.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -95,8 +95,11 @@ struct CameraView: View {
 
                             TimelineView(.periodic(from: .now, by: 1)) { contexto in
                                 Text(SelloFecha.texto(sello, fecha: contexto.date))
-                                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                                    .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.12))
+                                    .font(.custom(
+                                        controles.estiloFecha.fuente(13).fontName,
+                                        size: 13
+                                    ))
+                                    .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
                                     .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
                             }
                         }
@@ -104,9 +107,8 @@ struct CameraView: View {
                         .padding(.bottom, 6)
                     }
 
-                    barraHerramientas
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 6)
+                    barraInferior
+                        .padding(.bottom, 8)
 
                     if let texto = aviso {
                         Text(texto)
@@ -137,9 +139,6 @@ struct CameraView: View {
                             .background(Color.red.opacity(0.75), in: Capsule())
                             .padding(.bottom, 6)
                     }
-
-                    barraModos
-                        .padding(.bottom, 8)
 
                     CameraBar(
                         seleccionado: $preset,
@@ -294,6 +293,9 @@ struct CameraView: View {
             semillaVivo = UInt64.random(in: 1...UInt64.max)
             vivo.semilla = semillaVivo
         }
+        .onChange(of: modoVivo) { _, activo in
+            vivo.activo = activo
+        }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
             if mostrarCaptura {
@@ -357,7 +359,7 @@ struct CameraView: View {
         }
         .sheet(isPresented: $mostrarAjustes) {
             AjustesLookView(controles: $controles, sello: $sello, preset: preset)
-                .presentationDetents([.height(560)])
+                .presentationDetents([.height(660)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
@@ -606,46 +608,6 @@ struct CameraView: View {
     // MARK: - Encabezado
 
     private var cabecera: some View {
-        HStack(spacing: 8) {
-            Text(versionTexto)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.45), in: Capsule())
-
-            Spacer(minLength: 4)
-
-            Button {
-                modoVivo.toggle()
-            } label: {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(modoVivo ? Color.green : Color.white.opacity(0.35))
-                        .frame(width: 6, height: 6)
-
-                    Text(textoVivo)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(modoVivo ? Color.black : Color.white.opacity(0.8))
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    modoVivo ? Color.white : Color.black.opacity(0.45),
-                    in: Capsule()
-                )
-            }
-            .buttonStyle(.plain)
-            .fixedSize()
-        }
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: - Herramientas
-
-    private var barraHerramientas: some View {
         HStack(spacing: 6) {
             herramienta(
                 icono: flashEncendido ? "bolt.fill" : "bolt.slash.fill",
@@ -671,6 +633,46 @@ struct CameraView: View {
                 temporizador = temporizador.siguiente
             }
 
+            Spacer(minLength: 6)
+
+            Button {
+                modoVivo.toggle()
+            } label: {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(modoVivo ? Color.green : Color.white.opacity(0.35))
+                        .frame(width: 6, height: 6)
+
+                    Text(textoVivo)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(modoVivo ? Color.black : Color.white.opacity(0.8))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    modoVivo ? Color.white : Color.black.opacity(0.45),
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+
+            Text(versionTexto)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(.black.opacity(0.45), in: Capsule())
+        }
+        .padding(.horizontal, 14)
+    }
+
+    // MARK: - Herramientas
+
+    private var barraHerramientas: some View {
+        HStack(spacing: 6) {
             herramienta(
                 icono: "crop",
                 texto: proporcion.etiqueta,
@@ -692,22 +694,21 @@ struct CameraView: View {
                 }
             }
 
-            // En video no hay revision despues de grabar, asi que el look se
-            // ajusta antes. En foto se ajusta despues de disparar.
-            if modo == .video {
-                herramienta(
-                    icono: "slider.horizontal.3",
-                    texto: controles.automatico ? nil : "LOOK",
-                    activo: !controles.automatico
-                ) {
-                    mostrarAjustes = true
-                }
+            // En video el look se ajusta antes de grabar; en foto, despues
+            // de disparar. Este boton siempre esta a mano.
+            herramienta(
+                icono: "slider.horizontal.3",
+                texto: controles.automatico ? nil : "LOOK",
+                activo: !controles.automatico
+            ) {
+                mostrarAjustes = true
             }
 
-            herramientaIA
-
             Spacer()
+
+            herramientaIA
         }
+        .padding(.horizontal, 16)
     }
 
     private func herramienta(
@@ -753,7 +754,8 @@ struct CameraView: View {
         enDistanciaTipica && lenteResaltada == lente
     }
 
-    private var barraModos: some View {
+    /// 0.5x, 1x y 3x, centrados justo arriba del nombre de la camara.
+    private var barraLentes: some View {
         HStack(spacing: 8) {
             ForEach(camara.lentes) { lente in
                 Button {
@@ -761,9 +763,9 @@ struct CameraView: View {
                     zoomBase = camara.zoom
                 } label: {
                     Text(lente.etiqueta)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(lenteActiva(lente) ? Color.black : Color.white)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 36, height: 36)
                         .background(
                             lenteActiva(lente)
                                 ? Color.yellow
@@ -782,37 +784,54 @@ struct CameraView: View {
 
             if !enDistanciaTipica {
                 Text(String(format: "%.1fx", camara.zoom))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.yellow)
                     .fixedSize()
             }
+        }
+    }
 
-            Spacer()
+    /// FOTO o VIDEO, abajo a la derecha.
+    private var barraModos: some View {
+        HStack(spacing: 0) {
+            ForEach(ModoCaptura.allCases) { opcion in
+                Button {
+                    guard !video.grabando else { return }
+                    modo = opcion
+                } label: {
+                    Text(opcion.rawValue)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(modo == opcion ? Color.black : Color.white.opacity(0.75))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(
+                            modo == opcion ? Color.white : Color.clear,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Color.black.opacity(0.5), in: Capsule())
+    }
 
-            HStack(spacing: 0) {
-                ForEach(ModoCaptura.allCases) { opcion in
-                    Button {
-                        guard !video.grabando else { return }
-                        modo = opcion
-                    } label: {
-                        Text(opcion.rawValue)
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(modo == opcion ? Color.black : Color.white.opacity(0.75))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                modo == opcion ? Color.white : Color.clear,
-                                in: Capsule()
-                            )
-                    }
-                    .buttonStyle(.plain)
+    /// Fila de abajo: 16:9 y cuadricula a la izquierda, IA a la derecha,
+    /// y debajo las lentes centradas con FOTO/VIDEO a la derecha.
+    private var barraInferior: some View {
+        VStack(spacing: 10) {
+            barraHerramientas
+
+            ZStack {
+                barraLentes
+
+                HStack {
+                    Spacer()
+                    barraModos
                 }
             }
-            .padding(3)
-            .background(Color.black.opacity(0.5), in: Capsule())
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Boton IA
@@ -1092,7 +1111,11 @@ struct CameraView: View {
             procesada = FilterEngine.recortar(procesada, relacion: relacion)
         }
 
-        return SelloFecha.estampar(procesada, modo: marca)
+        return SelloFecha.estampar(
+            procesada,
+            modo: marca,
+            estilo: ajustes.estiloFecha
+        )
     }
 
     private func voltearCamara() {

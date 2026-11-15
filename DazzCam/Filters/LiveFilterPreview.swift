@@ -20,6 +20,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// video guardado tenga el mismo patron que estabas viendo.
     var semilla: UInt64 = 0
 
+    /// Si esta apagado no se gasta bateria filtrando cuadros que nadie ve.
+    var activo = true
+
     /// Numero de cuadro. Sirve para que los rayones se muevan en el visor,
     /// igual que se van a mover en el video guardado.
     private var momento: UInt64 = 0
@@ -75,6 +78,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         ultimoRender = ahora
 
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        // Si el visor no esta mostrando el filtro, no se gasta CPU.
+        guard activo else { return }
 
         momento &+= 1
 

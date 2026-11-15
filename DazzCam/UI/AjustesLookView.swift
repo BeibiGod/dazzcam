@@ -54,6 +54,8 @@ struct AjustesLookView: View {
 
                 filaFecha
 
+                filaEstilo
+
                 HStack {
                     Button {
                         controles = ControlesLook()
@@ -128,6 +130,62 @@ struct AjustesLookView: View {
                 .font(.system(size: 10))
                 .foregroundStyle(.white.opacity(0.35))
         }
+    }
+
+    /// Elige la tipografia con la que se quema la fecha.
+    private var filaEstilo: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("TIPOGRAFIA")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+
+                Spacer()
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(EstiloFecha.allCases) { estilo in
+                        Button {
+                            controles.estiloFecha = estilo
+                        } label: {
+                            Text(muestra(estilo))
+                                .font(.custom(estilo.fuente(15).fontName, size: 15))
+                                .foregroundStyle(Color(uiColor: estilo.color))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.white.opacity(
+                                            controles.estiloFecha == estilo ? 0.22 : 0.08
+                                        ))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .strokeBorder(
+                                            Color.white.opacity(
+                                                controles.estiloFecha == estilo ? 0.8 : 0.15
+                                            ),
+                                            lineWidth: 1
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+
+            Text("Asi se ve la fecha quemada")
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+    }
+
+    /// Muestra de la fecha. Si esta apagada igual enseña como quedaria.
+    private func muestra(_ estilo: EstiloFecha) -> String {
+        let modo = (sello == .apagado) ? SelloFecha.dazz : sello
+        return SelloFecha.texto(modo)
     }
 
     private func opcional(

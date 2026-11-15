@@ -106,6 +106,11 @@ enum FilterPreset: String, CaseIterable, Identifiable {
     case milk
     case neonDream
 
+    // ---- agregadas en la v1.15: SWAG, Jackboys y Riviera ----
+    case swagLive
+    case jackboys
+    case riviera92
+
     var id: String { rawValue }
 
     var nombre: String {
@@ -181,6 +186,10 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .disco: return "Disco"
         case .milk: return "Milk"
         case .neonDream: return "Neon Dream"
+
+        case .swagLive: return "SWAG Live"
+        case .jackboys: return "Jackboys"
+        case .riviera92: return "Riviera 92"
         }
     }
 
@@ -216,6 +225,12 @@ enum FilterPreset: String, CaseIterable, Identifiable {
             return "OLDROLL"
         case .tezzaClean, .tezzaWarm, .tezzaGrain, .tezzaPolaroid:
             return "TEZZA"
+        case .swagLive:
+            return "SWAG"
+        case .jackboys:
+            return "JACKBOYS"
+        case .riviera92:
+            return "RIVIERA"
         default:
             return "BEIBI"
         }
@@ -249,7 +264,7 @@ enum FilterPreset: String, CaseIterable, Identifiable {
              .triX, .tmax, .cinestill50d, .ektachrome, .disposable, .sepiaViejo,
              .ismPastel, .ismCream, .oldRoll35, .oldRollFlash, .oldRoll8,
              .tezzaGrain, .sakura, .latte, .oceanFade, .framedFade,
-             .cinemaTeal, .milk:
+             .cinemaTeal, .milk, .swagLive, .jackboys, .riviera92:
             return .vintage
         case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio,
              .polaroidNoir, .polaroidGo, .instaxMono, .tezzaPolaroid,
