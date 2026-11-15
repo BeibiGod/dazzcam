@@ -15,68 +15,72 @@ struct AjustesLookView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                Text("Muevelo y mira el cambio.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.45))
+            ScrollView {
+                VStack(spacing: 16) {
+                    vistaPreviaFecha
 
-                fila(
-                    titulo: "INTENSIDAD",
-                    detalle: "Baja todo el look. Lo que muevas a mano se queda",
-                    valor: $controles.intensidad,
-                    rango: 0...1,
-                    maximo: 1
-                )
+                    Text("Muevelo y mira el cambio.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.45))
 
-                fila(
-                    titulo: "RAYONES",
-                    detalle: "Rayones finos de pelicula vieja",
-                    valor: opcional(\.rayones, sugerido: sugerido.rayones),
-                    rango: 0...1,
-                    maximo: 1
-                )
+                    fila(
+                        titulo: "INTENSIDAD",
+                        detalle: "Baja todo el look. Lo que muevas a mano se queda",
+                        valor: $controles.intensidad,
+                        rango: 0...1,
+                        maximo: 1
+                    )
 
-                fila(
-                    titulo: "FUGAS DE LUZ",
-                    detalle: "Luz que se cuela por una esquina",
-                    valor: opcional(\.fuga, sugerido: sugerido.fuga),
-                    rango: 0...1,
-                    maximo: 1
-                )
+                    fila(
+                        titulo: "RAYONES",
+                        detalle: "Rayones finos de pelicula vieja",
+                        valor: opcional(\.rayones, sugerido: sugerido.rayones),
+                        rango: 0...1,
+                        maximo: 1
+                    )
 
-                fila(
-                    titulo: "GRANO",
-                    detalle: "Textura de pelicula",
-                    valor: opcional(\.grano, sugerido: sugerido.grano),
-                    rango: 0...0.35,
-                    maximo: 0.35
-                )
+                    fila(
+                        titulo: "FUGAS DE LUZ",
+                        detalle: "Luz que se cuela por una esquina",
+                        valor: opcional(\.fuga, sugerido: sugerido.fuga),
+                        rango: 0...1,
+                        maximo: 1
+                    )
 
-                filaFecha
+                    fila(
+                        titulo: "GRANO",
+                        detalle: "Textura de pelicula",
+                        valor: opcional(\.grano, sugerido: sugerido.grano),
+                        rango: 0...0.35,
+                        maximo: 0.35
+                    )
 
-                filaEstilo
+                    filaFecha
 
-                HStack {
-                    Button {
-                        controles = ControlesLook()
-                    } label: {
-                        Text("AUTOMATICO")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 9)
-                            .background(Color.white.opacity(0.1), in: Capsule())
+                    filaEstilo
+
+                    HStack {
+                        Button {
+                            controles = ControlesLook()
+                        } label: {
+                            Text("AUTOMATICO")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Color.white.opacity(0.1), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(controles.automatico)
+
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
-                    .disabled(controles.automatico)
 
-                    Spacer()
                 }
-
-                Spacer(minLength: 0)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
             .background(Color(red: 0.06, green: 0.06, blue: 0.08).ignoresSafeArea())
             .navigationTitle("EL LOOK")
             .navigationBarTitleDisplayMode(.inline)
@@ -87,6 +91,41 @@ struct AjustesLookView: View {
                 }
             }
         }
+    }
+
+    /// Muestra grande de la fecha. Va hasta arriba de la hoja para que se vea
+    /// aunque el panel tape la parte de abajo de la foto.
+    private var vistaPreviaFecha: some View {
+        HStack(spacing: 10) {
+            Text("FECHA")
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
+
+            Spacer(minLength: 8)
+
+            if sello.encendido {
+                TimelineView(.periodic(from: .now, by: 1)) { contexto in
+                    Text(SelloFecha.texto(sello, fecha: contexto.date))
+                        .font(.custom(
+                            controles.estiloFecha.fuente(21).fontName,
+                            size: 21
+                        ))
+                        .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
+                        .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
+                }
+            } else {
+                Text("Sin fecha")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     /// Fila para elegir la fecha que se quema en la foto o el video.

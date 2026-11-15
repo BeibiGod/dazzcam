@@ -41,28 +41,36 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fuente del sistema mas parecida a cada sello. Si el iPhone no la
-    /// trae, cae en la monoespaciada para no romper nada.
+    /// Fuente del sistema mas parecida a cada sello. Los sellos digitales usan
+    /// Silkscreen (la pixelada que va dentro de la app). Si no carga, cae en la
+    /// monoespaciada para no romper nada.
     func fuente(_ tamano: CGFloat) -> UIFont {
         let nombre: String
 
         switch self {
-        case .dazz: nombre = "Menlo-Bold"
-        case .digital: nombre = "AvenirNextCondensed-Bold"
-        case .maquina: nombre = "Courier-Bold"
-        case .clasico: nombre = "Georgia-Bold"
-        case .futura: nombre = "Futura-Medium"
-        case .mano: nombre = "Noteworthy-Bold"
-        case .neon: nombre = "Menlo-Bold"
-        case .ambar: nombre = "AmericanTypewriter-Bold"
-        case .plata: nombre = "HelveticaNeue-CondensedBold"
-        case .rosa: nombre = "Copperplate-Bold"
-        case .dosMil: nombre = "HelveticaNeue-Bold"
-        case .noventa: nombre = "CourierNewPS-BoldMT"
+        case .dazz, .digital, .neon, .dosMil:
+            nombre = "Silkscreen-Bold"
+        case .futura, .plata, .noventa:
+            nombre = "Silkscreen-Regular"
+        case .maquina:
+            nombre = "Courier-Bold"
+        case .clasico:
+            nombre = "Georgia-Bold"
+        case .mano:
+            nombre = "Noteworthy-Bold"
+        case .ambar:
+            nombre = "AmericanTypewriter-Bold"
+        case .rosa:
+            nombre = "Copperplate-Bold"
         }
 
-        return UIFont(name: nombre, size: tamano)
-            ?? UIFont.monospacedSystemFont(ofSize: tamano, weight: .bold)
+        if let fuente = UIFont(name: nombre, size: tamano) {
+            return fuente
+        }
+        if let pixel = UIFont(name: "Silkscreen-Regular", size: tamano) {
+            return pixel
+        }
+        return UIFont.monospacedSystemFont(ofSize: tamano, weight: .bold)
     }
 
     var color: UIColor {
