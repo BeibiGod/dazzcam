@@ -22,7 +22,7 @@ struct AjustesLookView: View {
 
                 fila(
                     titulo: "INTENSIDAD",
-                    detalle: "Solo el color del filtro. Rayones, fugas y grano van aparte",
+                    detalle: "Baja todo el look. Lo que muevas a mano se queda",
                     valor: $controles.intensidad,
                     rango: 0...1,
                     maximo: 1

@@ -111,7 +111,7 @@ enum FilterEngine {
         let punto = min(max(controles.intensidad, 0), 1)
         let fuerza = CGFloat(pow(Double(punto), 1.3) * 0.85)
 
-        var a = ajuste(preset)
+        var a = afinado(ajuste(preset))
 
         // Lo que trae la camara de fabrica (fuga y grano) se apaga junto con
         // la intensidad. Lo que muevas a mano se queda como lo pusiste.
@@ -140,6 +140,24 @@ enum FilterEngine {
             semilla: semilla,
             momento: momento
         )
+    }
+
+    /// Acomodo fino del look: los valores mas duros se acercan un poco al
+    /// centro y la viñeta baja tantito, para que ninguna camara se vea
+    /// exagerada. Las camaras suaves se quedan casi igual.
+    private static func afinado(_ original: AjusteFoto) -> AjusteFoto {
+        var a = original
+
+        a.temperatura = 6500 + (a.temperatura - 6500) * 0.85
+        a.saturacion = a.saturacion > 1
+            ? 1 + (a.saturacion - 1) * 0.8
+            : 1 - (1 - a.saturacion) * 0.92
+        a.contraste = a.contraste > 1
+            ? 1 + (a.contraste - 1) * 0.8
+            : 1 - (1 - a.contraste) * 0.92
+        a.vineta *= 0.85
+
+        return a
     }
 
     /// Mezcla el look con la foto original: 0 = original, 1 = look completo.
