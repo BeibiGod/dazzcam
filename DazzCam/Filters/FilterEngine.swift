@@ -105,22 +105,29 @@ enum FilterEngine {
     ) -> CIImage? {
         guard preset != .original else { return entrada }
 
+        // La intensidad no va en linea recta: abajo se siente de verdad
+        // suave y arriba se queda un poquito antes del tope. Asi el 100%
+        // no revienta y el 30% ya se nota ligero.
+        let punto = min(max(controles.intensidad, 0), 1)
+        let fuerza = CGFloat(pow(Double(punto), 1.3) * 0.85)
+
         var a = ajuste(preset)
-        a.rayones = controles.rayones ?? a.rayones
-        a.fuga = controles.fuga ?? a.fuga
-        a.grano = controles.grano ?? a.grano
+
+        // Lo que trae la camara de fabrica (fuga y grano) se apaga junto con
+        // la intensidad. Lo que muevas a mano se queda como lo pusiste.
+        a.rayones = controles.rayones ?? (a.rayones * fuerza)
+        a.fuga = controles.fuga ?? (a.fuga * fuerza)
+        a.grano = controles.grano ?? (a.grano * fuerza)
 
         guard let mirado = aplicarLook(a, a: entrada) else { return nil }
 
-        // La intensidad solo baja el look de color. El grano, los rayones y
-        // la fuga tienen su propio control y se quedan como estan.
         let base: CIImage
 
-        if controles.intensidad < 0.999,
+        if fuerza < 0.999,
            let mezcla = mezclar(
                mirado,
                con: entrada,
-               cantidad: controles.intensidad
+               cantidad: fuerza
            ) {
             base = mezcla
         } else {
@@ -437,6 +444,41 @@ enum FilterEngine {
             a.temperatura = 7600; a.tinte = 3; a.saturacion = 0.86
             a.contraste = 0.88; a.brillo = 0.02
             a.desvanecido = 0.1; a.grano = 0.07; a.vineta = 0.3
+
+        // ---- v1.17: camaras de rollo ----
+        case .yashicaT4:
+            a.temperatura = 7000; a.saturacion = 1.05; a.contraste = 1.06
+            a.grano = 0.07; a.vineta = 0.24
+
+        case .olympusMju:
+            a.temperatura = 7200; a.saturacion = 1.02; a.contraste = 0.96
+            a.desvanecido = 0.03; a.grano = 0.06; a.vineta = 0.2
+
+        case .canonSure:
+            a.temperatura = 8000; a.saturacion = 1.08; a.contraste = 1.05
+            a.brillo = 0.03; a.grano = 0.09; a.vineta = 0.34
+
+        case .nikonFm2:
+            a.temperatura = 6700; a.saturacion = 1.18; a.contraste = 1.18
+            a.grano = 0.08; a.vineta = 0.28
+
+        case .praktica:
+            a.temperatura = 6200; a.tinte = -6; a.saturacion = 0.95
+            a.contraste = 1.1; a.desvanecido = 0.03
+            a.grano = 0.11; a.vineta = 0.4
+
+        case .zenit12:
+            a.temperatura = 5800; a.tinte = -8; a.saturacion = 0.88
+            a.contraste = 1.22; a.grano = 0.13; a.vineta = 0.5
+
+        case .kodakVR:
+            a.temperatura = 7800; a.saturacion = 1.12; a.contraste = 1.03
+            a.desvanecido = 0.04; a.grano = 0.1; a.vineta = 0.32
+
+        case .agfaOptima:
+            a.temperatura = 7400; a.tinte = 5; a.saturacion = 1.06
+            a.contraste = 0.98; a.desvanecido = 0.05
+            a.grano = 0.09; a.vineta = 0.28
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -463,6 +505,16 @@ enum FilterEngine {
             a.fuga = 0.22
         case .dazzClassic:
             a.fuga = 0.18
+        case .canonSure, .kodakVR:
+            a.fuga = 0.32
+        case .zenit12:
+            a.fuga = 0.2
+        case .praktica, .yashicaT4, .agfaOptima:
+            a.fuga = 0.14
+        case .olympusMju:
+            a.fuga = 0.12
+        case .nikonFm2:
+            a.fuga = 0.1
         case .chatarraCCD:
             a.fuga = 0.35
         case .framedFade:

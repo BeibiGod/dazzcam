@@ -12,6 +12,12 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
     case futura
     case mano
 
+    // ---- agregadas en la v1.17: sellos de color ----
+    case neon
+    case ambar
+    case plata
+    case rosa
+
     var id: String { rawValue }
 
     var titulo: String {
@@ -22,6 +28,10 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .clasico: return "Clasico"
         case .futura: return "Futura"
         case .mano: return "A mano"
+        case .neon: return "Neon"
+        case .ambar: return "Ambar"
+        case .plata: return "Plata"
+        case .rosa: return "Rosa"
         }
     }
 
@@ -37,6 +47,10 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .clasico: nombre = "Georgia-Bold"
         case .futura: nombre = "Futura-Medium"
         case .mano: nombre = "Noteworthy-Bold"
+        case .neon: nombre = "Menlo-Bold"
+        case .ambar: nombre = "AmericanTypewriter-Bold"
+        case .plata: nombre = "HelveticaNeue-CondensedBold"
+        case .rosa: nombre = "Copperplate-Bold"
         }
 
         return UIFont(name: nombre, size: tamano)
@@ -57,6 +71,14 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
             return UIColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 0.92)
         case .mano:
             return UIColor(red: 1.0, green: 0.55, blue: 0.25, alpha: 0.95)
+        case .neon:
+            return UIColor(red: 0.40, green: 1.0, blue: 0.74, alpha: 0.96)
+        case .ambar:
+            return UIColor(red: 1.0, green: 0.71, blue: 0.20, alpha: 0.96)
+        case .plata:
+            return UIColor(red: 0.90, green: 0.93, blue: 0.99, alpha: 0.93)
+        case .rosa:
+            return UIColor(red: 1.0, green: 0.47, blue: 0.72, alpha: 0.95)
         }
     }
 
@@ -69,11 +91,15 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .clasico: return 0.02
         case .futura: return 0.20
         case .mano: return 0
+        case .neon: return 0.08
+        case .ambar: return 0.02
+        case .plata: return 0.12
+        case .rosa: return 0.06
         }
     }
 
-    /// Solo Dazz lleva el brillito extra alrededor del texto.
-    var conBrillo: Bool { self == .dazz }
+    /// Dazz y Neon llevan el brillito extra alrededor del texto.
+    var conBrillo: Bool { self == .dazz || self == .neon }
 }
 
 /// Marca de fecha y hora, como las camaras viejitas.

@@ -68,6 +68,10 @@
 "Maquina" = "Typewriter";
 "Clasico" = "Classic";
 "A mano" = "Handwritten";
+"Neon" = "Neon";
+"Ambar" = "Amber";
+"Plata" = "Silver";
+"Rosa" = "Pink";
 
 /* ---- libreria de camaras ---- */
 "Camaras" = "Cameras";

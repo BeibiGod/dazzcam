@@ -111,6 +111,16 @@ enum FilterPreset: String, CaseIterable, Identifiable {
     case jackboys
     case riviera92
 
+    // ---- agregadas en la v1.17: camaras de rollo ----
+    case yashicaT4
+    case olympusMju
+    case canonSure
+    case nikonFm2
+    case praktica
+    case zenit12
+    case kodakVR
+    case agfaOptima
+
     var id: String { rawValue }
 
     var nombre: String {
@@ -190,6 +200,15 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .swagLive: return "SWAG Live"
         case .jackboys: return "Jackboys"
         case .riviera92: return "Riviera 92"
+
+        case .yashicaT4: return "Yashica T4"
+        case .olympusMju: return "Olympus Mju"
+        case .canonSure: return "Canon Sure Shot"
+        case .nikonFm2: return "Nikon FM2"
+        case .praktica: return "Praktica"
+        case .zenit12: return "Zenit 12"
+        case .kodakVR: return "Kodak VR 35"
+        case .agfaOptima: return "Agfa Optima"
         }
     }
 
@@ -231,6 +250,22 @@ enum FilterPreset: String, CaseIterable, Identifiable {
             return "JACKBOYS"
         case .riviera92:
             return "RIVIERA"
+        case .yashicaT4:
+            return "YASHICA"
+        case .olympusMju:
+            return "OLYMPUS"
+        case .canonSure:
+            return "CANON"
+        case .nikonFm2:
+            return "NIKON"
+        case .praktica:
+            return "PRAKTICA"
+        case .zenit12:
+            return "ZENIT"
+        case .kodakVR:
+            return "KODAK"
+        case .agfaOptima:
+            return "AGFA"
         default:
             return "BEIBI"
         }
@@ -243,7 +278,7 @@ enum FilterPreset: String, CaseIterable, Identifiable {
              .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono,
              .tezzaPolaroid, .oldRollInstant:
             return .instantanea
-        case .hp5, .delta3200, .triX, .tmax:
+        case .hp5, .delta3200, .triX, .tmax, .nikonFm2, .praktica, .zenit12:
             return .reflex
         case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi,
              .ismNight, .disco, .neonDream:
@@ -264,7 +299,9 @@ enum FilterPreset: String, CaseIterable, Identifiable {
              .triX, .tmax, .cinestill50d, .ektachrome, .disposable, .sepiaViejo,
              .ismPastel, .ismCream, .oldRoll35, .oldRollFlash, .oldRoll8,
              .tezzaGrain, .sakura, .latte, .oceanFade, .framedFade,
-             .cinemaTeal, .milk, .swagLive, .jackboys, .riviera92:
+             .cinemaTeal, .milk, .swagLive, .jackboys, .riviera92,
+             .yashicaT4, .olympusMju, .canonSure, .nikonFm2,
+             .praktica, .zenit12, .kodakVR, .agfaOptima:
             return .vintage
         case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio,
              .polaroidNoir, .polaroidGo, .instaxMono, .tezzaPolaroid,
