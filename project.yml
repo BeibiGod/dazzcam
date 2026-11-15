@@ -7,6 +7,7 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
   generateEmptyDirectories: false
+  developmentLanguage: es
 
 settings:
   base:
@@ -28,7 +29,7 @@ targets:
       base:
         PRODUCT_NAME: DazzCam
         PRODUCT_BUNDLE_IDENTIFIER: com.diego.dazzcam
-        MARKETING_VERSION: "1.15.0"
+        MARKETING_VERSION: "1.16.0"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO

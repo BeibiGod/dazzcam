@@ -56,7 +56,7 @@ final class PhotoCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         guard let datos = photo.fileDataRepresentation(),
               let imagen = UIImage(data: datos) else {
             DispatchQueue.main.async {
-                self.error = "No se pudo leer la foto"
+                self.error = String(localized: "No se pudo leer la foto")
                 self.capturando = false
             }
             return

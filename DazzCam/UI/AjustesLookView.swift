@@ -22,7 +22,7 @@ struct AjustesLookView: View {
 
                 fila(
                     titulo: "INTENSIDAD",
-                    detalle: "Que tanto se ve el filtro",
+                    detalle: "Solo el color del filtro. Rayones, fugas y grano van aparte",
                     valor: $controles.intensidad,
                     rango: 0...1,
                     maximo: 1
@@ -113,7 +113,7 @@ struct AjustesLookView: View {
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(sello.tituloMenu)
+                        Text(LocalizedStringKey(sello.tituloMenu))
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
 
                         Image(systemName: "chevron.up.chevron.down")

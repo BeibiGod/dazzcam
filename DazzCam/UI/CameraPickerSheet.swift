@@ -17,7 +17,7 @@ struct CameraPickerSheet: View {
                         let items = FilterPreset.allCases.filter { $0.categoria == categoria }
 
                         if !items.isEmpty {
-                            Text(categoria.titulo)
+                            Text(LocalizedStringKey(categoria.titulo))
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.65))
                                 .padding(.horizontal, 20)

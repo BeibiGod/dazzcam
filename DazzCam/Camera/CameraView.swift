@@ -60,7 +60,7 @@ struct CameraView: View {
     @State private var semillaVideo: UInt64 = 0
 
     private var versionTexto: String {
-        "v1.15.0 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.16.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -392,14 +392,14 @@ struct CameraView: View {
                         videoImportado = archivo.url
                         mostrarEditorVideo = true
                     } else {
-                        aviso = "No pude abrir ese video"
+                        aviso = String(localized: "No pude abrir ese video")
                     }
                 } else if let datos = try? await item.loadTransferable(type: Data.self),
                           let imagen = UIImage(data: datos) {
                     fotoImportada = imagen
                     mostrarEditor = true
                 } else {
-                    aviso = "No pude abrir esa foto"
+                    aviso = String(localized: "No pude abrir esa foto")
                 }
                 fotoElegida = nil
             }
@@ -418,7 +418,7 @@ struct CameraView: View {
                     sello: sello
                 ) { elegido in
                     preset = elegido
-                    aviso = "Video guardado con \(elegido.nombre)"
+                    aviso = String(localized: "Video guardado con \(elegido.nombre)")
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -447,7 +447,7 @@ struct CameraView: View {
                     esRevision: true
                 ) { elegido in
                     preset = elegido
-                    aviso = "Video guardado con \(elegido.nombre)"
+                    aviso = String(localized: "Video guardado con \(elegido.nombre)")
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -465,7 +465,7 @@ struct CameraView: View {
                     controles: controles,
                     alGuardar: { _, elegido in
                         preset = elegido
-                        aviso = "Copia guardada con \(elegido.nombre)"
+                        aviso = String(localized: "Copia guardada con \(elegido.nombre)")
                         Task {
                             try? await Task.sleep(nanoseconds: 2_000_000_000)
                             aviso = nil
@@ -615,7 +615,7 @@ struct CameraView: View {
                 activo: flashEncendido
             ) {
                 guard camara.tieneFlash || camara.esFrontal else {
-                    aviso = "Esta lente no tiene flash"
+                    aviso = String(localized: "Esta lente no tiene flash")
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -799,7 +799,7 @@ struct CameraView: View {
                     guard !video.grabando else { return }
                     modo = opcion
                 } label: {
-                    Text(opcion.rawValue)
+                    Text(LocalizedStringKey(opcion.rawValue))
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .foregroundStyle(modo == opcion ? Color.black : Color.white.opacity(0.75))
                         .padding(.horizontal, 9)
@@ -940,7 +940,7 @@ struct CameraView: View {
 
     private func analizarEscena() {
         guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
-            aviso = "La camara todavia no tiene imagen"
+            aviso = String(localized: "La camara todavia no tiene imagen")
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 aviso = nil
@@ -955,7 +955,7 @@ struct CameraView: View {
             analizando = false
 
             guard let resultado = resultado else {
-                aviso = "No pude analizar la escena"
+                aviso = String(localized: "No pude analizar la escena")
                 return
             }
 
@@ -1041,9 +1041,9 @@ struct CameraView: View {
         Task {
             do {
                 try await PhotoLibrarySaver.guardar(final)
-                aviso = "Guardada en tu fototeca"
+                aviso = String(localized: "Guardada en tu fototeca")
             } catch {
-                aviso = "No se pudo guardar: \(error.localizedDescription)"
+                aviso = String(localized: "No se pudo guardar: \(error.localizedDescription)")
             }
 
             mostrarCaptura = false
@@ -1125,7 +1125,7 @@ struct CameraView: View {
             await camara.voltear()
             zoomBase = camara.zoom
 
-            aviso = camara.esFrontal ? "Camara frontal" : "Camara trasera"
+            aviso = camara.esFrontal ? String(localized: "Camara frontal") : String(localized: "Camara trasera")
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             aviso = nil
         }

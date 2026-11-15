@@ -1,0 +1,100 @@
+/* Beibi Cam - English strings */
+
+/* ---- camara ---- */
+"Esta lente no tiene flash" = "This lens has no flash";
+"Camara frontal" = "Front camera";
+"Camara trasera" = "Back camera";
+"La camara todavia no tiene imagen" = "The camera has no image yet";
+"No pude analizar la escena" = "I couldn't analyze the scene";
+"Guardada en tu fototeca" = "Saved to your library";
+"No pude abrir esa foto" = "I couldn't open that photo";
+"No pude abrir ese video" = "I couldn't open that video";
+"Preparando camara..." = "Preparing camera...";
+"Permiso de camara denegado. Activalo en Ajustes." = "Camera access denied. Turn it on in Settings.";
+"Sin permiso de microfono: el video saldra sin sonido" = "No microphone access: the video will be silent";
+"Sin permiso para guardar en la fototeca" = "No access to save to your library";
+"No se pudo leer la foto" = "Couldn't read that photo";
+"No se pudo preparar la grabacion de video" = "Couldn't prepare video recording";
+"No pude preparar el video" = "Couldn't prepare the video";
+"El video no se pudo procesar" = "The video couldn't be processed";
+"No encontre una camara disponible" = "I couldn't find an available camera";
+"No se pudo guardar: %@" = "Couldn't save: %@";
+"Video guardado con %@" = "Video saved with %@";
+"Copia guardada con %@" = "Copy saved with %@";
+
+/* ---- revison y editores ---- */
+"PONER FILTRO" = "ADD FILTER";
+"PONER FILTRO AL VIDEO" = "ADD FILTER TO VIDEO";
+"REVISAR VIDEO" = "REVIEW VIDEO";
+"GUARDAR COPIA" = "SAVE COPY";
+"GUARDAR" = "SAVE";
+"GUARDANDO" = "SAVING";
+"GUARDANDO..." = "SAVING...";
+"GUARDAR la manda a tu fototeca" = "SAVE sends it to your library";
+"Se guarda una copia, el original queda igual" = "A copy is saved, the original stays the same";
+"INTENSIDAD" = "INTENSITY";
+"MÁS AJUSTES" = "MORE SETTINGS";
+"MAS AJUSTES" = "MORE SETTINGS";
+"RAYONES, FUGAS Y GRANO" = "SCRATCHES, LEAKS AND GRAIN";
+"FOTOS" = "PHOTOS";
+"TODAS" = "ALL";
+"FOTO" = "PHOTO";
+"VIDEO" = "VIDEO";
+"VIVO" = "LIVE";
+"LOOK" = "LOOK";
+"IA" = "AI";
+"OFF" = "OFF";
+"Listo" = "Done";
+
+/* ---- panel EL LOOK ---- */
+"EL LOOK" = "THE LOOK";
+"Muevelo y mira el cambio." = "Move it and watch the change.";
+"Que tanto se ve el filtro" = "How strong the filter looks";
+"Solo el color del filtro. Rayones, fugas y grano van aparte" = "Only the filter color. Scratches, leaks and grain go separately";
+"RAYONES" = "SCRATCHES";
+"Rayones finos de pelicula vieja" = "Fine scratches from old film";
+"FUGAS DE LUZ" = "LIGHT LEAKS";
+"Luz que se cuela por una esquina" = "Light sneaking in from the edge";
+"GRANO" = "GRAIN";
+"Textura de pelicula" = "Film texture";
+"FECHA" = "DATE";
+"La hora sale de tu iPhone" = "The time comes from your iPhone";
+"AUTOMATICO" = "AUTOMATIC";
+"TIPOGRAFIA" = "TYPOGRAPHY";
+"Asi se ve la fecha quemada" = "This is how the burned date looks";
+"Sin fecha" = "No date";
+
+/* ---- estilos de fecha ---- */
+"Maquina" = "Typewriter";
+"Clasico" = "Classic";
+"A mano" = "Handwritten";
+
+/* ---- libreria de camaras ---- */
+"Camaras" = "Cameras";
+"Clasicas" = "Classic";
+"Vintage" = "Vintage";
+"Polaroid" = "Polaroid";
+"Underground" = "Underground";
+
+/* ---- analisis IA ---- */
+"Analisis aesthetic" = "Aesthetic analysis";
+"LO QUE VEO" = "WHAT I SEE";
+"CAMARAS QUE LE QUEDAN" = "CAMERAS THAT FIT";
+"LA QUE MAS PEGA" = "BEST MATCH";
+"VER LAS %lld CAMARAS" = "SEE ALL %lld CAMERAS";
+"LUZ" = "LIGHT";
+"CONTRASTE" = "CONTRAST";
+"COLOR" = "COLOR";
+"CARAS" = "FACES";
+"HORIZONTE" = "HORIZON";
+"Mira toda la escena: luz, contraste, color, caras y horizonte, y elige las camaras que mejor le quedan. No importa si hay mucha o poca luz: siempre busca lo mas aesthetic. Todo pasa dentro de tu iPhone; no se sube nada a internet." = "It reads the whole scene: light, contrast, color, faces and horizon, then picks the cameras that fit best. It doesn't matter if there's a lot of light or almost none: it always looks for the most aesthetic match. Everything happens inside your iPhone; nothing is uploaded.";
+
+/* ---- consejos del analisis ---- */
+"Mueve el sujeto un poco para que caiga en un cruce de tercios." = "Move the subject a little so it lands on a thirds intersection.";
+"El sujeto esta centrado: recorrelo a un tercio del cuadro." = "The subject is centered: shift it to a third of the frame.";
+"Hay varias caras: acerca o enfoca a una sola." = "Several faces: move closer or focus on one.";
+"El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula." = "The horizon is %.0f degrees tilted: use the grid level.";
+"Todo bien: dispara y elige el look que mas te guste." = "All good: shoot and pick the look you like most.";
+"Muy aesthetic. Dispara ya." = "Very aesthetic. Shoot now.";
+"Buen cuadro. Elige una de estas camaras." = "Good frame. Pick one of these cameras.";
+"Listo para disparar. Cualquiera de estas le queda." = "Ready to shoot. Any of these fits.";

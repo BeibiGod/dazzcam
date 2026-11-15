@@ -130,10 +130,10 @@ enum AestheticAnalyzer {
                 puntos += 20
             } else if distancia <= 0.22 {
                 puntos += 18
-                consejos.append("Mueve el sujeto un poco para que caiga en un cruce de tercios.")
+                consejos.append(String(localized: "Mueve el sujeto un poco para que caiga en un cruce de tercios."))
             } else {
                 puntos += 16
-                consejos.append("El sujeto esta centrado: recorrelo a un tercio del cuadro.")
+                consejos.append(String(localized: "El sujeto esta centrado: recorrelo a un tercio del cuadro."))
             }
         } else {
             puntos += 17
@@ -146,7 +146,7 @@ enum AestheticAnalyzer {
             puntos += 9
         } else {
             puntos += 8
-            consejos.append("Hay varias caras: acerca o enfoca a una sola.")
+            consejos.append(String(localized: "Hay varias caras: acerca o enfoca a una sola."))
         }
 
         // 6. horizonte torcido: resta poco, solo para avisar del nivel
@@ -154,13 +154,13 @@ enum AestheticAnalyzer {
         if inclinacion > 1.5 {
             puntos -= min(5, Int(inclinacion))
             consejos.append(String(
-                format: "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula.",
+                format: String(localized: "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula."),
                 inclinacion
             ))
         }
 
         if consejos.isEmpty {
-            consejos.append("Todo bien: dispara y elige el look que mas te guste.")
+            consejos.append(String(localized: "Todo bien: dispara y elige el look que mas te guste."))
         }
 
         let puntaje = min(max(puntos, 0), 100)
@@ -188,9 +188,9 @@ enum AestheticAnalyzer {
 
     private static func resumenPara(_ puntaje: Int) -> String {
         switch puntaje {
-        case 88...100: return "Muy aesthetic. Dispara ya."
-        case 78..<88: return "Buen cuadro. Elige una de estas camaras."
-        default: return "Listo para disparar. Cualquiera de estas le queda."
+        case 88...100: return String(localized: "Muy aesthetic. Dispara ya.")
+        case 78..<88: return String(localized: "Buen cuadro. Elige una de estas camaras.")
+        default: return String(localized: "Listo para disparar. Cualquiera de estas le queda.")
         }
     }
 

@@ -110,15 +110,29 @@ enum FilterEngine {
         a.fuga = controles.fuga ?? a.fuga
         a.grano = controles.grano ?? a.grano
 
-        guard let filtrada = aplicar(
+        guard let mirado = aplicarLook(a, a: entrada) else { return nil }
+
+        // La intensidad solo baja el look de color. El grano, los rayones y
+        // la fuga tienen su propio control y se quedan como estan.
+        let base: CIImage
+
+        if controles.intensidad < 0.999,
+           let mezcla = mezclar(
+               mirado,
+               con: entrada,
+               cantidad: controles.intensidad
+           ) {
+            base = mezcla
+        } else {
+            base = mirado
+        }
+
+        return aplicarTextura(
             a,
-            a: entrada,
+            a: base,
             semilla: semilla,
             momento: momento
-        ) else { return nil }
-        guard controles.intensidad < 0.999 else { return filtrada }
-
-        return mezclar(filtrada, con: entrada, cantidad: controles.intensidad)
+        )
     }
 
     /// Mezcla el look con la foto original: 0 = original, 1 = look completo.
@@ -468,18 +482,11 @@ enum FilterEngine {
 
     // MARK: - Cadena generica
 
-    private static func aplicar(
+    private static func aplicarLook(
         _ a: AjusteFoto,
-        a imagen: CIImage,
-        semilla: UInt64,
-        momento: UInt64
+        a imagen: CIImage
     ) -> CIImage? {
         var actual = imagen
-
-        // Cada efecto trae su propio dado. Asi mover los rayones no cambia
-        // donde sale la fuga, ni al reves.
-        var azarRayones = Azar(semilla ^ 0x9E37_79B9_7F4A_7C15)
-        var azarFuga = Azar(semilla ^ 0xD1B5_4A32_D192_ED03)
 
         // 1. balance de blancos
         if a.temperatura != 6500 || a.tinte != 0 {
@@ -523,6 +530,24 @@ enum FilterEngine {
             f.radius = Float(2.4 - (a.vineta * 0.6))
             if let salida = f.outputImage { actual = salida }
         }
+
+        return actual
+    }
+
+    /// Grano, rayones y fuga. Va aparte del look de color para que bajar la
+    /// intensidad del filtro no borre el dano de la pelicula.
+    private static func aplicarTextura(
+        _ a: AjusteFoto,
+        a imagen: CIImage,
+        semilla: UInt64,
+        momento: UInt64
+    ) -> CIImage? {
+        var actual = imagen
+
+        // Cada efecto trae su propio dado. Asi mover los rayones no cambia
+        // donde sale la fuga, ni al reves.
+        var azarRayones = Azar(semilla ^ 0x9E37_79B9_7F4A_7C15)
+        var azarFuga = Azar(semilla ^ 0xD1B5_4A32_D192_ED03)
 
         // 6. grano
         if a.grano > 0, let conGrano = grano(actual, cantidad: a.grano) {
@@ -581,7 +606,7 @@ enum FilterEngine {
 
                 // Dos capas mas, cada una con su propia zona y su propio
                 // parpadeo, para que no se vean siempre los mismos pelos.
-                for indice in 0..<2 {
+                for indice in 0..<3 {
                     let extra = temblor.valor(0.15...0.50)
                     guard extra > 0.18 else { continue }
 
@@ -609,7 +634,7 @@ enum FilterEngine {
                 : 1
             // El control responde suave abajo: al 10% apenas se insinua y
             // hasta arriba se pone fuerte, como una fuga de verdad.
-            let curva = CGFloat(pow(Double(a.fuga), 1.8))
+            let curva = CGFloat(pow(Double(a.fuga), 1.65))
             let fuerza = min(
                 max(curva * azarFuga.valor(0.75...1.15) * pulso, 0),
                 1
@@ -977,7 +1002,7 @@ enum FilterEngine {
 
         // 3. Rayones: tramos cortos y quebrados, casi verticales. Nunca de
         //    lado a lado: en un negativo real el roce viene por partes.
-        for _ in 0..<8 {
+        for _ in 0..<12 {
             let alfa = CGFloat.random(in: 0.05...0.19)
             let grosor = CGFloat.random(in: 0.5...1.3)
             let tramos = Int.random(in: 1...3)
@@ -1015,7 +1040,7 @@ enum FilterEngine {
         //    hebra fina de tela. Todo alargado: nunca circulos.
 
         // 4a. Motas finas de polvo claro.
-        for _ in 0..<46 {
+        for _ in 0..<62 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
             let largo = CGFloat.random(in: 0.8...2.6)
@@ -1035,7 +1060,7 @@ enum FilterEngine {
         }
 
         // 4b. Pelusas cortas con una curva suave.
-        for _ in 0..<20 {
+        for _ in 0..<28 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
             let largo = CGFloat.random(in: 3...11)
@@ -1062,7 +1087,7 @@ enum FilterEngine {
         }
 
         // 4c. Motas oscuras: polvo que tapa un poquito la luz.
-        for _ in 0..<12 {
+        for _ in 0..<17 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
             let largo = CGFloat.random(in: 1.5...5)
@@ -1082,7 +1107,7 @@ enum FilterEngine {
         }
 
         // 4d. Hebras largas y finitas, como pelos de tela.
-        for _ in 0..<7 {
+        for _ in 0..<10 {
             let x = CGFloat.random(in: 0..<ancho)
             let y = CGFloat.random(in: 0..<alto)
             let angulo = CGFloat.random(in: 0...(2 * .pi))

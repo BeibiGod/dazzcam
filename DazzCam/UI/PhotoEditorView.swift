@@ -267,7 +267,7 @@ struct PhotoEditorView: View {
                 alGuardar(vista, preset)
                 cerrar()
             } catch {
-                self.error = "No se pudo guardar: \(error.localizedDescription)"
+                self.error = String(localized: "No se pudo guardar: \(error.localizedDescription)")
             }
             guardando = false
         }
