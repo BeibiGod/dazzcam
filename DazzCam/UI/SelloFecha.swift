@@ -18,6 +18,10 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
     case plata
     case rosa
 
+    // ---- agregadas en la v1.19: sellos retro de los 90 y los 2000 ----
+    case dosMil
+    case noventa
+
     var id: String { rawValue }
 
     var titulo: String {
@@ -32,6 +36,8 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .ambar: return "Ambar"
         case .plata: return "Plata"
         case .rosa: return "Rosa"
+        case .dosMil: return "2000s"
+        case .noventa: return "90s"
         }
     }
 
@@ -51,6 +57,8 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .ambar: nombre = "AmericanTypewriter-Bold"
         case .plata: nombre = "HelveticaNeue-CondensedBold"
         case .rosa: nombre = "Copperplate-Bold"
+        case .dosMil: nombre = "HelveticaNeue-Bold"
+        case .noventa: nombre = "CourierNewPS-BoldMT"
         }
 
         return UIFont(name: nombre, size: tamano)
@@ -79,6 +87,10 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
             return UIColor(red: 0.90, green: 0.93, blue: 0.99, alpha: 0.93)
         case .rosa:
             return UIColor(red: 1.0, green: 0.47, blue: 0.72, alpha: 0.95)
+        case .dosMil:
+            return UIColor(red: 1.0, green: 0.80, blue: 0.25, alpha: 0.97)
+        case .noventa:
+            return UIColor(red: 0.62, green: 0.98, blue: 0.92, alpha: 0.95)
         }
     }
 
@@ -95,11 +107,13 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         case .ambar: return 0.02
         case .plata: return 0.12
         case .rosa: return 0.06
+        case .dosMil: return 0.04
+        case .noventa: return 0.14
         }
     }
 
-    /// Dazz y Neon llevan el brillito extra alrededor del texto.
-    var conBrillo: Bool { self == .dazz || self == .neon }
+    /// Dazz, Neon y 90s llevan el brillito extra alrededor del texto.
+    var conBrillo: Bool { self == .dazz || self == .neon || self == .noventa }
 }
 
 /// Marca de fecha y hora, como las camaras viejitas.
@@ -107,6 +121,7 @@ enum SelloFecha: String, CaseIterable, Identifiable {
     case apagado
     case dazz
     case dazzHora
+    case anio
     case fecha
     case fechaHora
 
@@ -117,6 +132,7 @@ enum SelloFecha: String, CaseIterable, Identifiable {
         case .apagado: return "OFF"
         case .dazz: return "DAZZ"
         case .dazzHora: return "DAZZ+H"
+        case .anio: return "2000"
         case .fecha: return "FECHA"
         case .fechaHora: return "F+HORA"
         }
@@ -128,6 +144,7 @@ enum SelloFecha: String, CaseIterable, Identifiable {
         case .apagado: return "Sin fecha"
         case .dazz: return "'26 11 12"
         case .dazzHora: return "'26 11 12 02:28"
+        case .anio: return "2026 11 12"
         case .fecha: return "12/11/2026"
         case .fechaHora: return "12/11/2026 2:28 AM"
         }
@@ -137,7 +154,8 @@ enum SelloFecha: String, CaseIterable, Identifiable {
         switch self {
         case .apagado: return .dazz
         case .dazz: return .dazzHora
-        case .dazzHora: return .fecha
+        case .dazzHora: return .anio
+        case .anio: return .fecha
         case .fecha: return .fechaHora
         case .fechaHora: return .apagado
         }
@@ -158,6 +176,9 @@ enum SelloFecha: String, CaseIterable, Identifiable {
 
         case .dazzHora:
             return formatear(fecha, patron: "''yy MM dd HH:mm")
+
+        case .anio:
+            return formatear(fecha, patron: "yyyy MM dd")
 
         case .fecha:
             return formatear(fecha, patron: "dd/MM/yyyy")
