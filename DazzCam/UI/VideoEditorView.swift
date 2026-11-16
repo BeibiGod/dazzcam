@@ -129,6 +129,9 @@ struct VideoEditorView: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
 
+                FilaFecha(sello: $sello, estilo: ajustes.estiloFecha, fecha: fecha)
+                    .padding(.horizontal, 18)
+
                 HStack(spacing: 10) {
                     Text("INTENSIDAD")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))

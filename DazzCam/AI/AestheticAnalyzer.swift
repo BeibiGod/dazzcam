@@ -16,6 +16,11 @@ struct Analisis {
     var contraste: Int    // 0-100
     var color: Int        // 0-100
     var horizonte: Int    // grados de inclinacion, 0 = derecho
+
+    /// Rectangulo donde conviene poner al sujeto para que el cuadro quede
+    /// aesthetic. Va en coordenadas de la foto, de 0 a 1 y desde arriba
+    /// a la izquierda, para poder dibujarlo encima del visor.
+    var encuadre: CGRect
 }
 
 /// Analiza la escena con Vision de Apple: luz, contraste, color, caras,
@@ -193,8 +198,81 @@ enum AestheticAnalyzer {
             luz: Int((luz * 100).rounded()),
             contraste: min(Int((contraste / 0.30 * 100).rounded()), 100),
             color: min(Int((color / 0.35 * 100).rounded()), 100),
-            horizonte: Int(inclinacion.rounded())
+            horizonte: Int(inclinacion.rounded()),
+            encuadre: encuadre(caras: caras, objetos: objetos)
         )
+    }
+
+    /// Calcula el recuadro que se dibuja sobre el visor. Toma al sujeto que
+    /// mas llama la atencion, lo lleva al cruce de tercios mas cercano y
+    /// devuelve una zona de su tamaño. Si ya esta bien puesto, lo deja quieto.
+    private static func encuadre(
+        caras: [VNFaceObservation],
+        objetos: [VNRectangleObservation]
+    ) -> CGRect {
+        var sujeto: CGRect?
+
+        if !caras.isEmpty {
+            for cara in caras {
+                let caja = CGRect(
+                    x: cara.boundingBox.minX,
+                    y: 1 - cara.boundingBox.maxY,
+                    width: cara.boundingBox.width,
+                    height: cara.boundingBox.height
+                )
+                sujeto = sujeto.map { $0.union(caja) } ?? caja
+            }
+        } else if let principal = objetos.max(by: {
+            $0.boundingBox.width * $0.boundingBox.height
+                < $1.boundingBox.width * $1.boundingBox.height
+        }) {
+            let caja = principal.boundingBox
+            sujeto = CGRect(
+                x: caja.minX,
+                y: 1 - caja.maxY,
+                width: caja.width,
+                height: caja.height
+            )
+        }
+
+        // La zona es un poco mas grande que el sujeto, con un minimo para
+        // que se vea comoda en la pantalla.
+        var ancho = min(max((sujeto?.width ?? 0.36) * 1.25, 0.30), 0.62)
+        var alto = min(max((sujeto?.height ?? 0.46) * 1.25, 0.34), 0.58)
+
+        let centro = CGPoint(
+            x: sujeto?.midX ?? 0.5,
+            y: sujeto?.midY ?? 0.5
+        )
+
+        let cruces = [
+            CGPoint(x: 1.0 / 3.0, y: 1.0 / 3.0),
+            CGPoint(x: 2.0 / 3.0, y: 1.0 / 3.0),
+            CGPoint(x: 1.0 / 3.0, y: 2.0 / 3.0),
+            CGPoint(x: 2.0 / 3.0, y: 2.0 / 3.0)
+        ]
+
+        let cercano = cruces.min {
+            hypot($0.x - centro.x, $0.y - centro.y)
+                < hypot($1.x - centro.x, $1.y - centro.y)
+        } ?? CGPoint(x: 1.0 / 3.0, y: 1.0 / 3.0)
+
+        let distancia = hypot(cercano.x - centro.x, cercano.y - centro.y)
+
+        // Ya cae en un tercio: se marca donde esta. Si esta centrado o
+        // perdido, se corre al cruce mas cercano.
+        let destino = distancia <= 0.10 ? centro : cercano
+
+        ancho = min(ancho, 0.94)
+        alto = min(alto, 0.94)
+
+        var x = destino.x - ancho / 2
+        var y = destino.y - alto / 2
+
+        x = min(max(x, 0.03), 0.97 - ancho)
+        y = min(max(y, 0.03), 0.97 - alto)
+
+        return CGRect(x: x, y: y, width: ancho, height: alto)
     }
 
     private static func resumenPara(_ puntaje: Int) -> String {

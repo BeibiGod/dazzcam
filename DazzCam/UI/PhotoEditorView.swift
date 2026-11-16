@@ -128,6 +128,9 @@ struct PhotoEditorView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
 
+                FilaFecha(sello: $sello, estilo: controles.estiloFecha)
+                    .padding(.horizontal, 18)
+
                 HStack(spacing: 10) {
                     Text("INTENSIDAD")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
