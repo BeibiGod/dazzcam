@@ -82,8 +82,19 @@
 
 /* ---- analisis IA ---- */
 "Analisis aesthetic" = "Aesthetic analysis";
-"ENCUADRA AQUÍ" = "FRAME HERE";
 "CÁMARAS" = "CAMERAS";
+"Buscando tu toma..." = "Finding your shot...";
+"el sujeto" = "the subject";
+"a la izquierda" = "to the left";
+"a la derecha" = "to the right";
+"arriba" = "up";
+"abajo" = "down";
+" y " = " and ";
+"Mueve el teléfono %@" = "Move your phone %@";
+"Buen encuadre. Dispara." = "Good frame. Shoot.";
+"Acércate un poco" = "Get a little closer";
+"Aléjate un poco" = "Step back a little";
+"No veo un sujeto claro: apunta a algo con detalle." = "I can't see a clear subject: point at something with detail.";
 "LO QUE VEO" = "WHAT I SEE";
 "CAMARAS QUE LE QUEDAN" = "CAMERAS THAT FIT";
 "LA QUE MAS PEGA" = "BEST MATCH";

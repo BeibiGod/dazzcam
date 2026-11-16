@@ -2,6 +2,19 @@ import CoreGraphics
 import UIKit
 import Vision
 
+/// Lo que la IA ve y hacia donde conviene mover el telefono. Va en
+/// coordenadas de la foto, de 0 a 1 y desde arriba a la izquierda.
+struct Guia {
+    /// Caja del sujeto que la IA esta siguiendo.
+    var sujeto: CGRect
+    /// Cruce de tercios donde conviene dejarlo.
+    var destino: CGPoint
+    /// true cuando ya esta en el lugar bueno.
+    var listo: Bool
+    /// Que hacer: "Mueve el telefono a la derecha", "Buen encuadre", etc.
+    var instruccion: String
+}
+
 /// Lo que devuelve el analisis de una escena.
 struct Analisis {
     var puntaje: Int
@@ -17,10 +30,10 @@ struct Analisis {
     var color: Int        // 0-100
     var horizonte: Int    // grados de inclinacion, 0 = derecho
 
-    /// Rectangulo donde conviene poner al sujeto para que el cuadro quede
-    /// aesthetic. Va en coordenadas de la foto, de 0 a 1 y desde arriba
-    /// a la izquierda, para poder dibujarlo encima del visor.
-    var encuadre: CGRect
+    /// Nombre de lo que la IA tiene en el cuadro, para ponerlo en la caja.
+    var etiqueta: String
+    /// Sujeto y encuadre recomendado. nil si no vio nada claro.
+    var guia: Guia?
 }
 
 /// Analiza la escena con Vision de Apple: luz, contraste, color, caras,
@@ -199,80 +212,228 @@ enum AestheticAnalyzer {
             contraste: min(Int((contraste / 0.30 * 100).rounded()), 100),
             color: min(Int((color / 0.35 * 100).rounded()), 100),
             horizonte: Int(inclinacion.rounded()),
-            encuadre: encuadre(caras: caras, objetos: objetos)
+            etiqueta: etiquetas.first ?? String(localized: "el sujeto"),
+            guia: componerGuia(caras: caras, objetos: objetos)
         )
     }
 
-    /// Calcula el recuadro que se dibuja sobre el visor. Toma al sujeto que
-    /// mas llama la atencion, lo lleva al cruce de tercios mas cercano y
-    /// devuelve una zona de su tamaño. Si ya esta bien puesto, lo deja quieto.
-    private static func encuadre(
+    // MARK: - Guia en vivo
+
+    /// Seguimiento rapido mientras la guia esta abierta: solo busca caras y
+    /// el objeto que mas llama la atencion. Sin clasificar ni medir luz, para
+    /// que pueda repetirse cada segundo sin gastar bateria.
+    static func seguir(_ imagen: UIImage) async -> Guia? {
+        let base = reducir(FilterEngine.normalizar(imagen), maximo: 720)
+        guard let cg = base.cgImage else { return nil }
+
+        return await withCheckedContinuation { (continuacion: CheckedContinuation<Guia?, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let manejador = VNImageRequestHandler(cgImage: cg, orientation: .up, options: [:])
+                let carasRequest = VNDetectFaceRectanglesRequest()
+                let saliencia = VNGenerateAttentionBasedSaliencyImageRequest()
+
+                do {
+                    try manejador.perform([carasRequest, saliencia])
+                } catch {
+                    continuacion.resume(returning: nil)
+                    return
+                }
+
+                let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?.salientObjects
+
+                continuacion.resume(returning: componerGuia(
+                    caras: carasRequest.results ?? [],
+                    objetos: objetos ?? []
+                ))
+            }
+        }
+    }
+
+    /// Elige al sujeto, calcula su caja y el cruce de tercios que le queda
+    /// mejor, y arma la instruccion para mover el telefono. El cruce cambia
+    /// segun donde este el sujeto y que mas haya en el cuadro.
+    private static func componerGuia(
         caras: [VNFaceObservation],
         objetos: [VNRectangleObservation]
-    ) -> CGRect {
-        var sujeto: CGRect?
+    ) -> Guia? {
+        var nucleo: CGRect?
+        var otros: [CGRect] = []
 
-        if !caras.isEmpty {
-            for cara in caras {
-                let caja = CGRect(
-                    x: cara.boundingBox.minX,
-                    y: 1 - cara.boundingBox.maxY,
-                    width: cara.boundingBox.width,
-                    height: cara.boundingBox.height
-                )
-                sujeto = sujeto.map { $0.union(caja) } ?? caja
+        if let primera = caras.first {
+            var union = cajaArriba(primera.boundingBox)
+            for cara in caras.dropFirst() {
+                union = union.union(cajaArriba(cara.boundingBox))
             }
-        } else if let principal = objetos.max(by: {
-            $0.boundingBox.width * $0.boundingBox.height
-                < $1.boundingBox.width * $1.boundingBox.height
-        }) {
-            let caja = principal.boundingBox
-            sujeto = CGRect(
-                x: caja.minX,
-                y: 1 - caja.maxY,
-                width: caja.width,
-                height: caja.height
+            nucleo = union
+        } else if !objetos.isEmpty {
+            var indice = 0
+            for (i, objeto) in objetos.enumerated()
+            where area(objeto.boundingBox) > area(objetos[indice].boundingBox) {
+                indice = i
+            }
+
+            nucleo = cajaArriba(objetos[indice].boundingBox)
+            otros = objetos.enumerated()
+                .filter { $0.offset != indice }
+                .map { cajaArriba($0.element.boundingBox) }
+        }
+
+        guard let base = nucleo else { return nil }
+
+        let centro = CGPoint(x: base.midX, y: base.midY)
+
+        // Caja que se dibuja: en caras incluye cabeza y algo de cuerpo; en
+        // objetos, un poco de aire alrededor.
+        var ancho: CGFloat
+        var alto: CGFloat
+
+        if caras.isEmpty {
+            ancho = min(max(base.width * 1.22, 0.24), 0.80)
+            alto = min(max(base.height * 1.22, 0.24), 0.80)
+        } else {
+            ancho = min(max(base.width * 2.6, 0.32), 0.86)
+            alto = min(max(base.height * 3.0, 0.36), 0.90)
+        }
+
+        let dibujo = CGRect(
+            x: centro.x - ancho / 2,
+            y: caras.isEmpty ? centro.y - alto / 2 : centro.y - alto * 0.36,
+            width: ancho,
+            height: alto
+        )
+
+        // Cruces de tercios. Los de abajo se usan menos: casi siempre el
+        // sujeto queda mejor arriba.
+        let cruces = [
+            CGPoint(x: 1.0 / 3.0, y: 0.34),
+            CGPoint(x: 2.0 / 3.0, y: 0.34),
+            CGPoint(x: 1.0 / 3.0, y: 0.63),
+            CGPoint(x: 2.0 / 3.0, y: 0.63)
+        ]
+
+        var destino = cruces[0]
+        var mejor = Double.infinity
+
+        for cruce in cruces {
+            var puntos = hypot(cruce.x - centro.x, cruce.y - centro.y) * 1.5
+
+            // Que el sujeto no se encime con otro objeto que llama la atencion.
+            for otro in otros
+            where abs(cruce.x - otro.midX) < 0.16 && abs(cruce.y - otro.midY) < 0.20 {
+                puntos += 0.25
+            }
+
+            // En retratos los ojos van arriba.
+            if !caras.isEmpty {
+                puntos += abs(cruce.y - 0.34) * 0.9
+            }
+
+            // Quedarse del mismo lado del cuadro se siente mas natural.
+            puntos += cruce.x > 0.5
+                ? (0.5 - centro.x) * 0.24
+                : (centro.x - 0.5) * 0.24
+
+            if puntos < mejor {
+                mejor = puntos
+                destino = cruce
+            }
+        }
+
+        let dx = destino.x - centro.x
+        let dy = destino.y - centro.y
+        let cerca = abs(dx) < 0.045 && abs(dy) < 0.05
+
+        var listo = cerca
+        var partes: [String] = []
+
+        if !cerca {
+            if dx >= 0.045 {
+                partes.append(String(localized: "a la izquierda"))
+            } else if dx <= -0.045 {
+                partes.append(String(localized: "a la derecha"))
+            }
+
+            if dy >= 0.05 {
+                partes.append(String(localized: "arriba"))
+            } else if dy <= -0.05 {
+                partes.append(String(localized: "abajo"))
+            }
+        }
+
+        var instruccion: String
+
+        if listo {
+            if base.height < 0.15 {
+                listo = false
+                instruccion = String(localized: "Acércate un poco")
+            } else if base.height > 0.92 {
+                listo = false
+                instruccion = String(localized: "Aléjate un poco")
+            } else {
+                instruccion = String(localized: "Buen encuadre. Dispara.")
+            }
+        } else {
+            let direccion = partes.joined(separator: String(localized: " y "))
+            instruccion = String(
+                format: String(localized: "Mueve el teléfono %@"),
+                direccion
             )
         }
 
-        // La zona es un poco mas grande que el sujeto, con un minimo para
-        // que se vea comoda en la pantalla.
-        var ancho = min(max((sujeto?.width ?? 0.36) * 1.25, 0.30), 0.62)
-        var alto = min(max((sujeto?.height ?? 0.46) * 1.25, 0.34), 0.58)
+        return Guia(
+            sujeto: recortar(dibujo),
+            destino: destino,
+            listo: listo,
+            instruccion: instruccion
+        )
+    }
 
-        let centro = CGPoint(
-            x: sujeto?.midX ?? 0.5,
-            y: sujeto?.midY ?? 0.5
+    /// Pasa una caja de Vision (origen abajo a la izquierda) al origen
+    /// de arriba a la izquierda que usa la pantalla.
+    private static func cajaArriba(_ caja: CGRect) -> CGRect {
+        CGRect(
+            x: caja.minX,
+            y: 1 - caja.maxY,
+            width: caja.width,
+            height: caja.height
+        )
+    }
+
+    private static func area(_ caja: CGRect) -> CGFloat {
+        caja.width * caja.height
+    }
+
+    /// Deja la caja dentro del cuadro.
+    private static func recortar(_ caja: CGRect) -> CGRect {
+        let ancho = min(caja.width, 0.98)
+        let alto = min(caja.height, 0.98)
+
+        return CGRect(
+            x: min(max(caja.minX, 0.01), 0.99 - ancho),
+            y: min(max(caja.minY, 0.01), 0.99 - alto),
+            width: ancho,
+            height: alto
+        )
+    }
+
+    /// Version chiquita de la foto, para que el seguimiento sea rapido.
+    private static func reducir(_ imagen: UIImage, maximo: CGFloat) -> UIImage {
+        let mayor = max(imagen.size.width, imagen.size.height)
+        guard mayor > maximo else { return imagen }
+
+        let escala = maximo / mayor
+        let tamano = CGSize(
+            width: imagen.size.width * escala,
+            height: imagen.size.height * escala
         )
 
-        let cruces = [
-            CGPoint(x: 1.0 / 3.0, y: 1.0 / 3.0),
-            CGPoint(x: 2.0 / 3.0, y: 1.0 / 3.0),
-            CGPoint(x: 1.0 / 3.0, y: 2.0 / 3.0),
-            CGPoint(x: 2.0 / 3.0, y: 2.0 / 3.0)
-        ]
+        let formato = UIGraphicsImageRendererFormat.default()
+        formato.scale = 1
+        formato.opaque = true
 
-        let cercano = cruces.min {
-            hypot($0.x - centro.x, $0.y - centro.y)
-                < hypot($1.x - centro.x, $1.y - centro.y)
-        } ?? CGPoint(x: 1.0 / 3.0, y: 1.0 / 3.0)
-
-        let distancia = hypot(cercano.x - centro.x, cercano.y - centro.y)
-
-        // Ya cae en un tercio: se marca donde esta. Si esta centrado o
-        // perdido, se corre al cruce mas cercano.
-        let destino = distancia <= 0.10 ? centro : cercano
-
-        ancho = min(ancho, 0.94)
-        alto = min(alto, 0.94)
-
-        var x = destino.x - ancho / 2
-        var y = destino.y - alto / 2
-
-        x = min(max(x, 0.03), 0.97 - ancho)
-        y = min(max(y, 0.03), 0.97 - alto)
-
-        return CGRect(x: x, y: y, width: ancho, height: alto)
+        return UIGraphicsImageRenderer(size: tamano, format: formato).image { _ in
+            imagen.draw(in: CGRect(origin: .zero, size: tamano))
+        }
     }
 
     private static func resumenPara(_ puntaje: Int) -> String {

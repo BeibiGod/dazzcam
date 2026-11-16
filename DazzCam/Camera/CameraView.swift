@@ -25,6 +25,7 @@ struct CameraView: View {
     @State private var modoVivo = true
     @State private var anillo: CGPoint?
     @State private var analisis: Analisis?
+    @State private var guia: Guia?
     @State private var mostrarGuia = false
     @State private var tamanoGuia: CGSize?
     @State private var analizando = false
@@ -70,7 +71,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.22.0 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.23.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -126,8 +127,18 @@ struct CameraView: View {
                     }
 
                     if mostrarGuia, let analisis = analisis {
-                        barraGuia(analisis)
+                        barraGuia(analisis, guia: guia)
                             .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    }
+
+                    if analizando, !mostrarGuia {
+                        Text("Buscando tu toma...")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.55), in: Capsule())
                             .padding(.bottom, 8)
                     }
 
@@ -316,6 +327,9 @@ struct CameraView: View {
         .onDisappear {
             nivel.parar()
             camara.detener()
+        }
+        .task(id: mostrarGuia) {
+            await seguirEscena()
         }
         .onChange(of: fase) { _, nueva in
             // Al volver a entrar a la app siempre arranca en 1x y 16:9.
@@ -569,8 +583,16 @@ struct CameraView: View {
                     .padding(.vertical, barra)
             }
 
-            if mostrarGuia, let guia = analisis?.encuadre {
-                guiaDeEncuadre(guia, en: geo.size)
+            if mostrarGuia {
+                if let guia = guia {
+                    guiaDeSujeto(
+                        guia,
+                        etiqueta: analisis?.etiqueta ?? "",
+                        en: geo.size
+                    )
+                }
+            } else if analizando {
+                miraIA
             }
 
             if let punto = puntoExposicion, barraExposicionVisible {
@@ -653,56 +675,86 @@ struct CameraView: View {
 
     // MARK: - Guia de encuadre
 
-    /// Recuadro que dice donde poner al sujeto para que el cuadro quede
-    /// aesthetic. Sale al tocar IA y se puede cerrar cuando quieras.
-    private func guiaDeEncuadre(_ normalizado: CGRect, en tamano: CGSize) -> some View {
-        let rect = rectDePantalla(normalizado, en: tamano)
+    /// Recuadro que sigue al sujeto, como un aimbot: amarillo mientras hay
+    /// que moverse y verde cuando ya quedo bien. Sale al tocar IA.
+    private func guiaDeSujeto(_ guia: Guia, etiqueta: String, en tamano: CGSize) -> some View {
+        let rect = rectDePantalla(guia.sujeto, en: tamano)
+        let color = guia.listo ? Self.verdeGuia : Self.amarilloGuia
 
         return ZStack {
-            // Oscurece todo menos la zona buena, como en Framed.
-            Path { camino in
-                camino.addRect(CGRect(origin: .zero, size: tamano))
-                camino.addRoundedRect(
-                    in: rect,
-                    cornerSize: CGSize(width: 16, height: 16)
+            if !guia.listo {
+                // Oscurece todo menos al sujeto.
+                Path { camino in
+                    camino.addRect(CGRect(origin: .zero, size: tamano))
+                    camino.addRoundedRect(
+                        in: rect,
+                        cornerSize: CGSize(width: 18, height: 18)
+                    )
+                }
+                .fill(
+                    Color.black.opacity(0.42),
+                    style: FillStyle(eoFill: true)
                 )
+
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(color, lineWidth: 2.2)
+                    .frame(width: rect.width, height: rect.height)
+                    .position(x: rect.midX, y: rect.midY)
             }
-            .fill(
-                Color.black.opacity(0.42),
-                style: FillStyle(eoFill: true)
-            )
 
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.white.opacity(0.30), lineWidth: 1)
-                .frame(width: rect.width, height: rect.height)
-                .position(x: rect.midX, y: rect.midY)
-
-            esquinasDeGuia(rect)
-                .stroke(
-                    Color(red: 1.0, green: 0.30, blue: 0.55),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-
-            Text("ENCUADRA AQUÍ")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(
-                    Color(red: 1.0, green: 0.30, blue: 0.55),
-                    in: Capsule()
-                )
+            etiquetaSujeto(etiqueta, color: color)
                 .position(
-                    x: rect.midX,
-                    y: rect.minY > 96 ? rect.minY - 18 : rect.minY + 18
+                    x: min(max(rect.midX, 84), tamano.width - 84),
+                    y: (rect.maxY + 20 > tamano.height - 196)
+                        ? rect.minY - 16
+                        : rect.maxY + 20
                 )
         }
+        .allowsHitTesting(false)
+    }
+
+    /// Nombre de lo que la IA esta viendo, pegado a la caja.
+    private func etiquetaSujeto(_ texto: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+
+            Text(texto)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(color)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.38), in: Capsule())
+    }
+
+    /// Mira chiquita mientras la IA busca al sujeto.
+    private var miraIA: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                .frame(width: 30, height: 30)
+
+            Rectangle()
+                .fill(Color.white.opacity(0.85))
+                .frame(width: 1, height: 12)
+
+            Rectangle()
+                .fill(Color.white.opacity(0.85))
+                .frame(width: 12, height: 1)
+        }
+        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
         .allowsHitTesting(false)
         .transition(.opacity)
     }
 
-    /// Pasa el recuadro de la foto analizada a la pantalla. La vista previa
-    /// se dibuja recortada (scaledToFill), asi que se hace la misma cuenta.
+    private static let amarilloGuia = Color(red: 1.0, green: 0.86, blue: 0.18)
+    private static let verdeGuia = Color(red: 0.28, green: 0.95, blue: 0.45)
+
+    /// Pasa una caja de la foto analizada a la pantalla. La vista previa se
+    /// dibuja recortada (scaledToFill), asi que se hace la misma cuenta.
     private func rectDePantalla(_ normalizado: CGRect, en tamano: CGSize) -> CGRect {
         let foto = tamanoGuia ?? vivo.imagen?.size ?? CGSize(width: 9, height: 16)
 
@@ -718,106 +770,80 @@ struct CameraView: View {
         let x0 = (tamano.width - dibujo.width) / 2
         let y0 = (tamano.height - dibujo.height) / 2
 
-        var caja = CGRect(
+        return CGRect(
             x: x0 + normalizado.minX * dibujo.width,
             y: y0 + normalizado.minY * dibujo.height,
             width: normalizado.width * dibujo.width,
             height: normalizado.height * dibujo.height
         )
-
-        // Que no se meta debajo del encabezado ni de los botones de abajo.
-        let arriba = insetArriba + 18
-        let abajo = tamano.height - insetAbajo - 206
-
-        if caja.maxY > abajo {
-            caja.origin.y = max(arriba, abajo - caja.height)
-        }
-        if caja.minY < arriba {
-            caja.origin.y = arriba
-        }
-
-        // Y que no se salga de los lados.
-        if caja.maxX > tamano.width - 12 {
-            caja.origin.x = tamano.width - 12 - caja.width
-        }
-        if caja.minX < 12 {
-            caja.origin.x = 12
-        }
-
-        return caja
     }
 
-    /// Las cuatro esquinas del recuadro, como las marcas de una camara.
-    private func esquinasDeGuia(_ rect: CGRect) -> Path {
-        var camino = Path()
-        let largo = max(min(min(rect.width, rect.height) * 0.22, 30), 10)
-        let corto = min(largo, min(rect.width, rect.height) / 2)
+    /// Instruccion grande y pastilla con el puntaje, las camaras y la X.
+    private func barraGuia(_ analisis: Analisis, guia: Guia?) -> some View {
+        VStack(spacing: 7) {
+            if let guia = guia {
+                Text(guia.instruccion)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(
+                        guia.listo ? Self.verdeGuia : Self.amarilloGuia
+                    )
+                    .multilineTextAlignment(.center)
+                    .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
+            } else {
+                Text("No veo un sujeto claro: apunta a algo con detalle.")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                    .shadow(color: .black.opacity(0.7), radius: 3, x: 1, y: 1)
+            }
 
-        camino.move(to: CGPoint(x: rect.minX, y: rect.minY + corto))
-        camino.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        camino.addLine(to: CGPoint(x: rect.minX + corto, y: rect.minY))
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        (guia?.listo ?? false) ? Self.verdeGuia : Self.amarilloGuia
+                    )
 
-        camino.move(to: CGPoint(x: rect.maxX - corto, y: rect.minY))
-        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + corto))
+                Text("\(analisis.puntaje)")
+                    .font(.system(size: 13, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
 
-        camino.move(to: CGPoint(x: rect.maxX, y: rect.maxY - corto))
-        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        camino.addLine(to: CGPoint(x: rect.maxX - corto, y: rect.maxY))
-
-        camino.move(to: CGPoint(x: rect.minX + corto, y: rect.maxY))
-        camino.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        camino.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - corto))
-
-        return camino
-    }
-
-    /// Pastilla con el puntaje, el acceso a las camaras y la X para cerrar.
-    private func barraGuia(_ analisis: Analisis) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color(red: 1.0, green: 0.30, blue: 0.55))
-
-            Text("\(analisis.puntaje)")
-                .font(.system(size: 13, weight: .heavy, design: .monospaced))
-                .foregroundStyle(.white)
-                .monospacedDigit()
-
-            Text("AESTHETIC")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.55))
-
-            Spacer(minLength: 6)
-
-            Button {
-                mostrarIA = true
-            } label: {
-                Text("CÁMARAS")
+                Text("AESTHETIC")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white, in: Capsule())
-            }
-            .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.55))
 
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    mostrarGuia = false
+                Spacer(minLength: 6)
+
+                Button {
+                    mostrarIA = true
+                } label: {
+                    Text("CÁMARAS")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white, in: Capsule())
                 }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.14), in: Circle())
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        mostrarGuia = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 24, height: 24)
+                        .background(Color.white.opacity(0.14), in: Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.6), in: Capsule())
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(.black.opacity(0.6), in: Capsule())
     }
 
     // MARK: - Encabezado
@@ -1153,6 +1179,28 @@ struct CameraView: View {
         }
     }
 
+    /// Mientras la guia esta abierta, vuelve a mirar la escena cada segundo
+    /// para que la caja siga al sujeto y la instruccion cambie en vivo.
+    private func seguirEscena() async {
+        guard mostrarGuia else { return }
+
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            guard !Task.isCancelled, mostrarGuia else { return }
+            guard !analizando else { continue }
+            guard let imagen = vivo.imagen else { continue }
+
+            guard let nueva = await AestheticAnalyzer.seguir(imagen) else { continue }
+            guard !Task.isCancelled, mostrarGuia else { return }
+
+            tamanoGuia = imagen.size
+
+            withAnimation(.easeOut(duration: 0.22)) {
+                guia = nueva
+            }
+        }
+    }
+
     private func analizarEscena() {
         guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
             aviso = String(localized: "La camara todavia no tiene imagen")
@@ -1176,6 +1224,7 @@ struct CameraView: View {
 
             analisis = resultado
             tamanoGuia = imagen.size
+            guia = resultado.guia
 
             // El recuadro sale en el visor; las camaras quedan a un toque.
             withAnimation(.easeOut(duration: 0.25)) {
