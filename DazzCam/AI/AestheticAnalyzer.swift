@@ -61,6 +61,7 @@ enum AestheticAnalyzer {
                     luz: medidas.luz,
                     contraste: medidas.contraste,
                     color: medidas.color,
+                    calidez: medidas.calidez,
                     caras: caras,
                     objetos: objetos ?? [],
                     etiquetas: Array(etiquetas),
@@ -78,6 +79,7 @@ enum AestheticAnalyzer {
         luz: Double,
         contraste: Double,
         color: Double,
+        calidez: Double,
         caras: [VNFaceObservation],
         objetos: [VNRectangleObservation],
         etiquetas: [String],
@@ -159,6 +161,13 @@ enum AestheticAnalyzer {
             ))
         }
 
+        // 7. consejos de luz: cortos y utiles.
+        if luz > 0.78 {
+            consejos.append(String(localized: "Hay mucha luz: baja un poco la exposicion para no quemar el cielo."))
+        } else if luz < 0.20 {
+            consejos.append(String(localized: "Hay poca luz: acerca o prende el flash calido."))
+        }
+
         if consejos.isEmpty {
             consejos.append(String(localized: "Todo bien: dispara y elige el look que mas te guste."))
         }
@@ -176,7 +185,9 @@ enum AestheticAnalyzer {
                 etiquetas: etiquetas,
                 caras: carasCount,
                 luz: luz,
+                contraste: contraste,
                 color: color,
+                calidez: calidez,
                 horizonte: inclinacion
             ),
             luz: Int((luz * 100).rounded()),
@@ -200,7 +211,9 @@ enum AestheticAnalyzer {
         etiquetas: [String],
         caras: Int,
         luz: Double,
+        contraste: Double,
         color: Double,
+        calidez: Double,
         horizonte: Double
     ) -> [FilterPreset] {
         let texto = etiquetas.joined(separator: " ")
@@ -222,6 +235,35 @@ enum AestheticAnalyzer {
             agregar(.tealNight)
             agregar(.y2kDigi)
             agregar(.noir)
+        }
+
+        // con mucho sol, peliculas que aguantan sin quemarse
+        if luz > 0.72 {
+            agregar(.ektar100)
+            agregar(.velvia)
+            agregar(.provia)
+        }
+
+        // escena calida: refuerza con rollo tibio. Fria: contrasta con frio.
+        if calidez > 0.05 {
+            agregar(.kodakGold)
+            agregar(.portra)
+            agregar(.goldenHour)
+        } else if calidez < -0.05 {
+            agregar(.cinestill)
+            agregar(.tealNight)
+            agregar(.provia)
+        }
+
+        // mucho contraste: peliculas suaves. Plano: sube el contraste.
+        if contraste > 0.26 {
+            agregar(.portra)
+            agregar(.fujiPro400)
+            agregar(.polaroid600)
+        } else if contraste < 0.09 {
+            agregar(.kodachrome)
+            agregar(.ektar100)
+            agregar(.bleachBypass)
         }
 
         // hay gente: pelicula de retrato
@@ -284,13 +326,37 @@ enum AestheticAnalyzer {
         agregar(.kodakGold)
         agregar(.polaroid600)
 
-        return Array(lista.prefix(3))
+        // Que no salgan tres de la misma familia: una compacta, una reflex o
+        // una instantanea. Asi la eleccion se siente variada y no repetida.
+        var elegidas: [FilterPreset] = []
+        var familias: Set<String> = []
+
+        for preset in lista where !elegidas.contains(preset) {
+            let familia = String(describing: preset.familia)
+            if !familias.contains(familia) {
+                elegidas.append(preset)
+                familias.insert(familia)
+            }
+            if elegidas.count == 3 { break }
+        }
+
+        if elegidas.count < 3 {
+            for preset in lista where !elegidas.contains(preset) {
+                elegidas.append(preset)
+                if elegidas.count == 3 { break }
+            }
+        }
+
+        return Array(elegidas.prefix(3))
     }
 
     // MARK: - Medidas de la imagen
 
-    /// Reduce la foto a 32x32 y mide luz, contraste y color. Rapido y suficiente.
-    private static func metricas(_ imagen: UIImage) -> (luz: Double, contraste: Double, color: Double) {
+    /// Reduce la foto a 32x32 y mide luz, contraste, color y calidez.
+    /// Rapido y suficiente.
+    private static func metricas(
+        _ imagen: UIImage
+    ) -> (luz: Double, contraste: Double, color: Double, calidez: Double) {
         let lado = 32
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = 1
@@ -302,7 +368,7 @@ enum AestheticAnalyzer {
         let chica = renderer.image { _ in
             imagen.draw(in: CGRect(x: 0, y: 0, width: lado, height: lado))
         }
-        guard let cg = chica.cgImage else { return (0.5, 0.1, 0.2) }
+        guard let cg = chica.cgImage else { return (0.5, 0.1, 0.2, 0) }
 
         let bytes = lado * lado * 4
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bytes)
@@ -317,7 +383,7 @@ enum AestheticAnalyzer {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            return (0.5, 0.1, 0.2)
+            return (0.5, 0.1, 0.2, 0)
         }
 
         contexto.draw(cg, in: CGRect(x: 0, y: 0, width: lado, height: lado))
@@ -325,6 +391,7 @@ enum AestheticAnalyzer {
         var suma = 0.0
         var sumaCuadrados = 0.0
         var sumaColor = 0.0
+        var sumaCalidez = 0.0
         let total = Double(lado * lado)
 
         for i in stride(from: 0, to: bytes, by: 4) {
@@ -339,11 +406,17 @@ enum AestheticAnalyzer {
             let maximo = max(r, max(g, b))
             let minimo = min(r, min(g, b))
             sumaColor += (maximo - minimo)
+            sumaCalidez += (r - b)
         }
 
         let media = suma / total
         let varianza = max(sumaCuadrados / total - media * media, 0)
 
-        return (media, varianza.squareRoot(), sumaColor / total)
+        return (
+            media,
+            varianza.squareRoot(),
+            sumaColor / total,
+            sumaCalidez / total
+        )
     }
 }

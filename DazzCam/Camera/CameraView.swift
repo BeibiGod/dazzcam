@@ -59,13 +59,29 @@ struct CameraView: View {
     @State private var semillaVivo = UInt64.random(in: 1...UInt64.max)
     @State private var semillaVideo: UInt64 = 0
 
+    /// Al abrir, retoma la ultima camara, fecha y look que dejo el usuario.
+    init() {
+        let guardado = Preferencias.cargar()
+        _preset = State(initialValue: guardado?.preset ?? .dazzClassic)
+        _sello = State(initialValue: guardado?.sello ?? .dazz)
+        _controles = State(initialValue: guardado?.controles ?? ControlesLook())
+    }
+
     private var versionTexto: String {
-        "v1.20.0 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.21.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
         guard modoVivo else { return "VIVO" }
         return vivo.cuadrosPorSegundo > 0 ? "VIVO \(vivo.cuadrosPorSegundo)" : "VIVO"
+    }
+
+    private func guardarPreferencias() {
+        Preferencias.guardar(
+            preset: preset,
+            sello: sello,
+            controles: controles
+        )
     }
 
     var body: some View {
@@ -298,17 +314,23 @@ struct CameraView: View {
         }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
+            // Cada camara prende su sello y su tipografia, como de fabrica.
+            sello = nuevo.selloDeFabrica
+            controles.estiloFecha = nuevo.estiloDeFecha
+            guardarPreferencias()
             if mostrarCaptura {
                 programarRecalculo()
             }
         }
         .onChange(of: controles) { _, nuevo in
             vivo.controles = nuevo
+            guardarPreferencias()
             if mostrarCaptura {
                 programarRecalculo()
             }
         }
         .onChange(of: sello) { _, _ in
+            guardarPreferencias()
             if mostrarCaptura {
                 programarRecalculo()
             }

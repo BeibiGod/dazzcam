@@ -99,6 +99,8 @@
 "Hay varias caras: acerca o enfoca a una sola." = "Several faces: move closer or focus on one.";
 "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula." = "The horizon is %.0f degrees tilted: use the grid level.";
 "Todo bien: dispara y elige el look que mas te guste." = "All good: shoot and pick the look you like most.";
+"Hay mucha luz: baja un poco la exposicion para no quemar el cielo." = "Lots of light: turn the exposure down a bit so the sky does not blow out.";
+"Hay poca luz: acerca o prende el flash calido." = "Low light: get closer or turn on the warm flash.";
 "Muy aesthetic. Dispara ya." = "Very aesthetic. Shoot now.";
 "Buen cuadro. Elige una de estas camaras." = "Good frame. Pick one of these cameras.";
 "Listo para disparar. Cualquiera de estas le queda." = "Ready to shoot. Any of these fits.";

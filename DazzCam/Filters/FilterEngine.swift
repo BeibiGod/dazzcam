@@ -18,7 +18,7 @@ struct AjusteFoto {
 }
 
 /// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
-struct ControlesLook: Equatable {
+struct ControlesLook: Equatable, Codable {
     var intensidad: CGFloat = 1
     var rayones: CGFloat? = nil
     var fuga: CGFloat? = nil

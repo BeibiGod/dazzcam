@@ -4,7 +4,7 @@ import UIKit
 
 /// Tipografia de la fecha quemada. Son los sellos que se ven en las camaras
 /// de rollo y en las apps tipo DazzCam.
-enum EstiloFecha: String, CaseIterable, Identifiable {
+enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
     case dazz
     case digital
     case maquina
@@ -41,28 +41,19 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fuente del sistema mas parecida a cada sello. Los sellos digitales usan
-    /// Silkscreen (la pixelada que va dentro de la app). Si no carga, cae en la
-    /// monoespaciada para no romper nada.
+    /// Todas pixeladas, como los sellos de las camaras viejas. Silkscreen va
+    /// dentro de la app; el peso cambia para que no se vean todas iguales.
     func fuente(_ tamano: CGFloat) -> UIFont {
-        let nombre: String
+        let negrita: Bool
 
         switch self {
-        case .dazz, .digital, .neon, .dosMil:
-            nombre = "Silkscreen-Bold"
-        case .futura, .plata, .noventa:
-            nombre = "Silkscreen-Regular"
-        case .maquina:
-            nombre = "Courier-Bold"
-        case .clasico:
-            nombre = "Georgia-Bold"
-        case .mano:
-            nombre = "Noteworthy-Bold"
-        case .ambar:
-            nombre = "AmericanTypewriter-Bold"
-        case .rosa:
-            nombre = "Copperplate-Bold"
+        case .dazz, .digital, .maquina, .neon, .ambar, .dosMil:
+            negrita = true
+        case .clasico, .futura, .mano, .plata, .rosa, .noventa:
+            negrita = false
         }
+
+        let nombre = negrita ? "Silkscreen-Bold" : "Silkscreen-Regular"
 
         if let fuente = UIFont(name: nombre, size: tamano) {
             return fuente
@@ -125,7 +116,7 @@ enum EstiloFecha: String, CaseIterable, Identifiable {
 }
 
 /// Marca de fecha y hora, como las camaras viejitas.
-enum SelloFecha: String, CaseIterable, Identifiable {
+enum SelloFecha: String, CaseIterable, Identifiable, Codable {
     case apagado
     case dazz
     case dazzHora

@@ -28,7 +28,7 @@ enum FamiliaCamara {
 }
 
 /// Las "camaritas": cada una es un look de pelicula completo.
-enum FilterPreset: String, CaseIterable, Identifiable {
+enum FilterPreset: String, CaseIterable, Identifiable, Codable {
     case original
     case portra
     case superia
@@ -310,6 +310,90 @@ enum FilterPreset: String, CaseIterable, Identifiable {
         case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave,
              .chatarraCCD, .y2kDigi, .ismNight, .disco, .neonDream:
             return .underground
+        }
+    }
+
+    /// Sello que traia la camara de verdad. Las que no tenian respaldo de
+    /// fecha arrancan apagadas; se pueden prender a mano cuando quieras.
+    var selloDeFabrica: SelloFecha {
+        switch self {
+        // Sin fecha: instantaneas, desechables, Lomo y reflex mecanicas.
+        case .original, .polaroid600, .sx70, .instaxMini, .instaxWide,
+             .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono,
+             .tezzaPolaroid, .oldRollInstant, .oldRoll35, .oldRollFlash,
+             .oldRoll8, .disposable, .lomo, .nikonFm2, .praktica, .zenit12:
+            return .apagado
+
+        // Digitales y videocamaras: año completo, como en los 2000.
+        case .y2kDigi, .chatarraCCD, .vhs, .d3d, .disco, .vaporwave,
+             .neonDream, .tealNight, .ismNight:
+            return .anio
+
+        // Las reconocidas por su respaldo de fecha de los 90.
+        case .contaxT2, .yashicaT4, .olympusMju, .canonSure, .kodakVR,
+             .agfaOptima:
+            return .dazz
+
+        // El resto: fecha corta, como la mayoria de las compactas.
+        default:
+            return .dazz
+        }
+    }
+
+    /// Tipografia y color con los que esa camara quema la fecha. Van con su
+    /// caracter: calidas las de rollo, frias las digitales, plata las de B y N.
+    var estiloDeFecha: EstiloFecha {
+        switch self {
+        // ---- calidas de rollo ----
+        case .kodakGold, .ultramax, .goldenHour, .contaxT2, .kodakVR,
+             .dazzClassic, .sepiaViejo:
+            return .dazz
+
+        case .portra, .warmFlash, .yashicaT4, .riviera92, .tezzaWarm,
+             .faded90s:
+            return .ambar
+
+        case .olympusMju, .instColor, .framedSoft, .framedFade, .ismCream,
+             .latte:
+            return .maquina
+
+        case .superia, .canonSure, .tezzaGrain:
+            return .clasico
+
+        // ---- rojas y rosas ----
+        case .agfaVista, .agfaOptima, .kodachrome, .ektar100, .copper,
+             .velvia:
+            return .digital
+
+        case .sakura, .ismPastel, .crossProcess, .vaporwave, .disco:
+            return .rosa
+
+        // ---- frias y digitales ----
+        case .vhs, .tealNight, .cinestill, .cinestill50d, .oceanFade,
+             .cinemaTeal:
+            return .noventa
+
+        case .y2kDigi, .chatarraCCD, .d3d, .jackboys:
+            return .dosMil
+
+        case .neonDream, .swagLive, .fujiPro400, .fujiC200, .provia:
+            return .neon
+
+        // ---- plata y blanco para B y N ----
+        case .hp5, .delta3200, .triX, .tmax, .bleachBypass, .ektachrome,
+             .tezzaClean:
+            return .plata
+
+        case .noir, .milk:
+            return .futura
+
+        // ---- apagadas: el estilo queda listo por si la prendes ----
+        case .original, .polaroid600, .sx70, .instaxMini, .instaxWide,
+             .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono,
+             .tezzaPolaroid, .oldRollInstant, .oldRoll35, .oldRollFlash,
+             .oldRoll8, .disposable, .lomo, .nikonFm2, .praktica, .zenit12,
+             .ismNight:
+            return .plata
         }
     }
 

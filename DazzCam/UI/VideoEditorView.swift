@@ -116,6 +116,8 @@ struct VideoEditorView: View {
                         }
                         .frame(height: 56)
                         .onChange(of: preset) { _, nuevo in
+                            sello = nuevo.selloDeFabrica
+                            ajustes.estiloFecha = nuevo.estiloDeFecha
                             withAnimation(.easeOut(duration: 0.22)) {
                                 proxy.scrollTo(nuevo, anchor: .center)
                             }
