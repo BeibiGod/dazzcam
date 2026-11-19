@@ -38,9 +38,8 @@ final class RastreadorSujeto: ObservableObject {
     private var ocupado = false
     private var ultimo: CFAbsoluteTime = 0
 
-    /// Unos 24 cuadros por segundo: se siente pegado a la mano y no gasta
-    /// bateria de mas.
-    private let intervalo: CFAbsoluteTime = 1.0 / 24.0
+    /// Rapido para que el recuadro se sienta pegado al sujeto.
+    private let intervalo: CFAbsoluteTime = 1.0 / 30.0
 
     // MARK: - Encendido
 
@@ -181,6 +180,7 @@ final class RastreadorSujeto: ObservableObject {
         _ buffer: CVPixelBuffer
     ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
         let caras = VNDetectFaceRectanglesRequest()
+        let personas = VNDetectHumanRectanglesRequest()
         let saliencia = VNGenerateAttentionBasedSaliencyImageRequest()
         let manejador = VNImageRequestHandler(
             cvPixelBuffer: buffer,
@@ -189,27 +189,69 @@ final class RastreadorSujeto: ObservableObject {
         )
 
         do {
-            try manejador.perform([caras, saliencia])
+            try manejador.perform([caras, personas, saliencia])
         } catch {
             return nil
         }
 
-        if let cara = (caras.results ?? []).max(by: {
-            area($0.boundingBox) < area($1.boundingBox)
-        }) {
+        // Cara = sujeto mas claro (retrato).
+        if let cara = mejor(caras.results ?? [], preferido: nil) {
             return (cara, true)
         }
 
-        let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?
-            .salientObjects ?? []
-
-        guard let mayor = objetos.max(by: {
-            area($0.boundingBox) < area($1.boundingBox)
-        }) else {
-            return nil
+        // Persona completa.
+        if let persona = mejor(personas.results ?? [], preferido: ultimaCaja) {
+            return (persona, false)
         }
 
-        return (mayor, false)
+        // Lo que mas llama la atencion en el cuadro.
+        let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?
+            .salientObjects ?? []
+        if let objeto = mejor(objetos, preferido: ultimaCaja) {
+            return (objeto, false)
+        }
+
+        return nil
+    }
+
+    /// Elige la mejor deteccion: si ya seguiamos algo, prefiere la que queda
+    /// cerca de donde iba para no saltar a otro sujeto.
+    private func mejor(
+        _ observaciones: [VNDetectedObjectObservation],
+        preferido: CGRect?
+    ) -> VNDetectedObjectObservation? {
+        guard !observaciones.isEmpty else { return nil }
+
+        if let preferido = preferido {
+            let centro = CGPoint(x: preferido.midX, y: 1 - preferido.midY)
+
+            return observaciones.max { a, b in
+                puntaje(a, cercaDe: centro, anterior: preferido)
+                    < puntaje(b, cercaDe: centro, anterior: preferido)
+            }
+        }
+
+        return observaciones.max(by: { area($0.boundingBox) < area($1.boundingBox) })
+    }
+
+    private func puntaje(
+        _ obs: VNDetectedObjectObservation,
+        cercaDe centro: CGPoint,
+        anterior: CGRect
+    ) -> CGFloat {
+        let caja = obs.boundingBox
+        let c = CGPoint(x: caja.midX, y: caja.midY)
+        let dist = hypot(c.x - centro.x, c.y - centro.y)
+        let tam = area(caja)
+        let tamAnterior = max(areaVision(anterior), 0.001)
+        let parecido = 1 - min(abs(tam - tamAnterior) / tamAnterior, 1)
+
+        // Cerca y de tamano parecido gana; el tamano ayuda a desempatar.
+        return (1 - min(dist, 1)) * 1.4 + parecido * 0.4 + min(tam * 4, 1) * 0.2
+    }
+
+    private func areaVision(_ cajaTopLeft: CGRect) -> CGFloat {
+        cajaTopLeft.width * cajaTopLeft.height
     }
 
     /// Pasa la caja a coordenadas de pantalla y la suaviza para que no tiemble.

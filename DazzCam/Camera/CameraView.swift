@@ -75,7 +75,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.3 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.4 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -761,6 +761,7 @@ struct CameraView: View {
     private func guiaDeSujeto(_ guia: Guia, etiqueta: String, en tamano: CGSize) -> some View {
         let rect = rectDePantalla(guia.sujeto, en: tamano)
         let color = guia.listo ? Self.verdeGuia : Self.amarilloGuia
+        let objetivo = puntoDePantalla(guia.destino, en: tamano)
 
         return ZStack {
             if !guia.listo {
@@ -773,9 +774,20 @@ struct CameraView: View {
                     )
                 }
                 .fill(
-                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.16),
                     style: FillStyle(eoFill: true)
                 )
+
+                // Punto de destino: donde debe quedar el sujeto.
+                ZStack {
+                    Circle()
+                        .stroke(color.opacity(0.9), lineWidth: 1.5)
+                        .frame(width: 22, height: 22)
+                    Circle()
+                        .fill(color.opacity(0.95))
+                        .frame(width: 5, height: 5)
+                }
+                .position(objetivo)
             }
 
             RoundedRectangle(cornerRadius: 14)
@@ -794,6 +806,29 @@ struct CameraView: View {
         }
         .animation(.easeOut(duration: 0.18), value: guia.listo)
         .allowsHitTesting(false)
+    }
+
+    /// Pasa un punto normalizado de la foto a la pantalla (misma proyeccion que
+    /// la vista previa recortada).
+    private func puntoDePantalla(_ normalizado: CGPoint, en tamano: CGSize) -> CGPoint {
+        let foto = tamanoGuia ?? vivo.imagen?.size ?? CGSize(width: 9, height: 16)
+
+        guard foto.width > 1, foto.height > 1 else {
+            return CGPoint(x: tamano.width / 2, y: tamano.height / 2)
+        }
+
+        let escala = max(tamano.width / foto.width, tamano.height / foto.height)
+        let dibujo = CGSize(
+            width: foto.width * escala,
+            height: foto.height * escala
+        )
+        let x0 = (tamano.width - dibujo.width) / 2
+        let y0 = (tamano.height - dibujo.height) / 2
+
+        return CGPoint(
+            x: x0 + normalizado.x * dibujo.width,
+            y: y0 + normalizado.y * dibujo.height
+        )
     }
 
     /// Nombre de lo que la IA esta viendo, pegado a la caja.
