@@ -35,6 +35,8 @@ final class RastreadorSujeto: ObservableObject {
     private var ultimaCaja: CGRect?
     private var ultimaCara = false
     private var generacion = 0
+    private var ultimaDeteccion: CFAbsoluteTime = 0
+    private var ultimaVezVisto: CFAbsoluteTime = 0
 
     private var ocupado = false
     private var ultimo: CFAbsoluteTime = 0
@@ -61,6 +63,8 @@ final class RastreadorSujeto: ObservableObject {
             self.cuadrosSeguidos = 0
             self.ultimaCaja = nil
             self.ultimaCara = false
+            self.ultimaDeteccion = 0
+            self.ultimaVezVisto = 0
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -148,12 +152,17 @@ final class RastreadorSujeto: ObservableObject {
                 peticion.inputObservation = observacion
                 perdidos = 0
                 cuadrosSeguidos += 1
+                ultimaVezVisto = CFAbsoluteTimeGetCurrent()
 
-                // Cada cierto tiempo re-detecta para corregir deriva, pero
-                // manteniendo la misma zona si sigue ahi.
-                if cuadrosSeguidos >= 75 {
-                    self.peticion = nil
+                // Corrige deriva cada cierto tiempo, pero solo si la deteccion
+                // sigue cerca del sujeto que ya estamos siguiendo.
+                if cuadrosSeguidos >= 45 {
                     cuadrosSeguidos = 0
+                    if let corregido = corregirDeriva(buffer, actual: observacion.boundingBox) {
+                        peticion.inputObservation = corregido.objeto
+                        ultimaCara = corregido.esCara
+                        return publicar(corregido.objeto.boundingBox, esCara: corregido.esCara)
+                    }
                 }
 
                 return publicar(observacion.boundingBox, esCara: ultimaCara)
@@ -161,31 +170,64 @@ final class RastreadorSujeto: ObservableObject {
 
             perdidos += 1
 
-            // Un par de cuadros malos no borran la caja: se queda quieta
-            // mientras Vision se recupera.
-            if perdidos < 6, let ultimaCaja {
+            // Unos cuadros malos no borran la caja: se queda quieta mientras
+            // Vision se recupera.
+            if perdidos < 8, let ultimaCaja {
                 return Resultado(caja: ultimaCaja, esCara: ultimaCara)
             }
 
             self.peticion = nil
         }
 
-        // Se perdio: se busca otra vez, cara primero y despues lo que mas
-        // llama la atencion en el cuadro.
-        guard let encontrado = detectar(buffer) else {
+        // Se perdio: busca de nuevo, sin hacerlo a cada instante.
+        let ahora = CFAbsoluteTimeGetCurrent()
+        guard ahora - ultimaDeteccion >= 0.35 else {
+            if let ultimaCaja, ahora - ultimaVezVisto < 2.0 {
+                return Resultado(caja: ultimaCaja, esCara: ultimaCara)
+            }
             ultimaCaja = nil
+            return nil
+        }
+        ultimaDeteccion = ahora
+
+        guard let encontrado = detectar(buffer) else {
+            if ultimaVezVisto == 0 || ahora - ultimaVezVisto > 2.0 {
+                ultimaCaja = nil
+                return nil
+            }
+            if let ultimaCaja {
+                return Resultado(caja: ultimaCaja, esCara: ultimaCara)
+            }
             return nil
         }
 
         perdidos = 0
         cuadrosSeguidos = 0
         ultimaCara = encontrado.esCara
+        ultimaVezVisto = ahora
 
         let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
         nueva.trackingLevel = .accurate
         peticion = nueva
 
         return publicar(encontrado.objeto.boundingBox, esCara: encontrado.esCara)
+    }
+
+    /// Re-detecta para corregir la deriva del tracker, pero solo acepta si
+    /// la deteccion sigue cerca de lo que ya se estaba siguiendo.
+    private func corregirDeriva(
+        _ buffer: CVPixelBuffer,
+        actual: CGRect
+    ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
+        guard let encontrado = detectar(buffer) else { return nil }
+
+        let c1 = CGPoint(x: actual.midX, y: actual.midY)
+        let c2 = CGPoint(x: encontrado.objeto.boundingBox.midX, y: encontrado.objeto.boundingBox.midY)
+        let dist = hypot(c1.x - c2.x, c1.y - c2.y)
+
+        // Si la deteccion fresca esta cerca, la usamos para anclar el tracker.
+        guard dist < 0.18 else { return nil }
+        return encontrado
     }
 
     private func detectar(

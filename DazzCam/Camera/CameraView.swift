@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.9 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.10 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -385,6 +385,8 @@ struct CameraView: View {
                 rastreador.parar()
                 zoomIA = nil
                 halago = nil
+                guia = nil
+                analisis = nil
                 volvioA1x = true
                 sujetoEsCara = false
             }
