@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.11 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.12 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -810,6 +810,8 @@ struct CameraView: View {
                 )
         }
         .animation(.easeOut(duration: 0.16), value: guia.listo)
+        .animation(.easeOut(duration: 0.12), value: rect.midX)
+        .animation(.easeOut(duration: 0.12), value: rect.midY)
         .allowsHitTesting(false)
     }
 

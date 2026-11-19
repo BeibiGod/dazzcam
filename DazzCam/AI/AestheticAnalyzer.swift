@@ -362,7 +362,11 @@ enum AestheticAnalyzer {
             // Mantener el mismo destino evita que el punto salte de lado.
             if let anterior = destinoAnterior {
                 let salto = hypot(cruce.x - anterior.x, cruce.y - anterior.y)
-                puntos += salto > 0.1 ? salto * 0.55 : 0
+                if salto < 0.05 {
+                    puntos -= 0.18
+                } else if salto > 0.1 {
+                    puntos += salto * 0.9
+                }
             }
 
             if puntos < mejor {

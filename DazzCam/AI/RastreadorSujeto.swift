@@ -42,7 +42,7 @@ final class RastreadorSujeto: ObservableObject {
     private var ultimo: CFAbsoluteTime = 0
 
     /// Rapido para que el recuadro se sienta pegado al sujeto.
-    private let intervalo: CFAbsoluteTime = 1.0 / 30.0
+    private let intervalo: CFAbsoluteTime = 1.0 / 24.0
 
     // MARK: - Encendido
 
@@ -148,7 +148,7 @@ final class RastreadorSujeto: ObservableObject {
             }
 
             if let observacion = peticion.results?.first as? VNDetectedObjectObservation,
-               observacion.confidence >= 0.3 {
+               observacion.confidence >= 0.25 {
                 peticion.inputObservation = observacion
                 perdidos = 0
                 cuadrosSeguidos += 1
@@ -156,7 +156,7 @@ final class RastreadorSujeto: ObservableObject {
 
                 // Corrige deriva cada cierto tiempo, pero solo si la deteccion
                 // sigue cerca del sujeto que ya estamos siguiendo.
-                if cuadrosSeguidos >= 45 {
+                if cuadrosSeguidos >= 60 {
                     cuadrosSeguidos = 0
                     if let corregido = corregirDeriva(buffer, actual: observacion.boundingBox) {
                         peticion.inputObservation = corregido.objeto
@@ -170,9 +170,31 @@ final class RastreadorSujeto: ObservableObject {
 
             perdidos += 1
 
+            // Si falla varias veces seguidas, intenta re-detectar antes de rendirse.
+            if perdidos >= 3 && perdidos < 10 {
+                let ahora = CFAbsoluteTimeGetCurrent()
+                if ahora - ultimaDeteccion >= 0.45, let encontrado = detectar(buffer) {
+                    ultimaDeteccion = ahora
+                    let dist = hypot(
+                        encontrado.objeto.boundingBox.midX - (ultimaCaja.map { $0.midX } ?? encontrado.objeto.boundingBox.midX),
+                        encontrado.objeto.boundingBox.midY - (ultimaCaja.map { 1 - $0.midY } ?? encontrado.objeto.boundingBox.midY)
+                    )
+                    if ultimaCaja == nil || dist < 0.25 {
+                        perdidos = 0
+                        cuadrosSeguidos = 0
+                        ultimaCara = encontrado.esCara
+                        ultimaVezVisto = ahora
+                        let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
+                        nueva.trackingLevel = .accurate
+                        self.peticion = nueva
+                        return publicar(encontrado.objeto.boundingBox, esCara: encontrado.esCara)
+                    }
+                }
+            }
+
             // Unos cuadros malos no borran la caja: se queda quieta mientras
             // Vision se recupera.
-            if perdidos < 8, let ultimaCaja {
+            if perdidos < 10, let ultimaCaja {
                 return Resultado(caja: ultimaCaja, esCara: ultimaCara)
             }
 
@@ -380,13 +402,14 @@ final class RastreadorSujeto: ObservableObject {
         let suave: CGRect
 
         if let anterior = ultimaCaja, anterior.width > 0.001 {
-            // Sigue rapido al sujeto, con solo un poco de suavizado.
-            let peso: CGFloat = 0.72
+            // Posicion responde rapido, tamano cambia mas suave para evitar temblor.
+            let pesoPos: CGFloat = 0.58
+            let pesoTam: CGFloat = 0.35
             suave = CGRect(
-                x: anterior.minX + (nueva.minX - anterior.minX) * peso,
-                y: anterior.minY + (nueva.minY - anterior.minY) * peso,
-                width: anterior.width + (nueva.width - anterior.width) * peso,
-                height: anterior.height + (nueva.height - anterior.height) * peso
+                x: anterior.minX + (nueva.minX - anterior.minX) * pesoPos,
+                y: anterior.minY + (nueva.minY - anterior.minY) * pesoPos,
+                width: anterior.width + (nueva.width - anterior.width) * pesoTam,
+                height: anterior.height + (nueva.height - anterior.height) * pesoTam
             )
         } else {
             suave = nueva
