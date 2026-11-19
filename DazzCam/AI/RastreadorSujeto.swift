@@ -31,6 +31,7 @@ final class RastreadorSujeto: ObservableObject {
 
     private var peticion: VNTrackObjectRequest?
     private var perdidos = 0
+    private var cuadrosSeguidos = 0
     private var ultimaCaja: CGRect?
     private var ultimaCara = false
     private var generacion = 0
@@ -57,6 +58,7 @@ final class RastreadorSujeto: ObservableObject {
             guard let self else { return }
             self.peticion = nil
             self.perdidos = 0
+            self.cuadrosSeguidos = 0
             self.ultimaCaja = nil
             self.ultimaCara = false
 
@@ -145,6 +147,15 @@ final class RastreadorSujeto: ObservableObject {
                observacion.confidence >= 0.3 {
                 peticion.inputObservation = observacion
                 perdidos = 0
+                cuadrosSeguidos += 1
+
+                // Cada cierto tiempo re-detecta para corregir deriva, pero
+                // manteniendo la misma zona si sigue ahi.
+                if cuadrosSeguidos >= 75 {
+                    self.peticion = nil
+                    cuadrosSeguidos = 0
+                }
+
                 return publicar(observacion.boundingBox, esCara: ultimaCara)
             }
 
@@ -167,6 +178,7 @@ final class RastreadorSujeto: ObservableObject {
         }
 
         perdidos = 0
+        cuadrosSeguidos = 0
         ultimaCara = encontrado.esCara
 
         let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
