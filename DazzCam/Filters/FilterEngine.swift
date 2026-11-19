@@ -587,15 +587,15 @@ enum FilterEngine {
         // ---- v1.24: vision nocturna ----
         case .nightshotVideo:
             // Verde, negro y luces reventadas. La videocamara de noche.
-            a.contraste = 1.22; a.brillo = -0.08
+            a.contraste = 1.18; a.brillo = -0.06
             a.vision = 1; a.halacion = 1
-            a.grano = 0.38; a.vineta = 1.0
+            a.grano = 0.42; a.vineta = 1.0
 
         case .nightshotFoto:
-            // La misma camara, pero para foto: un pelin menos bestia.
-            a.contraste = 1.18; a.brillo = -0.06
-            a.vision = 1; a.halacion = 0.9
-            a.grano = 0.3; a.vineta = 0.92
+            // La misma camara, pero para foto.
+            a.contraste = 1.15; a.brillo = -0.04
+            a.vision = 1; a.halacion = 0.95
+            a.grano = 0.34; a.vineta = 0.95
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -698,18 +698,20 @@ enum FilterEngine {
             if let gris = mono.outputImage {
                 let tinte = CIFilter.colorMatrix()
                 tinte.inputImage = gris
-                tinte.rVector = CIVector(x: 0.22, y: 0, z: 0, w: 0)
+                // Fosforo verde: casi monocromo, con muy poco rojo/azul.
+                tinte.rVector = CIVector(x: 0.12, y: 0, z: 0, w: 0)
                 tinte.gVector = CIVector(x: 0, y: 1.0, z: 0, w: 0)
-                tinte.bVector = CIVector(x: 0, y: 0, z: 0.28, w: 0)
-                tinte.biasVector = CIVector(x: 0.0, y: 0.01, z: 0.0, w: 0)
+                tinte.bVector = CIVector(x: 0, y: 0, z: 0.16, w: 0)
+                tinte.biasVector = CIVector(x: 0.0, y: 0.008, z: 0.0, w: 0)
 
                 if let verde = tinte.outputImage {
                     let curva = CIFilter.toneCurve()
                     curva.inputImage = verde
+                    // Negros aplastados y luces que revientan.
                     curva.point0 = CGPoint(x: 0.0, y: 0.0)
-                    curva.point1 = CGPoint(x: 0.14, y: 0.015)
-                    curva.point2 = CGPoint(x: 0.38, y: 0.26)
-                    curva.point3 = CGPoint(x: 0.72, y: 0.86)
+                    curva.point1 = CGPoint(x: 0.16, y: 0.01)
+                    curva.point2 = CGPoint(x: 0.40, y: 0.22)
+                    curva.point3 = CGPoint(x: 0.70, y: 0.88)
                     curva.point4 = CGPoint(x: 1.0, y: 1.0)
 
                     let crudo = curva.outputImage ?? verde

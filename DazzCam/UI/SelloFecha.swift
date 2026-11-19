@@ -131,7 +131,7 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
         case .noventa:
             return UIColor(red: 0.56, green: 1.0, blue: 0.94, alpha: 0.96)
         case .vision:
-            return UIColor(red: 0.58, green: 1.0, blue: 0.60, alpha: 0.98)
+            return UIColor(red: 0.78, green: 1.0, blue: 0.78, alpha: 0.98)
         }
     }
 

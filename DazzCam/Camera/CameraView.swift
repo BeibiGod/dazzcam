@@ -75,7 +75,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.1 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.2 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -754,58 +754,43 @@ struct CameraView: View {
 
     // MARK: - Guia de encuadre
 
-    /// Recuadro que sigue al sujeto, como un aimbot: amarillo mientras hay
-    /// que moverse y verde cuando ya quedo bien. Sale al tocar IA.
+    /// Recuadro que sigue al sujeto, como en Framed: amarillo mientras hay
+    /// que moverse y verde cuando ya quedo bien.
     private func guiaDeSujeto(_ guia: Guia, etiqueta: String, en tamano: CGSize) -> some View {
         let rect = rectDePantalla(guia.sujeto, en: tamano)
         let color = guia.listo ? Self.verdeGuia : Self.amarilloGuia
 
         return ZStack {
             if !guia.listo {
-                // Oscurece todo menos al sujeto. Suave, para que se siga
-                // viendo la escena mientras te acomodas.
+                // Oscurece un poco lo de fuera para resaltar al sujeto.
                 Path { camino in
                     camino.addRect(CGRect(origin: .zero, size: tamano))
                     camino.addRoundedRect(
                         in: rect,
-                        cornerSize: CGSize(width: 18, height: 18)
+                        cornerSize: CGSize(width: 14, height: 14)
                     )
                 }
                 .fill(
-                    Color.black.opacity(0.26),
+                    Color.black.opacity(0.18),
                     style: FillStyle(eoFill: true)
                 )
-
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(color, lineWidth: 2.0)
-                    .frame(width: rect.width, height: rect.height)
-                    .position(x: rect.midX, y: rect.midY)
-
-                // Mira al centro del sujeto, como la del visor de la
-                // videocamara: un cuadrito con un punto adentro.
-                ZStack {
-                    RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.white.opacity(0.9), lineWidth: 1.2)
-                        .frame(width: 18, height: 18)
-
-                    Circle()
-                        .fill(Color.white.opacity(0.9))
-                        .frame(width: 3.5, height: 3.5)
-                }
-                .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
-                .position(x: rect.midX, y: rect.midY)
-                .transition(.opacity)
             }
+
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(color, lineWidth: guia.listo ? 3 : 2.5)
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
+                .shadow(color: color.opacity(0.35), radius: guia.listo ? 6 : 2)
 
             etiquetaSujeto(etiqueta, color: color)
                 .position(
                     x: min(max(rect.midX, 84), tamano.width - 84),
-                    y: (rect.maxY + 20 > tamano.height - 196)
-                        ? rect.minY - 16
-                        : rect.maxY + 20
+                    y: (rect.maxY + 22 > tamano.height - 196)
+                        ? rect.minY - 18
+                        : rect.maxY + 22
                 )
         }
-        .animation(.easeOut(duration: 0.2), value: guia.listo)
+        .animation(.easeOut(duration: 0.18), value: guia.listo)
         .allowsHitTesting(false)
     }
 
@@ -1291,7 +1276,7 @@ struct CameraView: View {
 
         tamanoGuia = tamano
 
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+        withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.88)) {
             guia = nueva
         }
 
