@@ -32,6 +32,7 @@ struct CameraView: View {
     @State private var analizando = false
     @State private var halago: String?
     @State private var zoomIA: CGFloat?
+    @State private var volvioA1x = false
     @State private var modo: ModoCaptura = .foto
     @State private var vivoAntesDeGrabar = true
 
@@ -74,7 +75,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.0 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.1 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -377,11 +378,19 @@ struct CameraView: View {
         }
         .onChange(of: mostrarGuia) { _, abierto in
             if abierto {
+                volvioA1x = false
                 rastreador.empezar()
             } else {
                 rastreador.parar()
                 zoomIA = nil
                 halago = nil
+                volvioA1x = false
+
+                // Si la IA dejo la camara en 0.5x, al cerrar vuelve a 1x.
+                if abs(camara.zoom - 0.5) < 0.08 {
+                    camara.ponerZoom(1)
+                    zoomBase = camara.zoom
+                }
             }
         }
         .onReceive(
@@ -394,6 +403,7 @@ struct CameraView: View {
                let nueva = AestheticAnalyzer.guia(paraCaja: caja, esCara: esCara) {
                 let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
                 refrescarGuia(nueva, tamano: tamano)
+                volverA1xSiCorresponde()
             } else if buscando {
                 withAnimation(.easeOut(duration: 0.18)) {
                     guia = nil
@@ -1292,36 +1302,9 @@ struct CameraView: View {
                 halago = Self.halagos.randomElement()
             }
 
-            acercarIA(nueva)
+            volverA1xSiCorresponde()
         } else if !nueva.listo {
             halago = nil
-        }
-    }
-
-    /// Acerca el zoom para que el sujeto llene el cuadro, sin pasarse. Se
-    /// hace despacio, en pasitos, porque la camara solo acepta saltos.
-    private func acercarIA(_ guia: Guia) {
-        guard zoomIA == nil else { return }
-
-        let alto = max(guia.sujeto.height, 0.16)
-        let objetivo = min(max(0.46 / alto, 1), 2.4)
-        guard objetivo > camara.zoom + 0.12 else { return }
-
-        zoomIA = objetivo
-        let inicio = camara.zoom
-
-        Task { @MainActor in
-            for paso in 1...16 {
-                guard mostrarGuia else { break }
-
-                let avance = CGFloat(paso) / 16
-                let suave = CGFloat(1 - pow(1 - Double(avance), 3))
-                camara.ponerZoom(inicio + (objetivo - inicio) * suave)
-
-                try? await Task.sleep(nanoseconds: 22_000_000)
-            }
-
-            zoomBase = camara.zoom
         }
     }
 
@@ -1334,33 +1317,45 @@ struct CameraView: View {
     ]
 
     private func analizarEscena() {
-        guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
-            aviso = String(localized: "La camara todavia no tiene imagen")
-            Task {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                aviso = nil
-            }
-            return
-        }
+        guard !analizando else { return }
 
         analizando = true
+        volvioA1x = false
+        zoomIA = nil
+        halago = nil
 
         Task {
+            // Se abre a 0.5x para ver mas del entorno y decidir mejor la toma.
+            if camara.lentes.contains(.ultra) {
+                camara.ponerZoom(0.5)
+                zoomBase = camara.zoom
+                try? await Task.sleep(nanoseconds: 450_000_000)
+            }
+
+            guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
+                analizando = false
+                aviso = String(localized: "La camara todavia no tiene imagen")
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                aviso = nil
+                return
+            }
+
             let resultado = await AestheticAnalyzer.analizar(imagen)
             analizando = false
 
             guard let resultado = resultado else {
                 aviso = String(localized: "No pude analizar la escena")
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                aviso = nil
                 return
             }
 
             analisis = resultado
             tamanoGuia = imagen.size
-            zoomIA = nil
-            halago = nil
 
             if let inicial = resultado.guia {
                 refrescarGuia(inicial, tamano: imagen.size)
+                volverA1xSiCorresponde()
             } else {
                 guia = nil
             }
@@ -1370,6 +1365,16 @@ struct CameraView: View {
                 mostrarGuia = true
             }
         }
+    }
+
+    /// Cuando la IA ya sabe donde sera la toma, vuelve a 1x para disparar.
+    private func volverA1xSiCorresponde() {
+        guard !volvioA1x else { return }
+        guard abs(camara.zoom - 0.5) < 0.08 else { return }
+
+        volvioA1x = true
+        camara.ponerZoom(1)
+        zoomBase = camara.zoom
     }
 
     private func abrirCatalogo() {
