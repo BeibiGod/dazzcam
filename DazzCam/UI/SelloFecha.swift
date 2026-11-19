@@ -22,6 +22,9 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
     case dosMil
     case noventa
 
+    // ---- agregada en la v1.24: vision nocturna ----
+    case vision
+
     var id: String { rawValue }
 
     var titulo: String {
@@ -38,6 +41,7 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
         case .rosa: return "Rosa"
         case .dosMil: return "2000s"
         case .noventa: return "90s"
+        case .vision: return "Night"
         }
     }
 
@@ -47,7 +51,7 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
         let negrita: Bool
 
         switch self {
-        case .dazz, .digital, .maquina, .neon, .ambar, .dosMil:
+        case .dazz, .digital, .maquina, .neon, .ambar, .dosMil, .vision:
             negrita = true
         case .clasico, .futura, .mano, .plata, .rosa, .noventa:
             negrita = false
@@ -90,6 +94,8 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
             return UIColor(red: 1.0, green: 0.80, blue: 0.25, alpha: 0.97)
         case .noventa:
             return UIColor(red: 0.62, green: 0.98, blue: 0.92, alpha: 0.95)
+        case .vision:
+            return UIColor(red: 0.80, green: 1.0, blue: 0.84, alpha: 0.96)
         }
     }
 
@@ -108,7 +114,14 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
         case .rosa: return 0.06
         case .dosMil: return 0.04
         case .noventa: return 0.14
+        case .vision: return 0.06
         }
+    }
+
+    /// La vision nocturna escribe con mas aire entre lineas, como la
+    /// videocamara. El resto queda igual.
+    var renglon: CGFloat {
+        self == .vision ? 0.16 : 0.10
     }
 
     /// Dazz, Neon y 90s llevan el brillito extra alrededor del texto.
@@ -124,6 +137,9 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
     case fecha
     case fechaHora
 
+    // ---- agregada en la v1.24: sello de vision nocturna ----
+    case vision
+
     var id: String { rawValue }
 
     var etiqueta: String {
@@ -134,6 +150,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .anio: return "2000"
         case .fecha: return "FECHA"
         case .fechaHora: return "F+HORA"
+        case .vision: return "NIGHT"
         }
     }
 
@@ -146,6 +163,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .anio: return "2026 11 12"
         case .fecha: return "12/11/2026"
         case .fechaHora: return "12/11/2026 2:28 AM"
+        case .vision: return "2026 2 15 8:47 PM"
         }
     }
 
@@ -154,7 +172,8 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .apagado: return .dazz
         case .dazz: return .dazzHora
         case .dazzHora: return .anio
-        case .anio: return .fecha
+        case .anio: return .vision
+        case .vision: return .fecha
         case .fecha: return .fechaHora
         case .fechaHora: return .apagado
         }
@@ -184,7 +203,33 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
 
         case .fechaHora:
             return formatear(fecha, patron: "dd/MM/yyyy h:mm a")
+
+        case .vision:
+            // Como la videocamara: año, mes y dia arriba, hora con segundos
+            // abajo, sin espacio antes de AM/PM.
+            return formatear(fecha, patron: "yyyy M d\nh:mm:ssa")
         }
+    }
+
+    /// Junta el rotulo de la camara (por ejemplo NIGHTSHOT) con la fecha.
+    /// El rotulo es parte del visor, asi que se queda aunque apagues la fecha.
+    static func textoCompleto(
+        _ modo: SelloFecha,
+        fecha: Date = Date(),
+        rotulo: String? = nil
+    ) -> String {
+        var lineas: [String] = []
+
+        if let rotulo = rotulo, !rotulo.isEmpty {
+            lineas.append("\"\(rotulo)\"")
+        }
+
+        let cuerpo = texto(modo, fecha: fecha)
+        if !cuerpo.isEmpty {
+            lineas.append(cuerpo)
+        }
+
+        return lineas.joined(separator: "\n")
     }
 
     private static func formatear(_ fecha: Date, patron: String) -> String {
@@ -195,17 +240,18 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         return formato.string(from: fecha)
     }
 
-    /// Quema la fecha en la foto, abajo a la derecha.
+    /// Quema la fecha en la foto, abajo a la derecha. Si la camara traia un
+    /// rotulo en pantalla (NIGHTSHOT), va arriba de la fecha.
     static func estampar(
         _ imagen: UIImage,
         modo: SelloFecha,
-        estilo: EstiloFecha = .dazz
+        estilo: EstiloFecha = .dazz,
+        rotulo: String? = nil
     ) -> UIImage {
-        guard modo.encendido else { return imagen }
+        let texto = textoCompleto(modo, rotulo: rotulo)
+        guard !texto.isEmpty else { return imagen }
 
         let base = FilterEngine.normalizar(imagen)
-        let texto = texto(modo)
-        guard !texto.isEmpty else { return base }
 
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = base.scale
@@ -221,7 +267,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
             let tamano = max(ancho * (esDazz ? 0.036 : 0.042), 10)
             let letras = piezas(texto, tamanoFuente: tamano, estilo: estilo)
 
-            let medida = letras.principal.size()
+            let medida = medida(letras.principal)
             let margen = ancho * 0.032
             let punto = CGPoint(
                 x: ancho - medida.width - margen,
@@ -244,18 +290,19 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         _ modo: SelloFecha,
         fecha: Date,
         tamano: CGSize,
-        estilo: EstiloFecha = .dazz
+        estilo: EstiloFecha = .dazz,
+        rotulo: String? = nil
     ) -> CIImage? {
-        guard modo.encendido, tamano.width > 1, tamano.height > 1 else { return nil }
+        guard tamano.width > 1, tamano.height > 1 else { return nil }
 
-        let texto = texto(modo, fecha: fecha)
+        let texto = textoCompleto(modo, fecha: fecha, rotulo: rotulo)
         guard !texto.isEmpty else { return nil }
 
         let esDazz = estilo.conBrillo
         let tamanoFuente = max(tamano.width * (esDazz ? 0.036 : 0.042), 10)
         let letras = piezas(texto, tamanoFuente: tamanoFuente, estilo: estilo)
 
-        let medida = letras.principal.size()
+        let medida = medida(letras.principal)
         let relleno = max(tamanoFuente * 0.22, 2)
         let lienzo = CGSize(
             width: ceil(medida.width + relleno * 2),
@@ -282,6 +329,17 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         return CIImage(cgImage: cg)
     }
 
+    /// Mide el texto ya compuesto, contando los saltos de linea del rotulo.
+    private static func medida(_ texto: NSAttributedString) -> CGSize {
+        let caja = texto.boundingRect(
+            with: CGSize(width: 10_000, height: 10_000),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+
+        return CGSize(width: ceil(caja.width), height: ceil(caja.height))
+    }
+
     /// El mismo estilo para fotos y video: color y fuente segun el sello,
     /// con sombra suave y, en Dazz, un brillito alrededor.
     private static func piezas(
@@ -292,12 +350,16 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         let fuente = estilo.fuente(tamanoFuente)
         let interletra = estilo.interletra * tamanoFuente
 
+        let parrafo = NSMutableParagraphStyle()
+        parrafo.lineSpacing = max(tamanoFuente * estilo.renglon, 1)
+
         let principal = NSAttributedString(
             string: texto,
             attributes: [
                 .font: fuente,
                 .kern: interletra,
-                .foregroundColor: estilo.color
+                .foregroundColor: estilo.color,
+                .paragraphStyle: parrafo
             ]
         )
         let brillo = NSAttributedString(
@@ -305,7 +367,8 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
             attributes: [
                 .font: fuente,
                 .kern: interletra,
-                .foregroundColor: estilo.color.withAlphaComponent(0.45)
+                .foregroundColor: estilo.color.withAlphaComponent(0.45),
+                .paragraphStyle: parrafo
             ]
         )
         let sombra = NSAttributedString(
@@ -313,7 +376,8 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
             attributes: [
                 .font: fuente,
                 .kern: interletra,
-                .foregroundColor: UIColor.black.withAlphaComponent(0.5)
+                .foregroundColor: UIColor.black.withAlphaComponent(0.5),
+                .paragraphStyle: parrafo
             ]
         )
 

@@ -52,7 +52,12 @@ enum VideoBaker {
         fecha: Date = Date(),
         semilla: UInt64 = 0
     ) -> AVVideoComposition {
-        let capa = CapaFecha(modo: sello, fecha: fecha, estilo: controles.estiloFecha)
+        let capa = CapaFecha(
+            modo: sello,
+            fecha: fecha,
+            estilo: controles.estiloFecha,
+            rotulo: preset.rotulo
+        )
 
         return AVVideoComposition(asset: asset) { peticion in
             let segundos = peticion.compositionTime.seconds
@@ -149,17 +154,19 @@ private final class CapaFecha {
     private let modo: SelloFecha
     private let fecha: Date
     private let estilo: EstiloFecha
+    private let rotulo: String?
     private let cerrojo = NSLock()
     private var cache: (tamano: CGSize, imagen: CIImage)?
 
-    init(modo: SelloFecha, fecha: Date, estilo: EstiloFecha) {
+    init(modo: SelloFecha, fecha: Date, estilo: EstiloFecha, rotulo: String?) {
         self.modo = modo
         self.fecha = fecha
         self.estilo = estilo
+        self.rotulo = rotulo
     }
 
     func aplicar(sobre imagen: CIImage) -> CIImage {
-        guard modo.encendido else { return imagen }
+        guard modo.encendido || rotulo != nil else { return imagen }
 
         let extent = imagen.extent
         guard extent.width > 1, extent.height > 1 else { return imagen }
@@ -187,7 +194,8 @@ private final class CapaFecha {
             modo,
             fecha: fecha,
             tamano: tamano,
-            estilo: estilo
+            estilo: estilo,
+            rotulo: rotulo
         ) else {
             return nil
         }

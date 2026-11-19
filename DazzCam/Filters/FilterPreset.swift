@@ -121,6 +121,27 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
     case kodakVR
     case agfaOptima
 
+    // ---- agregadas en la v1.24: desechables ----
+    case funSaver
+    case quickSnap
+    case sprite35
+    case leBox
+    case simpleUse
+    case sportDesechable
+
+    // ---- agregadas en la v1.24: los 2000 ----
+    case powerShot
+    case cyberShot
+    case coolpix
+    case exilim
+    case lumix
+    case easyShare
+    case handycam
+
+    // ---- agregadas en la v1.24: vision nocturna ----
+    case nightshotVideo
+    case nightshotFoto
+
     var id: String { rawValue }
 
     var nombre: String {
@@ -209,6 +230,24 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         case .zenit12: return "Zenit 12"
         case .kodakVR: return "Kodak VR 35"
         case .agfaOptima: return "Agfa Optima"
+
+        case .funSaver: return "FunSaver"
+        case .quickSnap: return "QuickSnap"
+        case .sprite35: return "Sprite 35"
+        case .leBox: return "Le Box"
+        case .simpleUse: return "Simple Use"
+        case .sportDesechable: return "Sport Desechable"
+
+        case .powerShot: return "PowerShot A"
+        case .cyberShot: return "Cyber-shot"
+        case .coolpix: return "Coolpix"
+        case .exilim: return "Exilim"
+        case .lumix: return "Lumix"
+        case .easyShare: return "EasyShare"
+        case .handycam: return "Handycam"
+
+        case .nightshotVideo: return "Nightshot Video"
+        case .nightshotFoto: return "Nightshot Foto"
         }
     }
 
@@ -266,6 +305,26 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
             return "KODAK"
         case .agfaOptima:
             return "AGFA"
+        case .funSaver, .sportDesechable, .easyShare:
+            return "KODAK"
+        case .quickSnap:
+            return "FUJIFILM"
+        case .sprite35:
+            return "ILFORD"
+        case .leBox:
+            return "AGFA"
+        case .simpleUse:
+            return "LOMO"
+        case .powerShot:
+            return "CANON"
+        case .cyberShot, .handycam, .nightshotVideo, .nightshotFoto:
+            return "SONY"
+        case .coolpix:
+            return "NIKON"
+        case .exilim:
+            return "CASIO"
+        case .lumix:
+            return "PANASONIC"
         default:
             return "BEIBI"
         }
@@ -281,8 +340,13 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         case .hp5, .delta3200, .triX, .tmax, .nikonFm2, .praktica, .zenit12:
             return .reflex
         case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi,
-             .ismNight, .disco, .neonDream:
+             .ismNight, .disco, .neonDream, .powerShot, .cyberShot, .coolpix,
+             .exilim, .lumix, .easyShare, .handycam, .nightshotVideo,
+             .nightshotFoto:
             return .digital
+        case .funSaver, .quickSnap, .sprite35, .leBox, .simpleUse,
+             .sportDesechable:
+            return .compacta
         default:
             return .compacta
         }
@@ -301,14 +365,18 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
              .tezzaGrain, .sakura, .latte, .oceanFade, .framedFade,
              .cinemaTeal, .milk, .swagLive, .jackboys, .riviera92,
              .yashicaT4, .olympusMju, .canonSure, .nikonFm2,
-             .praktica, .zenit12, .kodakVR, .agfaOptima:
+             .praktica, .zenit12, .kodakVR, .agfaOptima,
+             .funSaver, .quickSnap, .sprite35, .leBox, .simpleUse,
+             .sportDesechable:
             return .vintage
         case .polaroid600, .sx70, .instaxMini, .instaxWide, .polaroidFrio,
              .polaroidNoir, .polaroidGo, .instaxMono, .tezzaPolaroid,
              .oldRollInstant:
             return .instantanea
         case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave,
-             .chatarraCCD, .y2kDigi, .ismNight, .disco, .neonDream:
+             .chatarraCCD, .y2kDigi, .ismNight, .disco, .neonDream,
+             .powerShot, .cyberShot, .coolpix, .exilim, .lumix, .easyShare,
+             .handycam, .nightshotVideo, .nightshotFoto:
             return .underground
         }
     }
@@ -321,13 +389,20 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         case .original, .polaroid600, .sx70, .instaxMini, .instaxWide,
              .polaroidFrio, .polaroidNoir, .polaroidGo, .instaxMono,
              .tezzaPolaroid, .oldRollInstant, .oldRoll35, .oldRollFlash,
-             .oldRoll8, .disposable, .lomo, .nikonFm2, .praktica, .zenit12:
+             .oldRoll8, .disposable, .lomo, .nikonFm2, .praktica, .zenit12,
+             .funSaver, .quickSnap, .sprite35, .leBox, .simpleUse,
+             .sportDesechable:
             return .apagado
 
         // Digitales y videocamaras: año completo, como en los 2000.
         case .y2kDigi, .chatarraCCD, .vhs, .d3d, .disco, .vaporwave,
-             .neonDream, .tealNight, .ismNight:
+             .neonDream, .tealNight, .ismNight, .powerShot, .cyberShot,
+             .coolpix, .exilim, .lumix, .easyShare, .handycam:
             return .anio
+
+        // Vision nocturna: el sello de la videocamara, con hora y segundos.
+        case .nightshotVideo, .nightshotFoto:
+            return .vision
 
         // Las reconocidas por su respaldo de fecha de los 90.
         case .contaxT2, .yashicaT4, .olympusMju, .canonSure, .kodakVR,
@@ -373,8 +448,21 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
              .cinemaTeal:
             return .noventa
 
-        case .y2kDigi, .chatarraCCD, .d3d, .jackboys:
+        case .y2kDigi, .chatarraCCD, .d3d, .jackboys, .powerShot, .cyberShot,
+             .coolpix, .exilim, .lumix, .easyShare, .handycam:
             return .dosMil
+
+        case .funSaver, .quickSnap, .sportDesechable:
+            return .dazz
+
+        case .sprite35, .leBox:
+            return .clasico
+
+        case .simpleUse:
+            return .ambar
+
+        case .nightshotVideo, .nightshotFoto:
+            return .vision
 
         case .neonDream, .swagLive, .fujiPro400, .fujiC200, .provia:
             return .neon
@@ -400,5 +488,141 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
     /// Camaras reales, sin contar "Original".
     static var cantidadCamaras: Int {
         allCases.count - 1
+    }
+
+    /// Año de la camara o del rollo que imita. Sirve para ordenar el selector.
+    var anio: Int {
+        switch self {
+        case .original: return 2026
+
+        // ---- rollo clasico ----
+        case .portra: return 1998
+        case .superia: return 1998
+        case .kodachrome: return 1974
+        case .instColor: return 2024
+        case .dazzClassic: return 2024
+        case .cinestill: return 2017
+        case .hp5: return 1976
+        case .lomo: return 1992
+        case .crossProcess: return 1995
+        case .bleachBypass: return 1999
+        case .faded90s: return 1993
+        case .copper: return 2023
+        case .kodakGold: return 1986
+        case .ektar100: return 1989
+        case .fujiPro400: return 2004
+        case .delta3200: return 1995
+        case .agfaVista: return 1996
+        case .contaxT2: return 1990
+        case .goldenHour: return 2021
+        case .ultramax: return 1997
+        case .fujiC200: return 2001
+        case .provia: return 1994
+        case .velvia: return 1990
+        case .triX: return 1954
+        case .tmax: return 1986
+        case .cinestill50d: return 2018
+        case .ektachrome: return 1962
+        case .disposable: return 1988
+        case .sepiaViejo: return 1920
+
+        // ---- instantaneas ----
+        case .polaroid600: return 1981
+        case .sx70: return 1972
+        case .instaxMini: return 1998
+        case .instaxWide: return 1999
+        case .polaroidFrio: return 1985
+        case .polaroidNoir: return 1982
+        case .polaroidGo: return 2021
+        case .instaxMono: return 2016
+
+        // ---- video y digitales ----
+        case .vhs: return 1987
+        case .d3d: return 2003
+        case .tealNight: return 2004
+        case .warmFlash: return 1998
+        case .noir: return 1995
+        case .vaporwave: return 2019
+        case .chatarraCCD: return 2002
+        case .y2kDigi: return 2000
+
+        // ---- apps ----
+        case .framedSoft, .framedFade: return 2023
+        case .ismPastel, .ismCream, .ismNight: return 2022
+        case .oldRoll35, .oldRollFlash, .oldRoll8, .oldRollInstant: return 2021
+        case .tezzaClean, .tezzaWarm, .tezzaGrain, .tezzaPolaroid: return 2019
+        case .sakura, .latte, .oceanFade: return 2020
+        case .cinemaTeal: return 2018
+        case .disco: return 1978
+        case .milk: return 2021
+        case .neonDream: return 2020
+        case .swagLive: return 2022
+        case .jackboys: return 2019
+        case .riviera92: return 1992
+
+        // ---- compactas y reflex de rollo ----
+        case .yashicaT4: return 1988
+        case .olympusMju: return 1991
+        case .canonSure: return 1985
+        case .nikonFm2: return 1982
+        case .praktica: return 1975
+        case .zenit12: return 1973
+        case .kodakVR: return 1990
+        case .agfaOptima: return 1979
+
+        // ---- desechables ----
+        case .funSaver: return 1987
+        case .quickSnap: return 1986
+        case .sprite35: return 1965
+        case .leBox: return 1992
+        case .simpleUse: return 2017
+        case .sportDesechable: return 1989
+
+        // ---- los 2000 ----
+        case .powerShot: return 2001
+        case .cyberShot: return 2001
+        case .coolpix: return 1997
+        case .exilim: return 2002
+        case .lumix: return 2001
+        case .easyShare: return 2001
+        case .handycam: return 2000
+
+        // ---- vision nocturna ----
+        case .nightshotVideo: return 1998
+        case .nightshotFoto: return 1998
+        }
+    }
+
+    /// Texto que la camara traia quemado en pantalla, ademas de la fecha.
+    /// Solo la vision nocturna lo lleva.
+    var rotulo: String? {
+        switch self {
+        case .nightshotVideo, .nightshotFoto:
+            return "NIGHTSHOT"
+        default:
+            return nil
+        }
+    }
+
+    /// Un grupo del selector: una decada con sus camaras, de la mas nueva
+    /// a la mas vieja.
+    struct GrupoAnio: Identifiable {
+        let id: String
+        let titulo: String
+        let camaras: [FilterPreset]
+    }
+
+    /// Todas las camaras ordenadas por año, agrupadas por decada.
+    static var porAnio: [GrupoAnio] {
+        let resto = allCases.filter { $0 != .original }
+        let decadas = Dictionary(grouping: resto) { ($0.anio / 10) * 10 }
+
+        return decadas.keys.sorted(by: >).map { decada in
+            GrupoAnio(
+                id: "d\(decada)",
+                titulo: decada < 1960 ? "Antes de 1960" : "\(decada)s",
+                camaras: decadas[decada, default: []].sorted { $0.anio > $1.anio }
+            )
+        }
     }
 }

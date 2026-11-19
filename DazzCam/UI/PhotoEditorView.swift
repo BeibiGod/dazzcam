@@ -128,7 +128,11 @@ struct PhotoEditorView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.5))
 
-                FilaFecha(sello: $sello, estilo: controles.estiloFecha)
+                FilaFecha(
+                    sello: $sello,
+                    estilo: controles.estiloFecha,
+                    rotulo: preset.rotulo
+                )
                     .padding(.horizontal, 18)
 
                 HStack(spacing: 10) {
@@ -249,7 +253,8 @@ struct PhotoEditorView: View {
                 salida = SelloFecha.estampar(
                     salida,
                     modo: marca,
-                    estilo: ajustes.estiloFecha
+                    estilo: ajustes.estiloFecha,
+                    rotulo: elegido.rotulo
                 )
 
                 DispatchQueue.main.async {

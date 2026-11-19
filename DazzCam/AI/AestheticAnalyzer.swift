@@ -288,11 +288,11 @@ enum AestheticAnalyzer {
         var alto: CGFloat
 
         if caras.isEmpty {
-            ancho = min(max(base.width * 1.22, 0.24), 0.80)
-            alto = min(max(base.height * 1.22, 0.24), 0.80)
+            ancho = min(max(base.width * 1.14, 0.20), 0.74)
+            alto = min(max(base.height * 1.14, 0.20), 0.74)
         } else {
-            ancho = min(max(base.width * 2.6, 0.32), 0.86)
-            alto = min(max(base.height * 3.0, 0.36), 0.90)
+            ancho = min(max(base.width * 2.05, 0.26), 0.80)
+            alto = min(max(base.height * 2.45, 0.30), 0.86)
         }
 
         let dibujo = CGRect(

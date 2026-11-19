@@ -7,6 +7,8 @@ struct FilaFecha: View {
     @Binding var sello: SelloFecha
     let estilo: EstiloFecha
     var fecha: Date = Date()
+    /// Rotulo que la camara traia quemado, como NIGHTSHOT.
+    var rotulo: String? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -14,14 +16,25 @@ struct FilaFecha: View {
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.55))
 
-            if sello.encendido {
-                Text(SelloFecha.texto(sello, fecha: fecha))
-                    .font(.custom(estilo.fuente(17).fontName, fixedSize: 17))
-                    .tracking(estilo.interletra * 17)
-                    .foregroundStyle(Color(uiColor: estilo.color))
-                    .shadow(color: .black.opacity(0.6), radius: 1, x: 1, y: 1)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+            if sello.encendido || rotulo != nil {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let rotulo = rotulo {
+                        Text("\"\(rotulo)\"")
+                            .font(.custom(estilo.fuente(11).fontName, fixedSize: 11))
+                            .tracking(estilo.interletra * 11)
+                            .foregroundStyle(Color(uiColor: estilo.color).opacity(0.85))
+                    }
+
+                    if sello.encendido {
+                        Text(SelloFecha.texto(sello, fecha: fecha))
+                            .font(.custom(estilo.fuente(17).fontName, fixedSize: 17))
+                            .tracking(estilo.interletra * 17)
+                            .foregroundStyle(Color(uiColor: estilo.color))
+                            .shadow(color: .black.opacity(0.6), radius: 1, x: 1, y: 1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                    }
+                }
             } else {
                 Text("Sin fecha")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

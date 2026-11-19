@@ -103,15 +103,32 @@ struct AjustesLookView: View {
 
             Spacer(minLength: 8)
 
-            if sello.encendido {
+            if sello.encendido || preset.rotulo != nil {
                 TimelineView(.periodic(from: .now, by: 1)) { contexto in
-                    Text(SelloFecha.texto(sello, fecha: contexto.date))
-                        .font(.custom(
-                            controles.estiloFecha.fuente(21).fontName,
-                            size: 21
-                        ))
-                        .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
-                        .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if let rotulo = preset.rotulo {
+                            Text("\"\(rotulo)\"")
+                                .font(.custom(
+                                    controles.estiloFecha.fuente(12).fontName,
+                                    size: 12
+                                ))
+                                .tracking(controles.estiloFecha.interletra * 12)
+                                .foregroundStyle(
+                                    Color(uiColor: controles.estiloFecha.color).opacity(0.85)
+                                )
+                        }
+
+                        if sello.encendido {
+                            Text(SelloFecha.texto(sello, fecha: contexto.date))
+                                .font(.custom(
+                                    controles.estiloFecha.fuente(21).fontName,
+                                    size: 21
+                                ))
+                                .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
+                                .multilineTextAlignment(.trailing)
+                                .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
+                        }
+                    }
                 }
             } else {
                 Text("Sin fecha")
@@ -224,7 +241,7 @@ struct AjustesLookView: View {
     /// Muestra de la fecha. Si esta apagada igual enseña como quedaria.
     private func muestra(_ estilo: EstiloFecha) -> String {
         let modo = (sello == .apagado) ? SelloFecha.dazz : sello
-        return SelloFecha.texto(modo)
+        return SelloFecha.texto(modo).replacingOccurrences(of: "\n", with: " ")
     }
 
     private func opcional(

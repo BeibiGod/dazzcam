@@ -117,3 +117,11 @@
 "Muy aesthetic. Dispara ya." = "Very aesthetic. Shoot now.";
 "Buen cuadro. Elige una de estas camaras." = "Good frame. Pick one of these cameras.";
 "Listo para disparar. Cualquiera de estas le queda." = "Ready to shoot. Any of these fits.";
+
+/* ---- v1.24: camaras por anio, desechables y vision nocturna ---- */
+"SIN FILTRO" = "NO FILTER";
+"Antes de 1960" = "Before 1960";
+"Buena luz, aguanta ahi" = "Nice light, hold it there";
+"Perfecto, dispara" = "Perfect, shoot";
+"Eso es, quedate ahi" = "That's it, stay there";
+"Encuadre listo" = "Framing ready";

@@ -129,7 +129,12 @@ struct VideoEditorView: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
 
-                FilaFecha(sello: $sello, estilo: ajustes.estiloFecha, fecha: fecha)
+                FilaFecha(
+                    sello: $sello,
+                    estilo: ajustes.estiloFecha,
+                    fecha: fecha,
+                    rotulo: preset.rotulo
+                )
                     .padding(.horizontal, 18)
 
                 HStack(spacing: 10) {

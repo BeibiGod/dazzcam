@@ -15,6 +15,10 @@ struct AjusteFoto {
     var rayones: CGFloat = 0             // rayones finos de pelicula vieja
     var fuga: CGFloat = 0                // luz que se cuela por el borde
     var blancoYNegro: Bool = false
+    /// Vision nocturna: 0 = normal, 1 = verde de videocamara con intensificador.
+    var vision: CGFloat = 0
+    /// Resplandor alrededor de las luces fuertes, como en un intensificador.
+    var halacion: CGFloat = 0
 }
 
 /// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
@@ -147,6 +151,14 @@ enum FilterEngine {
     /// exagerada. Las camaras suaves se quedan casi igual.
     private static func afinado(_ original: AjusteFoto) -> AjusteFoto {
         var a = original
+
+        // La vision nocturna se deja cruda a proposito: es dura, con los
+        // negros aplastados y las luces reventadas. Si la suavizamos, deja
+        // de parecer una videocamara de noche.
+        if a.vision > 0 {
+            a.vineta = min(a.vineta, 1)
+            return a
+        }
 
         a.temperatura = 6500 + (a.temperatura - 6500) * 0.85
         a.saturacion = a.saturacion > 1
@@ -497,6 +509,93 @@ enum FilterEngine {
             a.temperatura = 7400; a.tinte = 5; a.saturacion = 1.06
             a.contraste = 0.98; a.desvanecido = 0.05
             a.grano = 0.09; a.vineta = 0.28
+
+        // ---- v1.24: desechables ----
+        case .funSaver:
+            // Flash de una sola vez: calido, contrastado y con las esquinas
+            // quemadas. El amarillo Kodak se nota.
+            a.temperatura = 7800; a.tinte = 4; a.saturacion = 1.1
+            a.contraste = 1.06; a.brillo = 0.03
+            a.desvanecido = 0.03; a.grano = 0.14; a.vineta = 0.55
+
+        case .quickSnap:
+            // Fuji desechable: verde en las sombras y flash duro.
+            a.temperatura = 7000; a.tinte = -6; a.saturacion = 1.08
+            a.contraste = 1.1; a.brillo = 0.02
+            a.grano = 0.13; a.vineta = 0.5
+
+        case .sprite35:
+            // B y N barato, muy granoso, con poco rango.
+            a.blancoYNegro = true; a.contraste = 1.2
+            a.grano = 0.22; a.vineta = 0.52
+
+        case .leBox:
+            // Agfa de fiesta: rojos vivos y flash directo.
+            a.temperatura = 7600; a.tinte = 8; a.saturacion = 1.16
+            a.contraste = 1.02; a.brillo = 0.04
+            a.desvanecido = 0.04; a.grano = 0.12; a.vineta = 0.42
+
+        case .simpleUse:
+            // Lomo recargable: contraste alto y color pasado.
+            a.temperatura = 7200; a.tinte = -4; a.saturacion = 1.22
+            a.contraste = 1.14; a.grano = 0.12; a.vineta = 0.48
+
+        case .sportDesechable:
+            // Sumergible: frio, lavado y con el azul del agua.
+            a.temperatura = 6100; a.tinte = -10; a.saturacion = 1.05
+            a.contraste = 1.0; a.desvanecido = 0.05
+            a.grano = 0.11; a.vineta = 0.4
+
+        // ---- v1.24: los 2000 ----
+        case .powerShot:
+            // Canon de los 2000: color honesto y un pelin de ruido.
+            a.temperatura = 6700; a.saturacion = 1.12; a.contraste = 1.06
+            a.grano = 0.08; a.vineta = 0.2
+
+        case .cyberShot:
+            // Sony: azules frios, verdes electricos y flash quemado.
+            a.temperatura = 6100; a.tinte = -4; a.saturacion = 1.28
+            a.contraste = 1.12; a.brillo = 0.02; a.grano = 0.1
+            a.vineta = 0.24
+
+        case .coolpix:
+            // Nikon: mas neutra, casi de estudio.
+            a.temperatura = 6500; a.saturacion = 1.06; a.contraste = 1.08
+            a.grano = 0.07; a.vineta = 0.18
+
+        case .exilim:
+            // Casio: saturacion de folleto y blancos frios.
+            a.temperatura = 6300; a.tinte = 3; a.saturacion = 1.22
+            a.contraste = 1.04; a.grano = 0.09; a.vineta = 0.2
+
+        case .lumix:
+            // Panasonic: verdes ricos y sombras suaves.
+            a.temperatura = 6600; a.tinte = -3; a.saturacion = 1.14
+            a.contraste = 1.02; a.grano = 0.07; a.vineta = 0.2
+
+        case .easyShare:
+            // Kodak facil: calido, alegre y sin miedo al flash.
+            a.temperatura = 7500; a.saturacion = 1.18; a.contraste = 1.02
+            a.brillo = 0.03; a.grano = 0.09; a.vineta = 0.26
+
+        case .handycam:
+            // Videocamara MiniDV: contraste bajo, color lavado y ruido.
+            a.temperatura = 6800; a.tinte = -5; a.saturacion = 0.92
+            a.contraste = 0.94; a.brillo = 0.02
+            a.desvanecido = 0.06; a.grano = 0.16; a.vineta = 0.3
+
+        // ---- v1.24: vision nocturna ----
+        case .nightshotVideo:
+            // Verde, negro y luces reventadas. La videocamara de noche.
+            a.contraste = 1.35; a.brillo = -0.045
+            a.vision = 1; a.halacion = 1
+            a.grano = 0.32; a.vineta = 0.9
+
+        case .nightshotFoto:
+            // La misma camara, pero para foto: un pelin menos bestia.
+            a.contraste = 1.28; a.brillo = -0.03
+            a.vision = 0.94; a.halacion = 0.85
+            a.grano = 0.26; a.vineta = 0.78
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -535,6 +634,12 @@ enum FilterEngine {
             a.fuga = 0.1
         case .chatarraCCD:
             a.fuga = 0.35
+        case .funSaver, .quickSnap, .leBox, .sportDesechable:
+            a.fuga = 0.42
+        case .simpleUse:
+            a.fuga = 0.5
+        case .sprite35:
+            a.fuga = 0.28
         case .framedFade:
             a.fuga = 0.35
         case .vhs, .oldRoll35:
@@ -582,6 +687,56 @@ enum FilterEngine {
             let f = CIFilter.photoEffectMono()
             f.inputImage = actual
             if let salida = f.outputImage { actual = salida }
+        }
+
+        // 3b. vision nocturna: pasa a blanco y negro, lo tiñe de verde, le
+        //     aplasta los negros y le abre las luces. Es lo que hace un
+        //     intensificador de luz: lo que no hay, se lo inventa.
+        if a.vision > 0 {
+            let mono = CIFilter.photoEffectMono()
+            mono.inputImage = actual
+
+            if let gris = mono.outputImage {
+                let tinte = CIFilter.colorMatrix()
+                tinte.inputImage = gris
+                tinte.rVector = CIVector(x: 0.18, y: 0, z: 0, w: 0)
+                tinte.gVector = CIVector(x: 0, y: 0.96, z: 0, w: 0)
+                tinte.bVector = CIVector(x: 0, y: 0, z: 0.42, w: 0)
+                tinte.biasVector = CIVector(x: 0.004, y: 0.012, z: 0.006, w: 0)
+
+                if let verde = tinte.outputImage {
+                    let curva = CIFilter.toneCurve()
+                    curva.inputImage = verde
+                    curva.point0 = CGPoint(x: 0, y: 0)
+                    curva.point1 = CGPoint(x: 0.18, y: 0.07)
+                    curva.point2 = CGPoint(x: 0.45, y: 0.44)
+                    curva.point3 = CGPoint(x: 0.75, y: 0.90)
+                    curva.point4 = CGPoint(x: 1, y: 1)
+
+                    let crudo = curva.outputImage ?? verde
+                    let cantidad = min(max(a.vision, 0), 1)
+
+                    if cantidad >= 0.999 {
+                        actual = crudo
+                    } else if let mezcla = mezclar(crudo, con: actual, cantidad: cantidad) {
+                        actual = mezcla
+                    } else {
+                        actual = crudo
+                    }
+                }
+            }
+        }
+
+        // 3c. resplandor: las luces se derraman alrededor, como en el visor
+        //     de una videocamara de noche.
+        if a.halacion > 0 {
+            let f = CIFilter.bloom()
+            f.inputImage = actual
+            f.intensity = Float(min(a.halacion, 1) * 1.1)
+            f.radius = Float(max(imagen.extent.width * 0.013, 5))
+            if let salida = f.outputImage?.cropped(to: imagen.extent) {
+                actual = salida
+            }
         }
 
         // 4. negros levantados
