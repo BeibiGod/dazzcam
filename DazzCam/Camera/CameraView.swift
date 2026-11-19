@@ -75,7 +75,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.5 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.6 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -1226,7 +1226,6 @@ struct CameraView: View {
             .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
         }
         .buttonStyle(.plain)
-        .disabled(analizando)
         .fixedSize()
     }
 
@@ -1345,8 +1344,6 @@ struct CameraView: View {
     ]
 
     private func analizarEscena() {
-        guard !analizando else { return }
-
         // Si ya hay guia abierta, un toque en IA la cierra.
         if mostrarGuia {
             withAnimation(.easeOut(duration: 0.2)) {
@@ -1356,60 +1353,43 @@ struct CameraView: View {
             return
         }
 
-        analizando = true
-        volvioA1x = false
         zoomIA = nil
         halago = nil
         guia = nil
+        tamanoGuia = vivo.imagen?.size ?? CGSize(width: 9, height: 16)
 
-        Task {
-            let teniaUltra = camara.lentes.contains(.ultra)
-            let zoomPrevio = camara.zoom
+        let teniaUltra = camara.lentes.contains(.ultra)
+        if teniaUltra {
+            volvioA1x = false
+            camara.ponerZoom(0.5)
+            zoomBase = camara.zoom
+        } else {
+            volvioA1x = true
+        }
 
-            // Se abre a 0.5x para ver mas del entorno y decidir la toma.
-            if teniaUltra {
-                camara.ponerZoom(0.5)
-                zoomBase = camara.zoom
-                try? await Task.sleep(nanoseconds: 500_000_000)
+        // Abre la guia al instante: el rastreador busca y sigue al sujeto en vivo.
+        withAnimation(.easeOut(duration: 0.2)) {
+            mostrarGuia = true
+        }
+
+        // Echa un vistazo amplio y vuelve a 1x para encuadrar la toma.
+        if teniaUltra {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 650_000_000)
+                guard mostrarGuia else { return }
+                volverA1xSiCorresponde()
             }
+        }
 
-            guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
+        // Analisis de camaras/sugerencias en segundo plano, sin trabar la guia.
+        if let imagen = vivo.imagen ?? foto.ultimaFoto {
+            Task {
+                analizando = true
+                let resultado = await AestheticAnalyzer.analizar(imagen)
                 analizando = false
-                if teniaUltra {
-                    camara.ponerZoom(max(zoomPrevio, 1))
-                    zoomBase = camara.zoom
+                if let resultado = resultado {
+                    analisis = resultado
                 }
-                aviso = String(localized: "La camara todavia no tiene imagen")
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                aviso = nil
-                return
-            }
-
-            let resultado = await AestheticAnalyzer.analizar(imagen)
-
-            // Ya sabe donde sera la toma: vuelve a 1x para guiar y disparar.
-            if teniaUltra {
-                camara.ponerZoom(1)
-                zoomBase = camara.zoom
-                volvioA1x = true
-                try? await Task.sleep(nanoseconds: 350_000_000)
-            }
-
-            analizando = false
-
-            guard let resultado = resultado else {
-                aviso = String(localized: "No pude analizar la escena")
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                aviso = nil
-                return
-            }
-
-            analisis = resultado
-            tamanoGuia = vivo.imagen?.size ?? imagen.size
-
-            // El recuadro sale en el visor; el rastreador lo sigue en vivo en 1x.
-            withAnimation(.easeOut(duration: 0.25)) {
-                mostrarGuia = true
             }
         }
     }
