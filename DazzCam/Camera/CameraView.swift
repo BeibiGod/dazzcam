@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.10 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.11 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -389,6 +389,11 @@ struct CameraView: View {
                 analisis = nil
                 volvioA1x = true
                 sujetoEsCara = false
+
+                if abs(camara.zoom - 0.5) < 0.08 {
+                    camara.ponerZoom(1)
+                    zoomBase = camara.zoom
+                }
             }
         }
         .onReceive(
@@ -764,47 +769,35 @@ struct CameraView: View {
         let rect = rectDePantalla(guia.sujeto, en: tamano)
         let color = guia.listo ? Self.verdeGuia : Self.amarilloGuia
         let objetivo = puntoDePantalla(guia.destino, en: tamano)
+        let destinoRect = CGRect(
+            x: objetivo.x - rect.width / 2,
+            y: objetivo.y - rect.height / 2,
+            width: rect.width,
+            height: rect.height
+        )
 
         return ZStack {
+            // Recuadro fantasma: donde debe quedar el sujeto.
             if !guia.listo {
-                // Oscurece un poco lo de fuera para resaltar al sujeto.
-                Path { camino in
-                    camino.addRect(CGRect(origin: .zero, size: tamano))
-                    camino.addRoundedRect(
-                        in: rect,
-                        cornerSize: CGSize(width: 14, height: 14)
-                    )
-                }
-                .fill(
-                    Color.black.opacity(0.16),
-                    style: FillStyle(eoFill: true)
-                )
-
-                // Punto de destino: donde debe quedar el sujeto.
-                ZStack {
-                    Circle()
-                        .stroke(color.opacity(0.9), lineWidth: 1.5)
-                        .frame(width: 22, height: 22)
-                    Circle()
-                        .fill(color.opacity(0.95))
-                        .frame(width: 5, height: 5)
-                }
-                .position(objetivo)
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(color.opacity(0.55), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                    .frame(width: destinoRect.width, height: destinoRect.height)
+                    .position(x: destinoRect.midX, y: destinoRect.midY)
 
                 // Flechas que indican hacia donde mover el telefono.
                 flechasGuia(guia: guia, sujeto: rect, destino: objetivo, en: tamano, color: color)
             }
 
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(color, lineWidth: guia.listo ? 3 : 2.5)
+                .strokeBorder(color, lineWidth: guia.listo ? 3.5 : 3)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
-                .shadow(color: color.opacity(0.35), radius: guia.listo ? 6 : 2)
+                .shadow(color: color.opacity(0.4), radius: guia.listo ? 8 : 3)
 
             if guia.listo {
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(color.opacity(0.35), lineWidth: 7)
-                    .frame(width: rect.width + 8, height: rect.height + 8)
+                    .stroke(color.opacity(0.3), lineWidth: 8)
+                    .frame(width: rect.width + 10, height: rect.height + 10)
                     .position(x: rect.midX, y: rect.midY)
             }
 
@@ -816,7 +809,7 @@ struct CameraView: View {
                         : rect.maxY + 22
                 )
         }
-        .animation(.easeOut(duration: 0.18), value: guia.listo)
+        .animation(.easeOut(duration: 0.16), value: guia.listo)
         .allowsHitTesting(false)
     }
 
@@ -958,27 +951,28 @@ struct CameraView: View {
     /// Instruccion grande arriba, como en el video: que mover y, cuando ya
     /// quedo, un halago corto.
     private func instruccionGuia(_ guia: Guia) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             Text(guia.instruccion)
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .tracking(0.6)
-                .textCase(.uppercase)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(guia.listo ? Self.verdeGuia : Self.amarilloGuia)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.75)
-                .shadow(color: .black.opacity(0.9), radius: 5, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.85), radius: 6, x: 0, y: 2)
 
             if guia.listo, let halago = halago {
                 Text(halago)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
-                    .shadow(color: .black.opacity(0.85), radius: 4, x: 0, y: 1)
-                    .transition(.opacity)
+                    .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 1)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 18)
     }
 
     /// Pastilla de abajo: puntaje, acceso a las camaras y la X.
@@ -1300,6 +1294,13 @@ struct CameraView: View {
             if video.grabando {
                 video.parar()
             } else {
+                // Si la IA dejo en 0.5x, vuelve a 1x antes de grabar.
+                if mostrarGuia, abs(camara.zoom - 0.5) < 0.08 {
+                    camara.ponerZoom(1)
+                    zoomBase = camara.zoom
+                    volvioA1x = true
+                }
+
                 let azar = UInt64.random(in: 1...UInt64.max)
                 semillaVivo = azar
                 vivo.semilla = azar
@@ -1313,6 +1314,13 @@ struct CameraView: View {
     }
 
     private func dispararConTemporizador() {
+        // Si la IA dejo en 0.5x, vuelve a 1x antes de disparar.
+        if mostrarGuia, abs(camara.zoom - 0.5) < 0.08 {
+            camara.ponerZoom(1)
+            zoomBase = camara.zoom
+            volvioA1x = true
+        }
+
         let flashPantalla = flashEncendido && camara.esFrontal
         foto.flash = (flashEncendido && camara.tieneFlash) ? .on : .off
 
@@ -1417,38 +1425,73 @@ struct CameraView: View {
         halago = nil
         guia = nil
         analisis = nil
-        volvioA1x = true
+        sujetoEsCara = false
         tamanoGuia = vivo.imagen?.size ?? CGSize(width: 9, height: 16)
 
-        // Vuelve a 1x para que el seguimiento sea estable y preciso.
-        camara.ponerZoom(1)
-        zoomBase = camara.zoom
+        let tieneUltra = camara.lentes.contains(.ultra)
 
-        // Abre la guia al instante: el rastreador busca y sigue al sujeto en vivo.
+        if tieneUltra {
+            volvioA1x = false
+            camara.ponerZoom(0.5)
+            zoomBase = camara.zoom
+        } else {
+            volvioA1x = true
+            camara.ponerZoom(1)
+            zoomBase = camara.zoom
+        }
+
+        // Abre la guia al instante.
         withAnimation(.easeOut(duration: 0.2)) {
             mostrarGuia = true
         }
 
-        let imagenInicial = vivo.imagen ?? foto.ultimaFoto
+        if tieneUltra {
+            // Mira el entorno en 0.5x un momento y luego vuelve a 1x para guiar.
+            analizando = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                guard mostrarGuia else {
+                    analizando = false
+                    return
+                }
 
-        // Deteccion rapida para mostrar el recuadro de una vez.
-        if let imagenInicial = imagenInicial {
-            Task {
-                if let rapida = await AestheticAnalyzer.seguir(imagenInicial), mostrarGuia {
-                    tamanoGuia = imagenInicial.size
-                    refrescarGuia(rapida, tamano: imagenInicial.size)
+                // Vuelve a 1x: reinicia el rastreador para que siga en la nueva vista.
+                volvioA1x = true
+                camara.ponerZoom(1)
+                zoomBase = camara.zoom
+                guia = nil
+                sujetoEsCara = false
+                rastreador.empezar()
+
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                analizando = false
+
+                // Sugerencias de camaras en segundo plano.
+                if let imagen = vivo.imagen ?? foto.ultimaFoto, mostrarGuia {
+                    let resultado = await AestheticAnalyzer.analizar(imagen)
+                    if mostrarGuia, let resultado = resultado {
+                        analisis = resultado
+                    }
                 }
             }
-        }
+        } else {
+            // Deteccion rapida para mostrar el recuadro de una vez.
+            let imagenInicial = vivo.imagen ?? foto.ultimaFoto
+            if let imagenInicial = imagenInicial {
+                Task {
+                    if let rapida = await AestheticAnalyzer.seguir(imagenInicial), mostrarGuia {
+                        tamanoGuia = imagenInicial.size
+                        refrescarGuia(rapida, tamano: imagenInicial.size)
+                    }
+                }
 
-        // Analisis de camaras/sugerencias en segundo plano, sin trabar la guia.
-        if let imagenInicial = imagenInicial {
-            Task {
-                analizando = true
-                let resultado = await AestheticAnalyzer.analizar(imagenInicial)
-                analizando = false
-                if mostrarGuia, let resultado = resultado {
-                    analisis = resultado
+                Task {
+                    analizando = true
+                    let resultado = await AestheticAnalyzer.analizar(imagenInicial)
+                    analizando = false
+                    if mostrarGuia, let resultado = resultado {
+                        analisis = resultado
+                    }
                 }
             }
         }
