@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.8 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.9 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -788,6 +788,9 @@ struct CameraView: View {
                         .frame(width: 5, height: 5)
                 }
                 .position(objetivo)
+
+                // Flechas que indican hacia donde mover el telefono.
+                flechasGuia(guia: guia, sujeto: rect, destino: objetivo, en: tamano, color: color)
             }
 
             RoundedRectangle(cornerRadius: 14)
@@ -795,6 +798,13 @@ struct CameraView: View {
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
                 .shadow(color: color.opacity(0.35), radius: guia.listo ? 6 : 2)
+
+            if guia.listo {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(color.opacity(0.35), lineWidth: 7)
+                    .frame(width: rect.width + 8, height: rect.height + 8)
+                    .position(x: rect.midX, y: rect.midY)
+            }
 
             etiquetaSujeto(etiqueta, color: color)
                 .position(
@@ -806,6 +816,43 @@ struct CameraView: View {
         }
         .animation(.easeOut(duration: 0.18), value: guia.listo)
         .allowsHitTesting(false)
+    }
+
+    /// Flechas sutiles que muestran hacia donde hay que mover el telefono.
+    private func flechasGuia(
+        guia: Guia,
+        sujeto: CGRect,
+        destino: CGPoint,
+        en tamano: CGSize,
+        color: Color
+    ) -> some View {
+        let dx = destino.x - sujeto.midX
+        let dy = destino.y - sujeto.midY
+
+        return ZStack {
+            if abs(dx) > 18 {
+                // Mover telefono en direccion opuesta al desplazamiento del sujeto en pantalla.
+                Image(systemName: dx > 0 ? "chevron.left" : "chevron.right")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(color.opacity(0.95))
+                    .shadow(color: .black.opacity(0.5), radius: 3)
+                    .position(
+                        x: dx > 0 ? max(sujeto.minX - 28, 26) : min(sujeto.maxX + 28, tamano.width - 26),
+                        y: sujeto.midY
+                    )
+            }
+
+            if abs(dy) > 18 {
+                Image(systemName: dy > 0 ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(color.opacity(0.95))
+                    .shadow(color: .black.opacity(0.5), radius: 3)
+                    .position(
+                        x: sujeto.midX,
+                        y: dy > 0 ? max(sujeto.minY - 28, 110) : min(sujeto.maxY + 28, tamano.height - 210)
+                    )
+            }
+        }
     }
 
     private var etiquetaGuia: String {
