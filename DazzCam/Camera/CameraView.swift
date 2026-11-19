@@ -73,7 +73,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.24.0 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.24.1 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -126,18 +126,39 @@ struct CameraView: View {
 
                     Spacer(minLength: 0)
 
-                    if sello.encendido {
+                    if sello.encendido || preset.rotulo != nil {
                         HStack {
                             Spacer()
 
                             TimelineView(.periodic(from: .now, by: 1)) { contexto in
-                                Text(SelloFecha.texto(sello, fecha: contexto.date))
-                                    .font(.custom(
-                                        controles.estiloFecha.fuente(13).fontName,
-                                        size: 13
-                                    ))
-                                    .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
-                                    .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    if let rotulo = preset.rotulo {
+                                        Text("\"\(rotulo)\"")
+                                            .font(.custom(
+                                                controles.estiloFecha.fuente(10).fontName,
+                                                size: 10
+                                            ))
+                                            .tracking(controles.estiloFecha.interletra * 10)
+                                            .foregroundStyle(
+                                                Color(uiColor: controles.estiloFecha.color)
+                                                    .opacity(0.9)
+                                            )
+                                            .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
+                                    }
+
+                                    if sello.encendido {
+                                        Text(SelloFecha.texto(sello, fecha: contexto.date))
+                                            .font(.custom(
+                                                controles.estiloFecha.fuente(13).fontName,
+                                                size: 13
+                                            ))
+                                            .foregroundStyle(
+                                                Color(uiColor: controles.estiloFecha.color)
+                                            )
+                                            .multilineTextAlignment(.trailing)
+                                            .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
