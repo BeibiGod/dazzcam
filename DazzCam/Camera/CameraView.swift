@@ -33,6 +33,7 @@ struct CameraView: View {
     @State private var halago: String?
     @State private var zoomIA: CGFloat?
     @State private var volvioA1x = false
+    @State private var sujetoEsCara = false
     @State private var modo: ModoCaptura = .foto
     @State private var vivoAntesDeGrabar = true
 
@@ -75,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.6 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.7 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -378,19 +379,14 @@ struct CameraView: View {
         }
         .onChange(of: mostrarGuia) { _, abierto in
             if abierto {
-                volvioA1x = false
+                sujetoEsCara = false
                 rastreador.empezar()
             } else {
                 rastreador.parar()
                 zoomIA = nil
                 halago = nil
-                volvioA1x = false
-
-                // Si la IA dejo la camara en 0.5x, al cerrar vuelve a 1x.
-                if abs(camara.zoom - 0.5) < 0.08 {
-                    camara.ponerZoom(1)
-                    zoomBase = camara.zoom
-                }
+                volvioA1x = true
+                sujetoEsCara = false
             }
         }
         .onReceive(
@@ -401,6 +397,7 @@ struct CameraView: View {
 
             if let caja = caja,
                let nueva = AestheticAnalyzer.guia(paraCaja: caja, esCara: esCara) {
+                sujetoEsCara = esCara
                 let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
                 refrescarGuia(nueva, tamano: tamano)
             } else if buscando {
@@ -665,7 +662,7 @@ struct CameraView: View {
                 if let guia = guia {
                     guiaDeSujeto(
                         guia,
-                        etiqueta: analisis?.etiqueta ?? String(localized: "el sujeto"),
+                        etiqueta: etiquetaGuia,
                         en: geo.size
                     )
                 } else if rastreador.buscando || analizando {
@@ -805,6 +802,16 @@ struct CameraView: View {
         }
         .animation(.easeOut(duration: 0.18), value: guia.listo)
         .allowsHitTesting(false)
+    }
+
+    private var etiquetaGuia: String {
+        if sujetoEsCara {
+            return String(localized: "persona")
+        }
+        if let etiqueta = analisis?.etiqueta, !etiqueta.isEmpty {
+            return etiqueta
+        }
+        return String(localized: "sujeto")
     }
 
     /// Pasa un punto normalizado de la foto a la pantalla (misma proyeccion que
@@ -1356,38 +1363,38 @@ struct CameraView: View {
         zoomIA = nil
         halago = nil
         guia = nil
+        analisis = nil
+        volvioA1x = true
         tamanoGuia = vivo.imagen?.size ?? CGSize(width: 9, height: 16)
 
-        let teniaUltra = camara.lentes.contains(.ultra)
-        if teniaUltra {
-            volvioA1x = false
-            camara.ponerZoom(0.5)
-            zoomBase = camara.zoom
-        } else {
-            volvioA1x = true
-        }
+        // Vuelve a 1x para que el seguimiento sea estable y preciso.
+        camara.ponerZoom(1)
+        zoomBase = camara.zoom
 
         // Abre la guia al instante: el rastreador busca y sigue al sujeto en vivo.
         withAnimation(.easeOut(duration: 0.2)) {
             mostrarGuia = true
         }
 
-        // Echa un vistazo amplio y vuelve a 1x para encuadrar la toma.
-        if teniaUltra {
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 650_000_000)
-                guard mostrarGuia else { return }
-                volverA1xSiCorresponde()
+        let imagenInicial = vivo.imagen ?? foto.ultimaFoto
+
+        // Deteccion rapida para mostrar el recuadro de una vez.
+        if let imagenInicial = imagenInicial {
+            Task {
+                if let rapida = await AestheticAnalyzer.seguir(imagenInicial), mostrarGuia {
+                    tamanoGuia = imagenInicial.size
+                    refrescarGuia(rapida, tamano: imagenInicial.size)
+                }
             }
         }
 
         // Analisis de camaras/sugerencias en segundo plano, sin trabar la guia.
-        if let imagen = vivo.imagen ?? foto.ultimaFoto {
+        if let imagenInicial = imagenInicial {
             Task {
                 analizando = true
-                let resultado = await AestheticAnalyzer.analizar(imagen)
+                let resultado = await AestheticAnalyzer.analizar(imagenInicial)
                 analizando = false
-                if let resultado = resultado {
+                if mostrarGuia, let resultado = resultado {
                     analisis = resultado
                 }
             }
