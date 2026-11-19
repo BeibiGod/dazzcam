@@ -604,25 +604,36 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Un grupo del selector: una decada con sus camaras, de la mas nueva
-    /// a la mas vieja.
-    struct GrupoAnio: Identifiable {
+    /// true si es una videocamara. El resto son camaras de foto.
+    var esVideo: Bool {
+        switch self {
+        case .vhs, .d3d, .handycam, .nightshotVideo:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Un grupo del selector: fotos o video, ordenadas por año.
+    struct GrupoTipo: Identifiable {
         let id: String
         let titulo: String
         let camaras: [FilterPreset]
     }
 
-    /// Todas las camaras ordenadas por año, agrupadas por decada.
-    static var porAnio: [GrupoAnio] {
+    /// Camaras separadas en foto y video, de la mas vieja a la mas reciente.
+    static var porTipo: [GrupoTipo] {
         let resto = allCases.filter { $0 != .original }
-        let decadas = Dictionary(grouping: resto) { ($0.anio / 10) * 10 }
-
-        return decadas.keys.sorted(by: >).map { decada in
-            GrupoAnio(
-                id: "d\(decada)",
-                titulo: decada < 1960 ? "Antes de 1960" : "\(decada)s",
-                camaras: decadas[decada, default: []].sorted { $0.anio > $1.anio }
-            )
+        let fotos = resto.filter { !$0.esVideo }.sorted { a, b in
+            a.anio == b.anio ? a.nombre < b.nombre : a.anio < b.anio
         }
+        let videos = resto.filter { $0.esVideo }.sorted { a, b in
+            a.anio == b.anio ? a.nombre < b.nombre : a.anio < b.anio
+        }
+
+        return [
+            GrupoTipo(id: "fotos", titulo: "CAMARAS DE FOTO", camaras: fotos),
+            GrupoTipo(id: "video", titulo: "CAMARAS DE VIDEO", camaras: videos)
+        ].filter { !$0.camaras.isEmpty }
     }
 }

@@ -125,3 +125,7 @@
 "Perfecto, dispara" = "Perfect, shoot";
 "Eso es, quedate ahi" = "That's it, stay there";
 "Encuadre listo" = "Framing ready";
+
+/* ---- v1.25: selector por tipo ---- */
+"CAMARAS DE FOTO" = "PHOTO CAMERAS";
+"CAMARAS DE VIDEO" = "VIDEO CAMERAS";

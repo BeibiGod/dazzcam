@@ -173,8 +173,11 @@ private final class CapaFecha {
         guard let capa = capaPara(tamano: extent.size) else { return imagen }
 
         let margen = max(extent.width * 0.032, 2)
-        let x = extent.maxX - margen - capa.extent.width
-        let y = extent.minY + margen
+        let centrado = (estilo == .vision || rotulo == "NIGHTSHOT")
+        let x = centrado
+            ? extent.midX - capa.extent.width / 2
+            : extent.maxX - margen - capa.extent.width
+        let y = extent.minY + (centrado ? margen * 1.8 : margen)
 
         let puesta = capa.transformed(
             by: CGAffineTransform(translationX: x, y: y)

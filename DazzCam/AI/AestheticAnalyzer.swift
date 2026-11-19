@@ -249,6 +249,14 @@ enum AestheticAnalyzer {
         }
     }
 
+    /// Guia a partir de una caja ya seguida cuadro a cuadro. La usa el
+    /// rastreador en vivo: la caja se recalcula en cada frame y la
+    /// instruccion cambia al instante.
+    static func guia(paraCaja caja: CGRect, esCara: Bool) -> Guia? {
+        guard caja.width > 0.004, caja.height > 0.004 else { return nil }
+        return componerGuia(nucleo: recortar(caja), otros: [], esCara: esCara)
+    }
+
     /// Elige al sujeto, calcula su caja y el cruce de tercios que le queda
     /// mejor, y arma la instruccion para mover el telefono. El cruce cambia
     /// segun donde este el sujeto y que mas haya en el cuadro.
@@ -280,6 +288,14 @@ enum AestheticAnalyzer {
 
         guard let base = nucleo else { return nil }
 
+        return componerGuia(nucleo: base, otros: otros, esCara: !caras.isEmpty)
+    }
+
+    private static func componerGuia(
+        nucleo base: CGRect,
+        otros: [CGRect],
+        esCara: Bool
+    ) -> Guia? {
         let centro = CGPoint(x: base.midX, y: base.midY)
 
         // Caja que se dibuja: en caras incluye cabeza y algo de cuerpo; en
@@ -287,17 +303,17 @@ enum AestheticAnalyzer {
         var ancho: CGFloat
         var alto: CGFloat
 
-        if caras.isEmpty {
-            ancho = min(max(base.width * 1.14, 0.20), 0.74)
-            alto = min(max(base.height * 1.14, 0.20), 0.74)
-        } else {
+        if esCara {
             ancho = min(max(base.width * 2.05, 0.26), 0.80)
             alto = min(max(base.height * 2.45, 0.30), 0.86)
+        } else {
+            ancho = min(max(base.width * 1.14, 0.20), 0.74)
+            alto = min(max(base.height * 1.14, 0.20), 0.74)
         }
 
         let dibujo = CGRect(
             x: centro.x - ancho / 2,
-            y: caras.isEmpty ? centro.y - alto / 2 : centro.y - alto * 0.36,
+            y: esCara ? centro.y - alto * 0.36 : centro.y - alto / 2,
             width: ancho,
             height: alto
         )
@@ -324,7 +340,7 @@ enum AestheticAnalyzer {
             }
 
             // En retratos los ojos van arriba.
-            if !caras.isEmpty {
+            if esCara {
                 puntos += abs(cruce.y - 0.34) * 0.9
             }
 

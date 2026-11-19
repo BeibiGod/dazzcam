@@ -29,7 +29,7 @@ targets:
       base:
         PRODUCT_NAME: DazzCam
         PRODUCT_BUNDLE_IDENTIFIER: com.diego.dazzcam
-        MARKETING_VERSION: "1.24.1"
+        MARKETING_VERSION: "1.25.0"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
@@ -54,6 +54,9 @@ targets:
         UIAppFonts:
           - Silkscreen-Regular.ttf
           - Silkscreen-Bold.ttf
+          - PressStart2P-Regular.ttf
+          - Micro5-Regular.ttf
+          - Jersey10-Regular.ttf
         NSCameraUsageDescription: Beibi Cam usa la camara para tomar fotos y grabar video.
         NSMicrophoneUsageDescription: Beibi Cam usa el microfono para grabar el sonido del video.
         NSPhotoLibraryAddUsageDescription: Beibi Cam guarda tus fotos y videos en tu fototeca.

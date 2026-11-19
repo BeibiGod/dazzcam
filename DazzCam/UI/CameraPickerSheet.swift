@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Hoja con todas las camaras ordenadas por año, de la mas nueva a la mas
-/// vieja y agrupadas por decada. Cada una con su muestra.
+/// Hoja con todas las camaras separadas en foto y video, ordenadas por año
+/// de la mas vieja a la mas nueva. Cada una con su muestra.
 struct CameraPickerSheet: View {
     @Binding var seleccionado: FilterPreset
     let muestras: [FilterPreset: UIImage]
@@ -22,7 +22,7 @@ struct CameraPickerSheet: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
 
-                    ForEach(FilterPreset.porAnio) { grupo in
+                    ForEach(FilterPreset.porTipo) { grupo in
                         encabezado(grupo.titulo, cuenta: grupo.camaras.count)
 
                         LazyVGrid(columns: columnas, spacing: 16) {

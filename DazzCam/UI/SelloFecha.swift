@@ -12,17 +12,17 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
     case futura
     case mano
 
-    // ---- agregadas en la v1.17: sellos de color ----
+    // ---- sellos de color ----
     case neon
     case ambar
     case plata
     case rosa
 
-    // ---- agregadas en la v1.19: sellos retro de los 90 y los 2000 ----
+    // ---- sellos retro de los 90 y los 2000 ----
     case dosMil
     case noventa
 
-    // ---- agregada en la v1.24: vision nocturna ----
+    // ---- vision nocturna ----
     case vision
 
     var id: String { rawValue }
@@ -45,25 +45,61 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Todas pixeladas, como los sellos de las camaras viejas. Silkscreen va
-    /// dentro de la app; el peso cambia para que no se vean todas iguales.
+    /// Todas pixeladas, pero cada una con su propia letra y su propio
+    /// caracter. Van incluidas en la app.
     func fuente(_ tamano: CGFloat) -> UIFont {
-        let negrita: Bool
+        let nombre: String
+        let escala: CGFloat
 
         switch self {
-        case .dazz, .digital, .maquina, .neon, .ambar, .dosMil, .vision:
-            negrita = true
-        case .clasico, .futura, .mano, .plata, .rosa, .noventa:
-            negrita = false
+        case .dazz:
+            nombre = "Silkscreen-Bold"
+            escala = 1.0
+        case .digital:
+            nombre = "PressStart2P-Regular"
+            escala = 0.72
+        case .maquina:
+            nombre = "Jersey10-Regular"
+            escala = 1.04
+        case .clasico:
+            nombre = "Jersey10-Regular"
+            escala = 1.02
+        case .futura:
+            nombre = "Micro5-Regular"
+            escala = 1.18
+        case .mano:
+            nombre = "Silkscreen-Regular"
+            escala = 0.96
+        case .neon:
+            nombre = "PressStart2P-Regular"
+            escala = 0.70
+        case .ambar:
+            nombre = "Silkscreen-Bold"
+            escala = 0.98
+        case .plata:
+            nombre = "Micro5-Regular"
+            escala = 1.14
+        case .rosa:
+            nombre = "Jersey10-Regular"
+            escala = 1.02
+        case .dosMil:
+            nombre = "PressStart2P-Regular"
+            escala = 0.70
+        case .noventa:
+            nombre = "Micro5-Regular"
+            escala = 1.16
+        case .vision:
+            nombre = "PressStart2P-Regular"
+            escala = 0.68
         }
 
-        let nombre = negrita ? "Silkscreen-Bold" : "Silkscreen-Regular"
+        let medida = max(tamano * escala, 8)
 
-        if let fuente = UIFont(name: nombre, size: tamano) {
+        if let fuente = UIFont(name: nombre, size: medida) {
             return fuente
         }
-        if let pixel = UIFont(name: "Silkscreen-Regular", size: tamano) {
-            return pixel
+        if let respaldo = UIFont(name: "Silkscreen-Regular", size: tamano) {
+            return respaldo
         }
         return UIFont.monospacedSystemFont(ofSize: tamano, weight: .bold)
     }
@@ -71,61 +107,71 @@ enum EstiloFecha: String, CaseIterable, Identifiable, Codable {
     var color: UIColor {
         switch self {
         case .dazz:
-            return UIColor(red: 1.0, green: 0.58, blue: 0.16, alpha: 0.96)
+            return UIColor(red: 1.0, green: 0.60, blue: 0.18, alpha: 0.97)
         case .digital:
-            return UIColor(red: 1.0, green: 0.34, blue: 0.10, alpha: 0.97)
+            return UIColor(red: 1.0, green: 0.30, blue: 0.10, alpha: 0.98)
         case .maquina:
-            return UIColor(red: 1.0, green: 0.90, blue: 0.68, alpha: 0.94)
+            return UIColor(red: 1.0, green: 0.93, blue: 0.72, alpha: 0.96)
         case .clasico:
-            return UIColor(red: 1.0, green: 0.78, blue: 0.42, alpha: 0.95)
+            return UIColor(red: 1.0, green: 0.80, blue: 0.46, alpha: 0.96)
         case .futura:
-            return UIColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 0.92)
+            return UIColor(red: 0.96, green: 0.98, blue: 1.0, alpha: 0.94)
         case .mano:
-            return UIColor(red: 1.0, green: 0.55, blue: 0.25, alpha: 0.95)
+            return UIColor(red: 1.0, green: 0.66, blue: 0.34, alpha: 0.96)
         case .neon:
-            return UIColor(red: 0.40, green: 1.0, blue: 0.74, alpha: 0.96)
+            return UIColor(red: 0.36, green: 1.0, blue: 0.62, alpha: 0.98)
         case .ambar:
-            return UIColor(red: 1.0, green: 0.71, blue: 0.20, alpha: 0.96)
+            return UIColor(red: 1.0, green: 0.72, blue: 0.18, alpha: 0.97)
         case .plata:
-            return UIColor(red: 0.90, green: 0.93, blue: 0.99, alpha: 0.93)
+            return UIColor(red: 0.92, green: 0.95, blue: 1.0, alpha: 0.95)
         case .rosa:
-            return UIColor(red: 1.0, green: 0.47, blue: 0.72, alpha: 0.95)
+            return UIColor(red: 1.0, green: 0.48, blue: 0.70, alpha: 0.96)
         case .dosMil:
-            return UIColor(red: 1.0, green: 0.80, blue: 0.25, alpha: 0.97)
+            return UIColor(red: 1.0, green: 0.86, blue: 0.24, alpha: 0.98)
         case .noventa:
-            return UIColor(red: 0.62, green: 0.98, blue: 0.92, alpha: 0.95)
+            return UIColor(red: 0.56, green: 1.0, blue: 0.94, alpha: 0.96)
         case .vision:
-            return UIColor(red: 0.80, green: 1.0, blue: 0.84, alpha: 0.96)
+            return UIColor(red: 0.58, green: 1.0, blue: 0.60, alpha: 0.98)
         }
     }
 
     /// Que tan separadas van las letras, en proporcion al tamano.
     var interletra: CGFloat {
         switch self {
-        case .dazz: return 0.05
-        case .digital: return 0.10
-        case .maquina: return 0.03
-        case .clasico: return 0.02
-        case .futura: return 0.20
-        case .mano: return 0
-        case .neon: return 0.08
-        case .ambar: return 0.02
-        case .plata: return 0.12
-        case .rosa: return 0.06
-        case .dosMil: return 0.04
-        case .noventa: return 0.14
-        case .vision: return 0.06
+        case .dazz: return 0.06
+        case .digital: return 0.02
+        case .maquina: return 0.04
+        case .clasico: return 0.03
+        case .futura: return 0.18
+        case .mano: return 0.02
+        case .neon: return 0.02
+        case .ambar: return 0.04
+        case .plata: return 0.14
+        case .rosa: return 0.05
+        case .dosMil: return 0.02
+        case .noventa: return 0.12
+        case .vision: return 0.01
         }
     }
 
-    /// La vision nocturna escribe con mas aire entre lineas, como la
-    /// videocamara. El resto queda igual.
+    /// Aire entre lineas cuando el sello lleva rotulo y fecha.
     var renglon: CGFloat {
-        self == .vision ? 0.16 : 0.10
+        switch self {
+        case .vision: return 0.22
+        case .digital, .dosMil, .neon: return 0.18
+        default: return 0.10
+        }
     }
 
-    /// Dazz, Neon y 90s llevan el brillito extra alrededor del texto.
-    var conBrillo: Bool { self == .dazz || self == .neon || self == .noventa }
+    /// Sellos con un brillito extra alrededor del texto.
+    var conBrillo: Bool {
+        switch self {
+        case .dazz, .neon, .noventa, .vision:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 /// Marca de fecha y hora, como las camaras viejitas.
@@ -221,7 +267,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         var lineas: [String] = []
 
         if let rotulo = rotulo, !rotulo.isEmpty {
-            lineas.append("\"\(rotulo)\"")
+            lineas.append(rotulo)
         }
 
         let cuerpo = texto(modo, fecha: fecha)
@@ -269,9 +315,12 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
 
             let medida = medida(letras.principal)
             let margen = ancho * 0.032
+            let centrado = (estilo == .vision || rotulo == "NIGHTSHOT")
             let punto = CGPoint(
-                x: ancho - medida.width - margen,
-                y: alto - medida.height - margen
+                x: centrado
+                    ? (ancho - medida.width) / 2
+                    : ancho - medida.width - margen,
+                y: alto - medida.height - (centrado ? margen * 1.8 : margen)
             )
             let corrimiento = max(tamano * 0.05, 1)
 

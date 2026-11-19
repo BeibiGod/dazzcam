@@ -23,6 +23,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     /// Si esta apagado no se gasta bateria filtrando cuadros que nadie ve.
     var activo = true
 
+    /// La IA de encuadre mira el frame crudo aunque el filtro este apagado.
+    var rastreador: RastreadorSujeto?
+
     /// Numero de cuadro. Sirve para que los rayones se muevan en el visor,
     /// igual que se van a mover en el video guardado.
     private var momento: UInt64 = 0
@@ -78,6 +81,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
         ultimoRender = ahora
 
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        // La guia de encuadre sigue al sujeto en cada cuadro, con o sin filtro.
+        rastreador?.mirar(buffer)
 
         // Si el visor no esta mostrando el filtro, no se gasta CPU.
         guard activo else { return }

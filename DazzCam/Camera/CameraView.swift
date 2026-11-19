@@ -13,6 +13,7 @@ struct CameraView: View {
     @StateObject private var miniaturas = FilterThumbnails()
     @StateObject private var video = MovieRecorder()
     @StateObject private var nivel = Nivel()
+    @StateObject private var rastreador = RastreadorSujeto()
     @Environment(\.scenePhase) private var fase
 
     @State private var preparado = false
@@ -73,7 +74,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.24.1 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.0 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -127,42 +128,43 @@ struct CameraView: View {
                     Spacer(minLength: 0)
 
                     if sello.encendido || preset.rotulo != nil {
+                        let night = controles.estiloFecha == .vision || preset.rotulo == "NIGHTSHOT"
+
                         HStack {
-                            Spacer()
+                            if !night { Spacer() }
 
                             TimelineView(.periodic(from: .now, by: 1)) { contexto in
-                                VStack(alignment: .trailing, spacing: 1) {
+                                VStack(alignment: night ? .center : .trailing, spacing: 2) {
+                                    let fRotulo = controles.estiloFecha.fuente(11)
                                     if let rotulo = preset.rotulo {
-                                        Text("\"\(rotulo)\"")
-                                            .font(.custom(
-                                                controles.estiloFecha.fuente(10).fontName,
-                                                size: 10
-                                            ))
-                                            .tracking(controles.estiloFecha.interletra * 10)
+                                        Text(rotulo)
+                                            .font(.custom(fRotulo.fontName, size: fRotulo.pointSize))
+                                            .tracking(controles.estiloFecha.interletra * 11)
                                             .foregroundStyle(
                                                 Color(uiColor: controles.estiloFecha.color)
-                                                    .opacity(0.9)
+                                                    .opacity(0.95)
                                             )
-                                            .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
+                                            .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
                                     }
 
                                     if sello.encendido {
+                                        let fFecha = controles.estiloFecha.fuente(13)
                                         Text(SelloFecha.texto(sello, fecha: contexto.date))
-                                            .font(.custom(
-                                                controles.estiloFecha.fuente(13).fontName,
-                                                size: 13
-                                            ))
+                                            .font(.custom(fFecha.fontName, size: fFecha.pointSize))
                                             .foregroundStyle(
                                                 Color(uiColor: controles.estiloFecha.color)
                                             )
-                                            .multilineTextAlignment(.trailing)
+                                            .multilineTextAlignment(night ? .center : .trailing)
                                             .shadow(color: .black.opacity(0.55), radius: 2, x: 1, y: 1)
                                     }
                                 }
                             }
+
+                            if !night { Spacer().frame(width: 0) } else { Spacer() }
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 6)
+                        .padding(.bottom, night ? 14 : 6)
                     }
 
                     if mostrarGuia, let analisis = analisis {
@@ -359,6 +361,7 @@ struct CameraView: View {
                 vivo.preset = preset
                 vivo.controles = controles
                 vivo.semilla = semillaVivo
+                vivo.rastreador = rastreador
             }
             await camara.arrancar()
             camara.ponerZoom(1)
@@ -368,16 +371,33 @@ struct CameraView: View {
             }
         }
         .onDisappear {
+            rastreador.parar()
             nivel.parar()
             camara.detener()
         }
-        .task(id: mostrarGuia) {
-            await seguirEscena()
-        }
         .onChange(of: mostrarGuia) { _, abierto in
-            if !abierto {
+            if abierto {
+                rastreador.empezar()
+            } else {
+                rastreador.parar()
                 zoomIA = nil
                 halago = nil
+            }
+        }
+        .onReceive(
+            rastreador.$caja
+                .combineLatest(rastreador.$esCara, rastreador.$buscando)
+        ) { caja, esCara, buscando in
+            guard mostrarGuia else { return }
+
+            if let caja = caja,
+               let nueva = AestheticAnalyzer.guia(paraCaja: caja, esCara: esCara) {
+                let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
+                refrescarGuia(nueva, tamano: tamano)
+            } else if buscando {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    guia = nil
+                }
             }
         }
         .onChange(of: fase) { _, nueva in
@@ -1253,24 +1273,6 @@ struct CameraView: View {
         }
     }
 
-    /// Mientras la guia esta abierta, vuelve a mirar la escena cada segundo
-    /// para que la caja siga al sujeto y la instruccion cambie en vivo.
-    private func seguirEscena() async {
-        guard mostrarGuia else { return }
-
-        while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 900_000_000)
-            guard !Task.isCancelled, mostrarGuia else { return }
-            guard !analizando else { continue }
-            guard let imagen = vivo.imagen else { continue }
-
-            guard let nueva = await AestheticAnalyzer.seguir(imagen) else { continue }
-            guard !Task.isCancelled, mostrarGuia else { return }
-
-            refrescarGuia(nueva, tamano: imagen.size)
-        }
-    }
-
     /// Actualiza la caja y la instruccion. Cuando el sujeto queda encuadrado
     /// por primera vez: vibracion, halago y acercamiento automatico, como en
     /// el video de referencia.
@@ -1354,11 +1356,16 @@ struct CameraView: View {
 
             analisis = resultado
             tamanoGuia = imagen.size
-            guia = resultado.guia
             zoomIA = nil
             halago = nil
 
-            // El recuadro sale en el visor; las camaras quedan a un toque.
+            if let inicial = resultado.guia {
+                refrescarGuia(inicial, tamano: imagen.size)
+            } else {
+                guia = nil
+            }
+
+            // El recuadro sale en el visor; el rastreador lo sigue en vivo.
             withAnimation(.easeOut(duration: 0.25)) {
                 mostrarGuia = true
             }

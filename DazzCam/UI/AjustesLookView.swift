@@ -107,11 +107,9 @@ struct AjustesLookView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { contexto in
                     VStack(alignment: .trailing, spacing: 2) {
                         if let rotulo = preset.rotulo {
-                            Text("\"\(rotulo)\"")
-                                .font(.custom(
-                                    controles.estiloFecha.fuente(12).fontName,
-                                    size: 12
-                                ))
+                            let f = controles.estiloFecha.fuente(12)
+                            Text(rotulo)
+                                .font(.custom(f.fontName, size: f.pointSize))
                                 .tracking(controles.estiloFecha.interletra * 12)
                                 .foregroundStyle(
                                     Color(uiColor: controles.estiloFecha.color).opacity(0.85)
@@ -119,11 +117,9 @@ struct AjustesLookView: View {
                         }
 
                         if sello.encendido {
+                            let f = controles.estiloFecha.fuente(21)
                             Text(SelloFecha.texto(sello, fecha: contexto.date))
-                                .font(.custom(
-                                    controles.estiloFecha.fuente(21).fontName,
-                                    size: 21
-                                ))
+                                .font(.custom(f.fontName, size: f.pointSize))
                                 .foregroundStyle(Color(uiColor: controles.estiloFecha.color))
                                 .multilineTextAlignment(.trailing)
                                 .shadow(color: .black.opacity(0.6), radius: 2, x: 1, y: 1)
@@ -205,8 +201,9 @@ struct AjustesLookView: View {
                         Button {
                             controles.estiloFecha = estilo
                         } label: {
+                            let f = estilo.fuente(15)
                             Text(muestra(estilo))
-                                .font(.custom(estilo.fuente(15).fontName, size: 15))
+                                .font(.custom(f.fontName, size: f.pointSize))
                                 .foregroundStyle(Color(uiColor: estilo.color))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 7)

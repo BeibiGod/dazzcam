@@ -587,15 +587,15 @@ enum FilterEngine {
         // ---- v1.24: vision nocturna ----
         case .nightshotVideo:
             // Verde, negro y luces reventadas. La videocamara de noche.
-            a.contraste = 1.35; a.brillo = -0.045
+            a.contraste = 1.22; a.brillo = -0.08
             a.vision = 1; a.halacion = 1
-            a.grano = 0.32; a.vineta = 0.9
+            a.grano = 0.38; a.vineta = 1.0
 
         case .nightshotFoto:
             // La misma camara, pero para foto: un pelin menos bestia.
-            a.contraste = 1.28; a.brillo = -0.03
-            a.vision = 0.94; a.halacion = 0.85
-            a.grano = 0.26; a.vineta = 0.78
+            a.contraste = 1.18; a.brillo = -0.06
+            a.vision = 1; a.halacion = 0.9
+            a.grano = 0.3; a.vineta = 0.92
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -689,9 +689,8 @@ enum FilterEngine {
             if let salida = f.outputImage { actual = salida }
         }
 
-        // 3b. vision nocturna: pasa a blanco y negro, lo tiñe de verde, le
-        //     aplasta los negros y le abre las luces. Es lo que hace un
-        //     intensificador de luz: lo que no hay, se lo inventa.
+        // 3b. vision nocturna: intensificador de luz, verde, negros aplastados
+        //     y luces que revientan, como la videocamara de noche.
         if a.vision > 0 {
             let mono = CIFilter.photoEffectMono()
             mono.inputImage = actual
@@ -699,19 +698,19 @@ enum FilterEngine {
             if let gris = mono.outputImage {
                 let tinte = CIFilter.colorMatrix()
                 tinte.inputImage = gris
-                tinte.rVector = CIVector(x: 0.18, y: 0, z: 0, w: 0)
-                tinte.gVector = CIVector(x: 0, y: 0.96, z: 0, w: 0)
-                tinte.bVector = CIVector(x: 0, y: 0, z: 0.42, w: 0)
-                tinte.biasVector = CIVector(x: 0.004, y: 0.012, z: 0.006, w: 0)
+                tinte.rVector = CIVector(x: 0.22, y: 0, z: 0, w: 0)
+                tinte.gVector = CIVector(x: 0, y: 1.0, z: 0, w: 0)
+                tinte.bVector = CIVector(x: 0, y: 0, z: 0.28, w: 0)
+                tinte.biasVector = CIVector(x: 0.0, y: 0.01, z: 0.0, w: 0)
 
                 if let verde = tinte.outputImage {
                     let curva = CIFilter.toneCurve()
                     curva.inputImage = verde
-                    curva.point0 = CGPoint(x: 0, y: 0)
-                    curva.point1 = CGPoint(x: 0.18, y: 0.07)
-                    curva.point2 = CGPoint(x: 0.45, y: 0.44)
-                    curva.point3 = CGPoint(x: 0.75, y: 0.90)
-                    curva.point4 = CGPoint(x: 1, y: 1)
+                    curva.point0 = CGPoint(x: 0.0, y: 0.0)
+                    curva.point1 = CGPoint(x: 0.14, y: 0.015)
+                    curva.point2 = CGPoint(x: 0.38, y: 0.26)
+                    curva.point3 = CGPoint(x: 0.72, y: 0.86)
+                    curva.point4 = CGPoint(x: 1.0, y: 1.0)
 
                     let crudo = curva.outputImage ?? verde
                     let cantidad = min(max(a.vision, 0), 1)
@@ -732,8 +731,8 @@ enum FilterEngine {
         if a.halacion > 0 {
             let f = CIFilter.bloom()
             f.inputImage = actual
-            f.intensity = Float(min(a.halacion, 1) * 1.1)
-            f.radius = Float(max(imagen.extent.width * 0.013, 5))
+            f.intensity = Float(min(a.halacion, 1) * 1.45)
+            f.radius = Float(max(imagen.extent.width * 0.018, 7))
             if let salida = f.outputImage?.cropped(to: imagen.extent) {
                 actual = salida
             }

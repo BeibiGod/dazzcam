@@ -19,15 +19,17 @@ struct FilaFecha: View {
             if sello.encendido || rotulo != nil {
                 VStack(alignment: .leading, spacing: 2) {
                     if let rotulo = rotulo {
-                        Text("\"\(rotulo)\"")
-                            .font(.custom(estilo.fuente(11).fontName, fixedSize: 11))
+                        let f = estilo.fuente(11)
+                        Text(rotulo)
+                            .font(.custom(f.fontName, fixedSize: f.pointSize))
                             .tracking(estilo.interletra * 11)
                             .foregroundStyle(Color(uiColor: estilo.color).opacity(0.85))
                     }
 
                     if sello.encendido {
+                        let f = estilo.fuente(17)
                         Text(SelloFecha.texto(sello, fecha: fecha))
-                            .font(.custom(estilo.fuente(17).fontName, fixedSize: 17))
+                            .font(.custom(f.fontName, fixedSize: f.pointSize))
                             .tracking(estilo.interletra * 17)
                             .foregroundStyle(Color(uiColor: estilo.color))
                             .shadow(color: .black.opacity(0.6), radius: 1, x: 1, y: 1)
