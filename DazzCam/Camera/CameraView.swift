@@ -75,7 +75,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.2 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.3 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -116,7 +116,7 @@ struct CameraView: View {
                                 .padding(.top, 12)
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         } else {
-                            Text("No veo un sujeto claro: apunta a algo con detalle.")
+                            Text(analizando || rastreador.buscando ? "Buscando tu toma..." : "No veo un sujeto claro: apunta a algo con detalle.")
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.9))
                                 .multilineTextAlignment(.center)
@@ -666,9 +666,11 @@ struct CameraView: View {
                 if let guia = guia {
                     guiaDeSujeto(
                         guia,
-                        etiqueta: analisis?.etiqueta ?? "",
+                        etiqueta: analisis?.etiqueta ?? String(localized: "el sujeto"),
                         en: geo.size
                     )
+                } else if rastreador.buscando || analizando {
+                    miraIA
                 }
             } else if analizando {
                 miraIA
@@ -1273,10 +1275,13 @@ struct CameraView: View {
     /// el video de referencia.
     private func refrescarGuia(_ nueva: Guia, tamano: CGSize) {
         let antesListo = guia?.listo ?? false
-
         tamanoGuia = tamano
 
-        withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.88)) {
+        if nueva.listo != antesListo {
+            withAnimation(.easeOut(duration: 0.18)) {
+                guia = nueva
+            }
+        } else {
             guia = nueva
         }
 
@@ -1289,7 +1294,11 @@ struct CameraView: View {
 
             volverA1xSiCorresponde()
         } else if !nueva.listo {
-            halago = nil
+            if halago != nil {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    halago = nil
+                }
+            }
         }
     }
 

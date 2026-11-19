@@ -46,6 +46,8 @@ final class RastreadorSujeto: ObservableObject {
 
     func empezar() {
         activo = true
+        caja = nil
+        esCara = false
         buscando = true
 
         cerrojo.lock()
@@ -123,6 +125,7 @@ final class RastreadorSujeto: ObservableObject {
                     self.esCara = resultado.esCara
                     self.buscando = false
                 } else {
+                    self.caja = nil
                     self.buscando = true
                 }
             }
@@ -160,7 +163,7 @@ final class RastreadorSujeto: ObservableObject {
         // Se perdio: se busca otra vez, cara primero y despues lo que mas
         // llama la atencion en el cuadro.
         guard let encontrado = detectar(buffer) else {
-            perdidos += 1
+            ultimaCaja = nil
             return nil
         }
 
@@ -168,7 +171,7 @@ final class RastreadorSujeto: ObservableObject {
         ultimaCara = encontrado.esCara
 
         let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
-        nueva.trackingLevel = .fast
+        nueva.trackingLevel = .accurate
         peticion = nueva
 
         return publicar(encontrado.objeto.boundingBox, esCara: encontrado.esCara)
@@ -221,7 +224,8 @@ final class RastreadorSujeto: ObservableObject {
         let suave: CGRect
 
         if let anterior = ultimaCaja, anterior.width > 0.001 {
-            let peso: CGFloat = 0.45
+            // Sigue rapido al sujeto, con solo un poco de suavizado.
+            let peso: CGFloat = 0.72
             suave = CGRect(
                 x: anterior.minX + (nueva.minX - anterior.minX) * peso,
                 y: anterior.minY + (nueva.minY - anterior.minY) * peso,
