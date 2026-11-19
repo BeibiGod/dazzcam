@@ -193,7 +193,8 @@ final class RastreadorSujeto: ObservableObject {
     ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
         let caras = VNDetectFaceRectanglesRequest()
         let personas = VNDetectHumanRectanglesRequest()
-        let saliencia = VNGenerateAttentionBasedSaliencyImageRequest()
+        let atencion = VNGenerateAttentionBasedSaliencyImageRequest()
+        let objetosReq = VNGenerateObjectnessBasedSaliencyImageRequest()
         let manejador = VNImageRequestHandler(
             cvPixelBuffer: buffer,
             orientation: .up,
@@ -201,7 +202,7 @@ final class RastreadorSujeto: ObservableObject {
         )
 
         do {
-            try manejador.perform([caras, personas, saliencia])
+            try manejador.perform([caras, personas, atencion, objetosReq])
         } catch {
             return nil
         }
@@ -216,10 +217,17 @@ final class RastreadorSujeto: ObservableObject {
             return (persona, false)
         }
 
-        // Lo que mas llama la atencion en el cuadro.
-        let objetos = (saliencia.results?.first as? VNSaliencyImageObservation)?
-            .salientObjects ?? []
-        if let objeto = mejor(objetos, preferido: ultimaCaja) {
+        // Objetos definidos (suelen ser cosas concretas como laptop, taza, etc).
+        let objetos = ((objetosReq.results?.first as? VNSaliencyImageObservation)?
+            .salientObjects ?? []).filter { area($0.boundingBox) > 0.008 }
+        if let objeto = mejorObjeto(objetos, preferido: ultimaCaja) {
+            return (objeto, false)
+        }
+
+        // Fallback: lo que mas llama la atencion.
+        let atentos = ((atencion.results?.first as? VNSaliencyImageObservation)?
+            .salientObjects ?? []).filter { area($0.boundingBox) > 0.012 }
+        if let objeto = mejorObjeto(atentos, preferido: ultimaCaja) {
             return (objeto, false)
         }
 
@@ -244,6 +252,58 @@ final class RastreadorSujeto: ObservableObject {
         }
 
         return observaciones.max(by: { area($0.boundingBox) < area($1.boundingBox) })
+    }
+
+    /// Para objetos/saliencia: prefiere sujetos centrados y de tamano razonable,
+    /// no parches chicos en una esquina.
+    private func mejorObjeto(
+        _ observaciones: [VNDetectedObjectObservation],
+        preferido: CGRect?
+    ) -> VNDetectedObjectObservation? {
+        guard !observaciones.isEmpty else { return nil }
+
+        let centroImagen = CGPoint(x: 0.5, y: 0.5)
+
+        if let preferido = preferido {
+            let centro = CGPoint(x: preferido.midX, y: 1 - preferido.midY)
+            return observaciones.max { a, b in
+                puntajeObjeto(a, cercaDe: centro, anterior: preferido, centroImagen: centroImagen)
+                    < puntajeObjeto(b, cercaDe: centro, anterior: preferido, centroImagen: centroImagen)
+            }
+        }
+
+        return observaciones.max { a, b in
+            puntajeObjetoNuevo(a, centroImagen: centroImagen)
+                < puntajeObjetoNuevo(b, centroImagen: centroImagen)
+        }
+    }
+
+    private func puntajeObjeto(
+        _ obs: VNDetectedObjectObservation,
+        cercaDe centro: CGPoint,
+        anterior: CGRect,
+        centroImagen: CGPoint
+    ) -> CGFloat {
+        let caja = obs.boundingBox
+        let c = CGPoint(x: caja.midX, y: caja.midY)
+        let dist = hypot(c.x - centro.x, c.y - centro.y)
+        let tam = area(caja)
+        let tamAnterior = max(areaVision(anterior), 0.001)
+        let parecido = 1 - min(abs(tam - tamAnterior) / tamAnterior, 1)
+        let central = 1 - min(hypot(c.x - centroImagen.x, c.y - centroImagen.y), 1)
+
+        return (1 - min(dist, 1)) * 1.6 + parecido * 0.4 + min(tam * 3, 1) * 0.25 + central * 0.15
+    }
+
+    private func puntajeObjetoNuevo(_ obs: VNDetectedObjectObservation, centroImagen: CGPoint) -> CGFloat {
+        let caja = obs.boundingBox
+        let c = CGPoint(x: caja.midX, y: caja.midY)
+        let tam = area(caja)
+        let central = 1 - min(hypot(c.x - centroImagen.x, c.y - centroImagen.y) * 1.4, 1)
+        // Penaliza cosas muy chicas o gigantes (fondo completo).
+        let tamBueno = tam > 0.02 && tam < 0.7 ? min(tam * 3.5, 1) : tam * 0.5
+
+        return tamBueno * 0.55 + central * 0.35 + CGFloat(obs.confidence) * 0.1
     }
 
     private func puntaje(

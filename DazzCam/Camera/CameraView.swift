@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.7 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.8 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -396,7 +396,11 @@ struct CameraView: View {
             guard mostrarGuia else { return }
 
             if let caja = caja,
-               let nueva = AestheticAnalyzer.guia(paraCaja: caja, esCara: esCara) {
+               let nueva = AestheticAnalyzer.guia(
+                   paraCaja: caja,
+                   esCara: esCara,
+                   destinoAnterior: guia?.destino
+               ) {
                 sujetoEsCara = esCara
                 let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
                 refrescarGuia(nueva, tamano: tamano)

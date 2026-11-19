@@ -252,9 +252,18 @@ enum AestheticAnalyzer {
     /// Guia a partir de una caja ya seguida cuadro a cuadro. La usa el
     /// rastreador en vivo: la caja se recalcula en cada frame y la
     /// instruccion cambia al instante.
-    static func guia(paraCaja caja: CGRect, esCara: Bool) -> Guia? {
+    static func guia(
+        paraCaja caja: CGRect,
+        esCara: Bool,
+        destinoAnterior: CGPoint? = nil
+    ) -> Guia? {
         guard caja.width > 0.004, caja.height > 0.004 else { return nil }
-        return componerGuia(nucleo: recortar(caja), otros: [], esCara: esCara)
+        return componerGuia(
+            nucleo: recortar(caja),
+            otros: [],
+            esCara: esCara,
+            destinoAnterior: destinoAnterior
+        )
     }
 
     /// Elige al sujeto, calcula su caja y el cruce de tercios que le queda
@@ -288,13 +297,14 @@ enum AestheticAnalyzer {
 
         guard let base = nucleo else { return nil }
 
-        return componerGuia(nucleo: base, otros: otros, esCara: !caras.isEmpty)
+        return componerGuia(nucleo: base, otros: otros, esCara: !caras.isEmpty, destinoAnterior: nil)
     }
 
     private static func componerGuia(
         nucleo base: CGRect,
         otros: [CGRect],
-        esCara: Bool
+        esCara: Bool,
+        destinoAnterior: CGPoint? = nil
     ) -> Guia? {
         let centro = CGPoint(x: base.midX, y: base.midY)
 
@@ -307,8 +317,8 @@ enum AestheticAnalyzer {
             ancho = min(max(base.width * 2.05, 0.26), 0.80)
             alto = min(max(base.height * 2.45, 0.30), 0.86)
         } else {
-            ancho = min(max(base.width * 1.14, 0.20), 0.74)
-            alto = min(max(base.height * 1.14, 0.20), 0.74)
+            ancho = min(max(base.width * 1.28, 0.22), 0.76)
+            alto = min(max(base.height * 1.28, 0.22), 0.76)
         }
 
         let dibujo = CGRect(
@@ -349,6 +359,12 @@ enum AestheticAnalyzer {
                 ? (0.5 - centro.x) * 0.24
                 : (centro.x - 0.5) * 0.24
 
+            // Mantener el mismo destino evita que el punto salte de lado.
+            if let anterior = destinoAnterior {
+                let salto = hypot(cruce.x - anterior.x, cruce.y - anterior.y)
+                puntos += salto > 0.1 ? salto * 0.55 : 0
+            }
+
             if puntos < mejor {
                 mejor = puntos
                 destino = cruce
@@ -357,7 +373,7 @@ enum AestheticAnalyzer {
 
         let dx = destino.x - centro.x
         let dy = destino.y - centro.y
-        let cerca = abs(dx) < 0.045 && abs(dy) < 0.05
+        let cerca = abs(dx) < 0.06 && abs(dy) < 0.065
 
         var listo = cerca
         var partes: [String] = []
