@@ -76,7 +76,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.12 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.13 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {

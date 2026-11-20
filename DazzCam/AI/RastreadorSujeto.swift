@@ -1,3 +1,4 @@
+import Accelerate
 import Combine
 import CoreGraphics
 import CoreVideo
@@ -40,6 +41,10 @@ final class RastreadorSujeto: ObservableObject {
 
     private var ocupado = false
     private var ultimo: CFAbsoluteTime = 0
+
+    /// Frame chico reutilizado para Vision (evita crear memoria cada cuadro).
+    private var bufferChico: CVPixelBuffer?
+    private var tamanoChico: (ancho: Int, alto: Int)?
 
     /// Rapido para que el recuadro se sienta pegado al sujeto.
     private let intervalo: CFAbsoluteTime = 1.0 / 24.0
@@ -115,7 +120,9 @@ final class RastreadorSujeto: ObservableObject {
         cola.async { [weak self] in
             guard let self else { return }
 
-            let resultado = self.procesar(buffer)
+            // Vision sobre un frame chico: vuela y deja de costar tanto.
+            let chico = self.reducir(buffer, ancho: 480)
+            let resultado = self.procesar(chico ?? buffer)
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -138,6 +145,75 @@ final class RastreadorSujeto: ObservableObject {
     }
 
     // MARK: - Seguimiento
+
+    /// Encoge el frame a ~480 px de ancho antes de Vision. Las cajas siguen
+    /// siendo normalizadas (0 a 1), asi que no hay que convertir nada.
+    private func reducir(_ buffer: CVPixelBuffer, ancho: Int) -> CVPixelBuffer? {
+        let w = CVPixelBufferGetWidth(buffer)
+        let h = CVPixelBufferGetHeight(buffer)
+        guard w > ancho, h > 0 else { return buffer }
+
+        let alto = max(Int((Double(ancho) * Double(h) / Double(w)).rounded()), 1)
+
+        let destino: CVPixelBuffer
+
+        if let actual = bufferChico,
+           let tam = tamanoChico,
+           tam.ancho == ancho,
+           tam.alto == alto {
+            destino = actual
+        } else {
+            var nuevo: CVPixelBuffer?
+            let atributos: [CFString: Any] = [
+                kCVPixelBufferCGImageCompatibilityKey: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey: true
+            ]
+            guard CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                ancho,
+                alto,
+                kCVPixelFormatType_32BGRA,
+                atributos as CFDictionary,
+                &nuevo
+            ) == kCVReturnSuccess, let creado = nuevo else {
+                return nil
+            }
+            bufferChico = creado
+            tamanoChico = (ancho, alto)
+            destino = creado
+        }
+
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        CVPixelBufferLockBaseAddress(destino, [])
+        defer {
+            CVPixelBufferUnlockBaseAddress(destino, [])
+            CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+        }
+
+        guard let origenDatos = CVPixelBufferGetBaseAddress(buffer),
+              let destinoDatos = CVPixelBufferGetBaseAddress(destino) else {
+            return nil
+        }
+
+        var origen = vImage_Buffer(
+            data: origenDatos,
+            height: vImagePixelCount(h),
+            width: vImagePixelCount(w),
+            rowBytes: CVPixelBufferGetBytesPerRow(buffer)
+        )
+        var reducido = vImage_Buffer(
+            data: destinoDatos,
+            height: vImagePixelCount(alto),
+            width: vImagePixelCount(ancho),
+            rowBytes: CVPixelBufferGetBytesPerRow(destino)
+        )
+
+        guard vImageScale_ARGB8888(&origen, &reducido, nil, vImage_Flags(kvImageNoFlags)) == kvImageNoError else {
+            return nil
+        }
+
+        return destino
+    }
 
     private func procesar(_ buffer: CVPixelBuffer) -> Resultado? {
         if let peticion {
@@ -255,40 +331,39 @@ final class RastreadorSujeto: ObservableObject {
     private func detectar(
         _ buffer: CVPixelBuffer
     ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
-        let caras = VNDetectFaceRectanglesRequest()
-        let personas = VNDetectHumanRectanglesRequest()
-        let atencion = VNGenerateAttentionBasedSaliencyImageRequest()
-        let objetosReq = VNGenerateObjectnessBasedSaliencyImageRequest()
         let manejador = VNImageRequestHandler(
             cvPixelBuffer: buffer,
             orientation: .up,
             options: [:]
         )
 
-        do {
-            try manejador.perform([caras, personas, atencion, objetosReq])
-        } catch {
+        // Primero lo barato: caras y personas. Casi siempre alcanza.
+        let caras = VNDetectFaceRectanglesRequest()
+        let personas = VNDetectHumanRectanglesRequest()
+
+        if (try? manejador.perform([caras, personas])) != nil {
+            if let cara = mejor(caras.results ?? [], preferido: nil) {
+                return (cara, true)
+            }
+            if let persona = mejor(personas.results ?? [], preferido: ultimaCaja) {
+                return (persona, false)
+            }
+        }
+
+        // Sin gente: lo que mas resalta (objetos primero).
+        let objetosReq = VNGenerateObjectnessBasedSaliencyImageRequest()
+        let atencion = VNGenerateAttentionBasedSaliencyImageRequest()
+
+        guard (try? manejador.perform([objetosReq, atencion])) != nil else {
             return nil
         }
 
-        // Cara = sujeto mas claro (retrato).
-        if let cara = mejor(caras.results ?? [], preferido: nil) {
-            return (cara, true)
-        }
-
-        // Persona completa.
-        if let persona = mejor(personas.results ?? [], preferido: ultimaCaja) {
-            return (persona, false)
-        }
-
-        // Objetos definidos (suelen ser cosas concretas como laptop, taza, etc).
         let objetos = ((objetosReq.results?.first as? VNSaliencyImageObservation)?
             .salientObjects ?? []).filter { area($0.boundingBox) > 0.008 }
         if let objeto = mejorObjeto(objetos, preferido: ultimaCaja) {
             return (objeto, false)
         }
 
-        // Fallback: lo que mas llama la atencion.
         let atentos = ((atencion.results?.first as? VNSaliencyImageObservation)?
             .salientObjects ?? []).filter { area($0.boundingBox) > 0.012 }
         if let objeto = mejorObjeto(atentos, preferido: ultimaCaja) {
