@@ -414,12 +414,12 @@ enum AestheticAnalyzer {
         // La IA acerca sola: si el sujeto esta lejos, sube el zoom en vez de
         // pedirle al usuario que camine. Si esta muy grande, lo baja.
         var zoom: CGFloat?
-        let alto = dibujo.height
+        let altoCaja = dibujo.height
 
-        if alto < 0.30 {
-            zoom = min(max(0.52 / max(alto, 0.06), 1.2), 2.0)
-        } else if alto > 0.82 {
-            zoom = max(0.66 / alto, 0.6)
+        if altoCaja < 0.30 {
+            zoom = min(max(0.52 / max(altoCaja, 0.06), 1.2), 2.0)
+        } else if altoCaja > 0.82 {
+            zoom = max(0.66 / altoCaja, 0.6)
         }
 
         return Guia(
