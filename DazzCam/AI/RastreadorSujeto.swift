@@ -33,11 +33,13 @@ final class RastreadorSujeto: ObservableObject {
     private var peticion: VNTrackObjectRequest?
     private var perdidos = 0
     private var cuadrosSeguidos = 0
+    private var cuadrosEstetica = 0
     private var ultimaCaja: CGRect?
     private var ultimaCara = false
     private var generacion = 0
     private var ultimaDeteccion: CFAbsoluteTime = 0
     private var ultimaVezVisto: CFAbsoluteTime = 0
+    private var ultimaClasificacion: CFAbsoluteTime = 0
 
     private var ocupado = false
     private var ultimo: CFAbsoluteTime = 0
@@ -66,10 +68,12 @@ final class RastreadorSujeto: ObservableObject {
             self.peticion = nil
             self.perdidos = 0
             self.cuadrosSeguidos = 0
+            self.cuadrosEstetica = 0
             self.ultimaCaja = nil
             self.ultimaCara = false
             self.ultimaDeteccion = 0
             self.ultimaVezVisto = 0
+            self.ultimaClasificacion = 0
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -241,6 +245,24 @@ final class RastreadorSujeto: ObservableObject {
                     }
                 }
 
+                // Cada ~4 segundos revisa que el sujeto no sea algo feo
+                // (pared, mesa, texto) y, si lo es, se cambia a algo mejor.
+                cuadrosEstetica += 1
+                if cuadrosEstetica >= 96 {
+                    cuadrosEstetica = 0
+                    if let bonito = revisarEstetica(buffer, actual: observacion.boundingBox) {
+                        let dist = hypot(
+                            bonito.objeto.boundingBox.midX - observacion.boundingBox.midX,
+                            bonito.objeto.boundingBox.midY - observacion.boundingBox.midY
+                        )
+                        if dist > 0.08 {
+                            peticion.inputObservation = bonito.objeto
+                            ultimaCara = bonito.esCara
+                            return publicar(bonito.objeto.boundingBox, esCara: bonito.esCara)
+                        }
+                    }
+                }
+
                 return publicar(observacion.boundingBox, esCara: ultimaCara)
             }
 
@@ -258,6 +280,7 @@ final class RastreadorSujeto: ObservableObject {
                     if ultimaCaja == nil || dist < 0.25 {
                         perdidos = 0
                         cuadrosSeguidos = 0
+                        cuadrosEstetica = 0
                         ultimaCara = encontrado.esCara
                         ultimaVezVisto = ahora
                         let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
@@ -301,6 +324,7 @@ final class RastreadorSujeto: ObservableObject {
 
         perdidos = 0
         cuadrosSeguidos = 0
+        cuadrosEstetica = 0
         ultimaCara = encontrado.esCara
         ultimaVezVisto = ahora
 
@@ -350,7 +374,7 @@ final class RastreadorSujeto: ObservableObject {
             }
         }
 
-        // Sin gente: lo que mas resalta (objetos primero).
+        // Sin gente: juntar objetos candidatos y quedarse con el mas aesthetic.
         let objetosReq = VNGenerateObjectnessBasedSaliencyImageRequest()
         let atencion = VNGenerateAttentionBasedSaliencyImageRequest()
 
@@ -360,17 +384,60 @@ final class RastreadorSujeto: ObservableObject {
 
         let objetos = ((objetosReq.results?.first as? VNSaliencyImageObservation)?
             .salientObjects ?? []).filter { area($0.boundingBox) > 0.008 }
-        if let objeto = mejorObjeto(objetos, preferido: ultimaCaja) {
-            return (objeto, false)
-        }
-
         let atentos = ((atencion.results?.first as? VNSaliencyImageObservation)?
             .salientObjects ?? []).filter { area($0.boundingBox) > 0.012 }
-        if let objeto = mejorObjeto(atentos, preferido: ultimaCaja) {
-            return (objeto, false)
+
+        struct Candidato {
+            let objeto: VNDetectedObjectObservation
+            let definido: Bool
         }
 
-        return nil
+        var candidatos: [Candidato] = objetos.map { Candidato(objeto: $0, definido: true) }
+        candidatos += atentos.map { Candidato(objeto: $0, definido: false) }
+
+        guard !candidatos.isEmpty else { return nil }
+
+        // Los 3 mejores por forma/tamano/centro; entre ellos, gana el que
+        // se vea mas aesthetic (comida, plantas, arquitectura, arte...).
+        let ordenados = candidatos.sorted {
+            puntajeForma($0.objeto, definido: $0.definido)
+                > puntajeForma($1.objeto, definido: $1.definido)
+        }
+        let finalistas = Array(ordenados.prefix(3))
+
+        let ahora = CFAbsoluteTimeGetCurrent()
+        let puedeClasificar = ahora - ultimaClasificacion >= 0.8
+        if puedeClasificar {
+            ultimaClasificacion = ahora
+        }
+
+        var elegido = finalistas[0]
+        var mejorPuntaje = -CGFloat.infinity
+
+        for candidato in finalistas {
+            var puntos = puntajeForma(candidato.objeto, definido: candidato.definido)
+
+            // Si ya seguiamos algo, no saltar lejos de ahi.
+            if let anterior = ultimaCaja {
+                let c = CGPoint(x: candidato.objeto.boundingBox.midX, y: candidato.objeto.boundingBox.midY)
+                let dist = hypot(c.x - anterior.midX, c.y - (1 - anterior.midY))
+                puntos -= min(dist, 1) * 0.5
+            }
+
+            if puedeClasificar {
+                puntos += bonusEstetico(
+                    candidato.objeto.boundingBox,
+                    manejador: manejador
+                )
+            }
+
+            if puntos > mejorPuntaje {
+                mejorPuntaje = puntos
+                elegido = candidato
+            }
+        }
+
+        return (elegido.objeto, false)
     }
 
     /// Elige la mejor deteccion: si ya seguiamos algo, prefiere la que queda
@@ -381,89 +448,145 @@ final class RastreadorSujeto: ObservableObject {
     ) -> VNDetectedObjectObservation? {
         guard !observaciones.isEmpty else { return nil }
 
-        if let preferido = preferido {
+        if let preferido {
             let centro = CGPoint(x: preferido.midX, y: 1 - preferido.midY)
 
             return observaciones.max { a, b in
-                puntaje(a, cercaDe: centro, anterior: preferido)
-                    < puntaje(b, cercaDe: centro, anterior: preferido)
+                puntajeCerca(a, centro: centro, anterior: preferido)
+                    < puntajeCerca(b, centro: centro, anterior: preferido)
             }
         }
 
         return observaciones.max(by: { area($0.boundingBox) < area($1.boundingBox) })
     }
 
-    /// Para objetos/saliencia: prefiere sujetos centrados y de tamano razonable,
-    /// no parches chicos en una esquina.
-    private func mejorObjeto(
-        _ observaciones: [VNDetectedObjectObservation],
-        preferido: CGRect?
-    ) -> VNDetectedObjectObservation? {
-        guard !observaciones.isEmpty else { return nil }
-
-        let centroImagen = CGPoint(x: 0.5, y: 0.5)
-
-        if let preferido = preferido {
-            let centro = CGPoint(x: preferido.midX, y: 1 - preferido.midY)
-            return observaciones.max { a, b in
-                puntajeObjeto(a, cercaDe: centro, anterior: preferido, centroImagen: centroImagen)
-                    < puntajeObjeto(b, cercaDe: centro, anterior: preferido, centroImagen: centroImagen)
-            }
-        }
-
-        return observaciones.max { a, b in
-            puntajeObjetoNuevo(a, centroImagen: centroImagen)
-                < puntajeObjetoNuevo(b, centroImagen: centroImagen)
-        }
-    }
-
-    private func puntajeObjeto(
+    /// Para caras y personas: cerca y de tamano parecido gana.
+    private func puntajeCerca(
         _ obs: VNDetectedObjectObservation,
-        cercaDe centro: CGPoint,
-        anterior: CGRect,
-        centroImagen: CGPoint
-    ) -> CGFloat {
-        let caja = obs.boundingBox
-        let c = CGPoint(x: caja.midX, y: caja.midY)
-        let dist = hypot(c.x - centro.x, c.y - centro.y)
-        let tam = area(caja)
-        let tamAnterior = max(areaVision(anterior), 0.001)
-        let parecido = 1 - min(abs(tam - tamAnterior) / tamAnterior, 1)
-        let central = 1 - min(hypot(c.x - centroImagen.x, c.y - centroImagen.y), 1)
-
-        return (1 - min(dist, 1)) * 1.6 + parecido * 0.4 + min(tam * 3, 1) * 0.25 + central * 0.15
-    }
-
-    private func puntajeObjetoNuevo(_ obs: VNDetectedObjectObservation, centroImagen: CGPoint) -> CGFloat {
-        let caja = obs.boundingBox
-        let c = CGPoint(x: caja.midX, y: caja.midY)
-        let tam = area(caja)
-        let central = 1 - min(hypot(c.x - centroImagen.x, c.y - centroImagen.y) * 1.4, 1)
-        // Penaliza cosas muy chicas o gigantes (fondo completo).
-        let tamBueno = tam > 0.02 && tam < 0.7 ? min(tam * 3.5, 1) : tam * 0.5
-
-        return tamBueno * 0.55 + central * 0.35 + CGFloat(obs.confidence) * 0.1
-    }
-
-    private func puntaje(
-        _ obs: VNDetectedObjectObservation,
-        cercaDe centro: CGPoint,
+        centro: CGPoint,
         anterior: CGRect
     ) -> CGFloat {
         let caja = obs.boundingBox
         let c = CGPoint(x: caja.midX, y: caja.midY)
         let dist = hypot(c.x - centro.x, c.y - centro.y)
         let tam = area(caja)
-        let tamAnterior = max(areaVision(anterior), 0.001)
+        let tamAnterior = max(anterior.width * anterior.height, 0.001)
         let parecido = 1 - min(abs(tam - tamAnterior) / tamAnterior, 1)
 
-        // Cerca y de tamano parecido gana; el tamano ayuda a desempatar.
         return (1 - min(dist, 1)) * 1.4 + parecido * 0.4 + min(tam * 4, 1) * 0.2
     }
 
-    private func areaVision(_ cajaTopLeft: CGRect) -> CGFloat {
-        cajaTopLeft.width * cajaTopLeft.height
+    /// Forma/tamano/posicion: prefiere cosas completas, centradas y de buen
+    /// tamano; castiga parches en el borde y tiras raras.
+    private func puntajeForma(
+        _ obs: VNDetectedObjectObservation,
+        definido: Bool
+    ) -> CGFloat {
+        let caja = obs.boundingBox
+        let c = CGPoint(x: caja.midX, y: caja.midY)
+        let tam = area(caja)
+
+        let central = 1 - min(hypot(c.x - 0.5, c.y - 0.5) * 1.3, 1)
+
+        let tamBueno: CGFloat
+        if tam < 0.02 {
+            tamBueno = tam * 8
+        } else if tam > 0.55 {
+            tamBueno = 0.55 / tam
+        } else {
+            tamBueno = 0.7 + tam
+        }
+
+        // Una caja pegada al borde suele ser pared, mesa o piso.
+        let tocaBorde: CGFloat =
+            (caja.minX < 0.03 || caja.maxX > 0.97 || caja.minY < 0.03 || caja.maxY > 0.97)
+            ? 0.35
+            : 1.0
+
+        let ratio = caja.width / max(caja.height, 0.001)
+        let forma: CGFloat = (ratio > 0.35 && ratio < 2.8) ? 1.0 : 0.6
+
+        let tipo: CGFloat = definido ? 1.15 : 1.0
+
+        return (tamBueno * 0.9 + central * 0.9) * tocaBorde * forma * tipo
     }
+
+    /// Suma puntos si lo que hay dentro de la caja se ve aesthetic.
+    private func bonusEstetico(
+        _ caja: CGRect,
+        manejador: VNImageRequestHandler
+    ) -> CGFloat {
+        let clasificar = VNClassifyImageRequest()
+        clasificar.regionOfInterest = caja
+
+        guard (try? manejador.perform([clasificar])) != nil else { return 0 }
+
+        var bueno: CGFloat = 0
+        var malo: CGFloat = 0
+
+        // Se miran bastantes etiquetas: la buena suele venir mas abajo que
+        // las cuatro primeras (que casi siempre son "wall", "indoor"...).
+        for etiqueta in (clasificar.results ?? []).prefix(40) {
+            let id = etiqueta.identifier
+                .replacingOccurrences(of: "_", with: " ")
+                .lowercased()
+            let palabras = Set(id.split(separator: " ").map(String.init))
+            let confianza = CGFloat(etiqueta.confidence)
+
+            if !palabras.isDisjoint(with: Self.buenas) {
+                bueno = max(bueno, confianza)
+            } else if !palabras.isDisjoint(with: Self.malas) {
+                malo = max(malo, confianza)
+            }
+        }
+
+        return bueno * 1.8 - malo * 1.1
+    }
+
+    /// Cada tanto revisa que lo que estamos siguiendo no sea una pared, una
+    /// mesa o texto. Si salio feo, busca algo mejor y se cambia.
+    private func revisarEstetica(
+        _ buffer: CVPixelBuffer,
+        actual: CGRect
+    ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
+        let manejador = VNImageRequestHandler(
+            cvPixelBuffer: buffer,
+            orientation: .up,
+            options: [:]
+        )
+
+        guard bonusEstetico(actual, manejador: manejador) <= -0.45 else { return nil }
+        return detectar(buffer)
+    }
+
+    /// Lo que se ve lindo en una foto (palabras exactas de Vision).
+    private static let buenas: Set<String> = [
+        "person", "people", "portrait", "face", "selfie", "smile", "family",
+        "baby", "child", "kid", "man", "woman", "bride", "groom",
+        "pet", "dog", "puppy", "cat", "kitten", "animal", "bird", "horse",
+        "flower", "flowers", "blossom", "bouquet", "plant", "houseplant",
+        "succulent", "foliage", "tree", "forest", "garden", "park",
+        "food", "meal", "dish", "cuisine", "dessert", "cake", "bread",
+        "bakery", "pizza", "sushi", "seafood", "fruit", "produce",
+        "vegetable", "coffee", "drink", "beverage", "cocktail", "wine",
+        "sky", "cloud", "clouds", "sunset", "sunrise", "landscape",
+        "beach", "coast", "sea", "ocean", "lake", "river", "waterfall",
+        "mountain", "snow", "desert", "island", "harbor", "water",
+        "architecture", "building", "house", "church", "castle", "bridge",
+        "skyscraper", "tower", "monument", "statue", "sculpture", "museum",
+        "street", "city", "downtown", "alley", "art", "artwork", "painting",
+        "graffiti", "vehicle", "car", "motorcycle", "bicycle", "boat",
+        "train", "airplane", "fashion", "jewelry", "footwear", "book",
+        "guitar", "instrument", "stage", "concert", "fireworks"
+    ]
+
+    /// Lo que suele quedar feo como sujeto.
+    private static let malas: Set<String> = [
+        "text", "document", "receipt", "screenshot", "wall", "ceiling",
+        "floor", "carpet", "pattern", "paper", "keyboard", "whiteboard",
+        "blank", "plastic", "cardboard", "trash", "garbage", "wire", "cable",
+        "metal", "concrete", "asphalt", "tile", "curtain", "blinds"
+    ]
 
     /// Pasa la caja a coordenadas de pantalla y la suaviza para que no tiemble.
     private func publicar(_ cajaVision: CGRect, esCara: Bool) -> Resultado {
