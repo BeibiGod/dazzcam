@@ -9,6 +9,9 @@ struct CameraBar: View {
     let grabando: Bool
     let procesando: Bool
     let segundos: Int
+    /// true cuando la IA ya dejo el encuadre listo: el disparador se pone
+    /// amarillo, igual que en Framed.
+    var listo: Bool = false
 
     var alDisparar: () -> Void
     var alImportar: () -> Void
@@ -112,8 +115,15 @@ struct CameraBar: View {
                 Button(action: alDisparar) {
                     ZStack {
                         Circle()
-                            .strokeBorder(.white, lineWidth: 4)
+                            .strokeBorder(
+                                listo ? Color.yellow : .white,
+                                lineWidth: listo ? 5 : 4
+                            )
                             .frame(width: 78, height: 78)
+                            .shadow(
+                                color: listo ? Color.yellow.opacity(0.65) : .clear,
+                                radius: listo ? 10 : 0
+                            )
 
                         if grabando {
                             RoundedRectangle(cornerRadius: 7)
@@ -121,10 +131,15 @@ struct CameraBar: View {
                                 .frame(width: 32, height: 32)
                         } else {
                             Circle()
-                                .fill(capturando || procesando ? Color.gray : Color.white)
+                                .fill(
+                                    capturando || procesando
+                                        ? Color.gray
+                                        : Color.white
+                                )
                                 .frame(width: 64, height: 64)
                         }
                     }
+                    .animation(.easeOut(duration: 0.18), value: listo)
                 }
                 .buttonStyle(.plain)
                 .disabled(capturando || procesando)

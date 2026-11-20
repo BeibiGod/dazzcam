@@ -31,6 +31,8 @@ struct CameraView: View {
     @State private var tamanoGuia: CGSize?
     @State private var analizando = false
     @State private var halago: String?
+    @State private var cuentaGuia: Int?
+    @State private var tareaCuenta: Task<Void, Never>?
     @State private var zoomIA: CGFloat?
     @State private var volvioA1x = false
     @State private var sujetoEsCara = false
@@ -79,7 +81,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.16 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.17 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -102,6 +104,14 @@ struct CameraView: View {
 
                 visor(geo)
 
+                if let n = cuentaGuia, guia == nil {
+                    Text("\(n)")
+                        .font(.system(size: 86, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .shadow(color: .black.opacity(0.55), radius: 18)
+                        .transition(.opacity)
+                }
+
                 if let cuenta = cuenta {
                     Text("\(cuenta)")
                         .font(.system(size: 130, weight: .heavy, design: .rounded))
@@ -113,22 +123,6 @@ struct CameraView: View {
                 VStack(spacing: 0) {
                     cabecera
                         .padding(.top, insetArriba + 6)
-
-                    if mostrarGuia {
-                        if let guia = guia {
-                            instruccionGuia(guia)
-                                .padding(.top, 12)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                        } else {
-                            Text(analizando || rastreador.buscando ? "Buscando tu toma..." : "No veo un sujeto claro: apunta a algo con detalle.")
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.9))
-                                .multilineTextAlignment(.center)
-                                .shadow(color: .black.opacity(0.85), radius: 4, x: 0, y: 1)
-                                .padding(.horizontal, 24)
-                                .padding(.top, 12)
-                        }
-                    }
 
                     Spacer(minLength: 0)
 
@@ -176,6 +170,11 @@ struct CameraView: View {
                         barraGuia(analisis, guia: guia)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
+                    }
+
+                    if mostrarGuia {
+                        instruccionGuia(guia)
+                            .padding(.bottom, 10)
                     }
 
                     if analizando, !mostrarGuia {
@@ -228,6 +227,7 @@ struct CameraView: View {
                         grabando: video.grabando,
                         procesando: video.procesando,
                         segundos: video.segundos,
+                        listo: guia?.listo ?? false,
                         alDisparar: accionDeDisparo,
                         alImportar: { mostrarImportar = true },
                         alAbrirTodas: { mostrarTodas = true }
@@ -377,6 +377,7 @@ struct CameraView: View {
         }
         .onDisappear {
             rastreador.parar()
+            detenerCuentaGuia()
             nivel.parar()
             camara.detener()
         }
@@ -386,6 +387,7 @@ struct CameraView: View {
                 rastreador.empezar()
             } else {
                 rastreador.parar()
+                detenerCuentaGuia()
                 zoomIA = nil
                 halago = nil
                 guia = nil
@@ -793,17 +795,11 @@ struct CameraView: View {
             }
 
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(color, lineWidth: guia.listo ? 3.5 : 3)
+                .strokeBorder(color, lineWidth: 3)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
-                .shadow(color: color.opacity(0.4), radius: guia.listo ? 8 : 3)
-
-            if guia.listo {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(color.opacity(0.3), lineWidth: 8)
-                    .frame(width: rect.width + 10, height: rect.height + 10)
-                    .position(x: rect.midX, y: rect.midY)
-            }
+                .opacity(guia.listo ? 0 : 1)
+                .shadow(color: color.opacity(0.4), radius: 3)
 
             etiquetaSujeto(etiqueta, color: color)
                 .position(
@@ -954,31 +950,32 @@ struct CameraView: View {
         )
     }
 
-    /// Instruccion grande arriba, como en el video: que mover y, cuando ya
-    /// quedo, un halago corto.
-    private func instruccionGuia(_ guia: Guia) -> some View {
-        VStack(spacing: 5) {
-            Text(guia.instruccion)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(guia.listo ? Self.verdeGuia : Self.amarilloGuia)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.75)
-                .shadow(color: .black.opacity(0.85), radius: 6, x: 0, y: 2)
-
-            if guia.listo, let halago = halago {
-                Text(halago)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+    /// Texto de abajo, como en Framed: "Buscando tu toma...", la instruccion
+    /// para mover el telefono, y en verde cuando ya quedo.
+    private func instruccionGuia(_ guia: Guia?) -> some View {
+        Group {
+            if let guia {
+                if guia.listo {
+                    Text(halago ?? String(localized: "Listo, dispara"))
+                        .foregroundStyle(Self.verdeGuia)
+                } else {
+                    Text(guia.instruccion)
+                        .foregroundStyle(.white.opacity(0.95))
+                }
+            } else {
+                Text(analizando || rastreador.buscando
+                     ? "Buscando tu toma..."
+                     : "No veo un sujeto claro: apunta a algo con detalle.")
                     .foregroundStyle(.white.opacity(0.9))
-                    .multilineTextAlignment(.center)
-                    .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 1)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, 18)
+        .font(.system(size: 12, weight: .semibold, design: .rounded))
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
+        .shadow(color: .black.opacity(0.9), radius: 5, x: 0, y: 1)
+        .padding(.horizontal, 24)
+        .transition(.opacity)
     }
 
     /// Pastilla de abajo: puntaje, acceso a las camaras y la X.
@@ -1181,6 +1178,8 @@ struct CameraView: View {
     }
 
     /// 0.5x, 1x y 3x, centrados justo arriba del nombre de la camara.
+    /// Mientras la IA guia, las lentes se atenuan y el zoom elegido se ve
+    /// en amarillo, como en Framed.
     private var barraLentes: some View {
         HStack(spacing: 8) {
             ForEach(camara.lentes) { lente in
@@ -1190,12 +1189,16 @@ struct CameraView: View {
                 } label: {
                     Text(lente.etiqueta)
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(lenteActiva(lente) ? Color.black : Color.white)
+                        .foregroundStyle(
+                            lenteActiva(lente)
+                                ? Color.black
+                                : Color.white.opacity(mostrarGuia ? 0.5 : 1)
+                        )
                         .frame(width: 36, height: 36)
                         .background(
                             lenteActiva(lente)
                                 ? Color.yellow
-                                : Color.black.opacity(0.5),
+                                : Color.black.opacity(mostrarGuia ? 0.35 : 0.5),
                             in: Circle()
                         )
                         .overlay(
@@ -1211,10 +1214,13 @@ struct CameraView: View {
             if !enDistanciaTipica {
                 Text(String(format: "%.1fx", camara.zoom))
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Color.yellow, in: Circle())
                     .fixedSize()
             }
         }
+        .animation(.easeOut(duration: 0.18), value: mostrarGuia)
     }
 
     /// FOTO o VIDEO, abajo a la derecha.
@@ -1420,6 +1426,32 @@ struct CameraView: View {
         "Encuadre listo"
     ]
 
+    /// Cuenta 3-2-1 mientras la IA mira la escena, como en Framed.
+    private func iniciarCuentaGuia() {
+        tareaCuenta?.cancel()
+        cuentaGuia = 3
+
+        tareaCuenta = Task { @MainActor in
+            for numero in [3, 2, 1] {
+                if Task.isCancelled || !mostrarGuia { break }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    cuentaGuia = numero
+                }
+                try? await Task.sleep(nanoseconds: 700_000_000)
+            }
+
+            withAnimation(.easeOut(duration: 0.25)) {
+                cuentaGuia = nil
+            }
+        }
+    }
+
+    private func detenerCuentaGuia() {
+        tareaCuenta?.cancel()
+        tareaCuenta = nil
+        cuentaGuia = nil
+    }
+
     /// Acerca o aleja el zoom solo cuando la sugerencia se mantiene estable,
     /// para que no ande bombeando con el temblor del recuadro.
     private func programarZoom(_ factor: CGFloat?) {
@@ -1464,6 +1496,7 @@ struct CameraView: View {
     private func analizarEscena() {
         // Si ya hay guia abierta, un toque en IA la cierra.
         if mostrarGuia {
+            detenerCuentaGuia()
             withAnimation(.easeOut(duration: 0.2)) {
                 mostrarGuia = false
                 guia = nil
@@ -1477,6 +1510,7 @@ struct CameraView: View {
         analisis = nil
         sujetoEsCara = false
         tamanoGuia = vivo.imagen?.size ?? CGSize(width: 9, height: 16)
+        iniciarCuentaGuia()
 
         let tieneUltra = camara.lentes.contains(.ultra)
 
