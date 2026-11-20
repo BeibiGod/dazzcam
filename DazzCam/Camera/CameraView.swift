@@ -34,6 +34,9 @@ struct CameraView: View {
     @State private var zoomIA: CGFloat?
     @State private var volvioA1x = false
     @State private var sujetoEsCara = false
+    @State private var zoomPendiente: CGFloat?
+    @State private var zoomDesde = Date()
+    @State private var zoomEnfriando = Date.distantPast
     @State private var modo: ModoCaptura = .foto
     @State private var vivoAntesDeGrabar = true
 
@@ -76,7 +79,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.13 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.14 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -389,6 +392,7 @@ struct CameraView: View {
                 analisis = nil
                 volvioA1x = true
                 sujetoEsCara = false
+                zoomPendiente = nil
 
                 if abs(camara.zoom - 0.5) < 0.08 {
                     camara.ponerZoom(1)
@@ -830,23 +834,23 @@ struct CameraView: View {
             if abs(dx) > 18 {
                 // Mover telefono en direccion opuesta al desplazamiento del sujeto en pantalla.
                 Image(systemName: dx > 0 ? "chevron.left" : "chevron.right")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(color.opacity(0.95))
-                    .shadow(color: .black.opacity(0.5), radius: 3)
+                    .shadow(color: .black.opacity(0.55), radius: 4)
                     .position(
-                        x: dx > 0 ? max(sujeto.minX - 28, 26) : min(sujeto.maxX + 28, tamano.width - 26),
+                        x: dx > 0 ? max(sujeto.minX - 32, 28) : min(sujeto.maxX + 32, tamano.width - 28),
                         y: sujeto.midY
                     )
             }
 
             if abs(dy) > 18 {
                 Image(systemName: dy > 0 ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(color.opacity(0.95))
-                    .shadow(color: .black.opacity(0.5), radius: 3)
+                    .shadow(color: .black.opacity(0.55), radius: 4)
                     .position(
                         x: sujeto.midX,
-                        y: dy > 0 ? max(sujeto.minY - 28, 110) : min(sujeto.maxY + 28, tamano.height - 210)
+                        y: dy > 0 ? max(sujeto.minY - 32, 110) : min(sujeto.maxY + 32, tamano.height - 210)
                     )
             }
         }
@@ -1388,6 +1392,9 @@ struct CameraView: View {
             guia = nueva
         }
 
+        // La IA acerca sola cuando el sujeto esta lejos.
+        programarZoom(nueva.zoom)
+
         if nueva.listo && !antesListo {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
 
@@ -1412,6 +1419,46 @@ struct CameraView: View {
         "Eso es, quedate ahi",
         "Encuadre listo"
     ]
+
+    /// Acerca o aleja el zoom solo cuando la sugerencia se mantiene estable,
+    /// para que no ande bombeando con el temblor del recuadro.
+    private func programarZoom(_ factor: CGFloat?) {
+        let ahora = Date()
+        guard ahora > zoomEnfriando else { return }
+
+        guard let factor = factor, factor > 1.25 || factor < 0.8 else {
+            zoomPendiente = nil
+            return
+        }
+
+        let redondeado = (factor * 10).rounded() / 10
+
+        if let pendiente = zoomPendiente, abs(pendiente - redondeado) < 0.2 {
+            if ahora.timeIntervalSince(zoomDesde) >= 1.1 {
+                aplicarZoom(redondeado)
+            }
+        } else {
+            zoomPendiente = redondeado
+            zoomDesde = ahora
+        }
+    }
+
+    private func aplicarZoom(_ factor: CGFloat) {
+        zoomPendiente = nil
+        zoomEnfriando = Date().addingTimeInterval(2.5)
+
+        let actual = camara.zoom
+        let nuevo = min(max(actual * factor, 1), 3)
+
+        guard abs(nuevo - actual) / max(actual, 0.01) > 0.12 else { return }
+
+        camara.ponerZoom(nuevo)
+        zoomBase = camara.zoom
+        volvioA1x = true
+
+        // Con otro zoom, el recuadro se reengancha al sujeto desde cero.
+        rastreador.empezar()
+    }
 
     private func analizarEscena() {
         // Si ya hay guia abierta, un toque en IA la cierra.

@@ -13,6 +13,9 @@ struct Guia {
     var listo: Bool
     /// Que hacer: "Mueve el telefono a la derecha", "Buen encuadre", etc.
     var instruccion: String
+    /// Cuanto acercar (o alejar) el zoom para que el sujeto quede bien.
+    /// nil = ya esta bien. Ej: 1.6 = acercar 1.6x.
+    var zoom: CGFloat?
 }
 
 /// Lo que devuelve el analisis de una escena.
@@ -399,28 +402,32 @@ enum AestheticAnalyzer {
         var instruccion: String
 
         if listo {
-            if base.height < 0.15 {
-                listo = false
-                instruccion = String(localized: "Acércate un poco")
-            } else if base.height > 0.92 {
-                listo = false
-                instruccion = String(localized: "Aléjate un poco")
-            } else {
-                instruccion = String(localized: "Buen encuadre. Dispara.")
-            }
+            instruccion = String(localized: "Buen encuadre. Dispara.")
         } else {
             let direccion = partes.joined(separator: String(localized: " y "))
             instruccion = String(
-                format: String(localized: "Mueve el teléfono %@"),
+                format: String(localized: "Apunta el iPhone %@"),
                 direccion
             )
+        }
+
+        // La IA acerca sola: si el sujeto esta lejos, sube el zoom en vez de
+        // pedirle al usuario que camine. Si esta muy grande, lo baja.
+        var zoom: CGFloat?
+        let alto = dibujo.height
+
+        if alto < 0.30 {
+            zoom = min(max(0.52 / max(alto, 0.06), 1.2), 2.0)
+        } else if alto > 0.82 {
+            zoom = max(0.66 / alto, 0.6)
         }
 
         return Guia(
             sujeto: recortar(dibujo),
             destino: destino,
             listo: listo,
-            instruccion: instruccion
+            instruccion: instruccion,
+            zoom: zoom
         )
     }
 
