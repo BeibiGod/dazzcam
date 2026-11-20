@@ -258,14 +258,16 @@ enum AestheticAnalyzer {
     static func guia(
         paraCaja caja: CGRect,
         esCara: Bool,
-        destinoAnterior: CGPoint? = nil
+        destinoAnterior: CGPoint? = nil,
+        estabaListo: Bool = false
     ) -> Guia? {
         guard caja.width > 0.004, caja.height > 0.004 else { return nil }
         return componerGuia(
             nucleo: recortar(caja),
             otros: [],
             esCara: esCara,
-            destinoAnterior: destinoAnterior
+            destinoAnterior: destinoAnterior,
+            estabaListo: estabaListo
         )
     }
 
@@ -307,7 +309,8 @@ enum AestheticAnalyzer {
         nucleo base: CGRect,
         otros: [CGRect],
         esCara: Bool,
-        destinoAnterior: CGPoint? = nil
+        destinoAnterior: CGPoint? = nil,
+        estabaListo: Bool = false
     ) -> Guia? {
         let centro = CGPoint(x: base.midX, y: base.midY)
 
@@ -380,22 +383,31 @@ enum AestheticAnalyzer {
 
         let dx = destino.x - centro.x
         let dy = destino.y - centro.y
-        let cerca = abs(dx) < 0.06 && abs(dy) < 0.065
+
+        // Una vez listo, se aguanta un poco mas: asi el verde no parpadea
+        // cuando el recuadro tiembla un pixel.
+        let toleranciaX: CGFloat = estabaListo ? 0.10 : 0.06
+        let toleranciaY: CGFloat = estabaListo ? 0.11 : 0.065
+        let cerca = abs(dx) < toleranciaX && abs(dy) < toleranciaY
 
         var listo = cerca
         var partes: [String] = []
 
         if !cerca {
-            if dx >= 0.045 {
-                partes.append(String(localized: "a la izquierda"))
-            } else if dx <= -0.045 {
-                partes.append(String(localized: "a la derecha"))
-            }
-
-            if dy >= 0.05 {
-                partes.append(String(localized: "arriba"))
-            } else if dy <= -0.05 {
-                partes.append(String(localized: "abajo"))
+            // Un solo movimiento a la vez, como Framed: primero el eje que
+            // mas falta, y cuando eso queda, el otro.
+            if abs(dx) >= abs(dy) {
+                if dx >= 0.045 {
+                    partes.append(String(localized: "a la izquierda"))
+                } else if dx <= -0.045 {
+                    partes.append(String(localized: "a la derecha"))
+                }
+            } else {
+                if dy >= 0.05 {
+                    partes.append(String(localized: "arriba"))
+                } else if dy <= -0.05 {
+                    partes.append(String(localized: "abajo"))
+                }
             }
         }
 

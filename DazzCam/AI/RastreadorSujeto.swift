@@ -36,6 +36,8 @@ final class RastreadorSujeto: ObservableObject {
     private var cuadrosEstetica = 0
     private var revisionesMalas = 0
     private var ultimaCaja: CGRect?
+    private var ultimaCajaCruda: CGRect?
+    private var velocidad = CGPoint.zero
     private var ultimaCara = false
     private var generacion = 0
     private var ultimaDeteccion: CFAbsoluteTime = 0
@@ -72,6 +74,8 @@ final class RastreadorSujeto: ObservableObject {
             self.cuadrosEstetica = 0
             self.revisionesMalas = 0
             self.ultimaCaja = nil
+            self.ultimaCajaCruda = nil
+            self.velocidad = .zero
             self.ultimaCara = false
             self.ultimaDeteccion = 0
             self.ultimaVezVisto = 0
@@ -119,6 +123,8 @@ final class RastreadorSujeto: ObservableObject {
             if let anterior = self.ultimaCaja {
                 self.ultimaCaja = ampliada(anterior)
             }
+            self.ultimaCajaCruda = nil
+            self.velocidad = .zero
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -140,6 +146,8 @@ final class RastreadorSujeto: ObservableObject {
             guard let self else { return }
             self.peticion = nil
             self.ultimaCaja = nil
+            self.ultimaCajaCruda = nil
+            self.velocidad = .zero
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -328,10 +336,10 @@ final class RastreadorSujeto: ObservableObject {
                 }
             }
 
-            // Unos cuadros malos no borran la caja: se queda quieta mientras
-            // Vision se recupera.
-            if perdidos < 10, let ultimaCaja {
-                return Resultado(caja: ultimaCaja, esCara: ultimaCara)
+            // Unos cuadros malos no borran la caja: se sigue moviendo con la
+            // velocidad que traia, para que no se congele.
+            if perdidos < 10, let predicha = predecir(perdidos) {
+                return Resultado(caja: predicha, esCara: ultimaCara)
             }
 
             self.peticion = nil
@@ -340,8 +348,8 @@ final class RastreadorSujeto: ObservableObject {
         // Se perdio: busca de nuevo, sin hacerlo a cada instante.
         let ahora = CFAbsoluteTimeGetCurrent()
         guard ahora - ultimaDeteccion >= 0.35 else {
-            if let ultimaCaja, ahora - ultimaVezVisto < 2.0 {
-                return Resultado(caja: ultimaCaja, esCara: ultimaCara)
+            if let predicha = predecir(1), ahora - ultimaVezVisto < 2.0 {
+                return Resultado(caja: predicha, esCara: ultimaCara)
             }
             ultimaCaja = nil
             return nil
@@ -353,8 +361,8 @@ final class RastreadorSujeto: ObservableObject {
                 ultimaCaja = nil
                 return nil
             }
-            if let ultimaCaja {
-                return Resultado(caja: ultimaCaja, esCara: ultimaCara)
+            if let predicha = predecir(1) {
+                return Resultado(caja: predicha, esCara: ultimaCara)
             }
             return nil
         }
@@ -571,10 +579,18 @@ final class RastreadorSujeto: ObservableObject {
         _ caja: CGRect,
         manejador: VNImageRequestHandler
     ) -> CGFloat {
+        var total: CGFloat = 0
+
+        // El modelo de estetica de Apple (iOS 18+): le pone nota a la escena
+        // y castiga capturas de pantalla o papeles.
+        if let apple = puntajeAestheticsApple(caja, manejador: manejador) {
+            total += apple * 1.6
+        }
+
         let clasificar = VNClassifyImageRequest()
         clasificar.regionOfInterest = caja
 
-        guard (try? manejador.perform([clasificar])) != nil else { return 0 }
+        guard (try? manejador.perform([clasificar])) != nil else { return total }
 
         var bueno: CGFloat = 0
         var malo: CGFloat = 0
@@ -595,7 +611,26 @@ final class RastreadorSujeto: ObservableObject {
             }
         }
 
-        return bueno * 1.8 - malo * 1.1
+        return total + bueno * 1.4 - malo * 0.9
+    }
+
+    /// Nota de estetica de Apple para una zona de la imagen.
+    private func puntajeAestheticsApple(
+        _ caja: CGRect,
+        manejador: VNImageRequestHandler
+    ) -> CGFloat? {
+        guard #available(iOS 18.0, *) else { return nil }
+
+        let peticion = VNCalculateImageAestheticsScoresRequest()
+        peticion.regionOfInterest = caja
+
+        guard (try? manejador.perform([peticion])) != nil,
+              let observacion = peticion.results?.first else {
+            return nil
+        }
+
+        if observacion.isUtility { return -0.9 }
+        return CGFloat(observacion.overallScore)
     }
 
     /// Cada tanto revisa que lo que estamos siguiendo no sea una pared, una
@@ -673,6 +708,26 @@ final class RastreadorSujeto: ObservableObject {
         "metal", "concrete", "asphalt", "tile", "curtain", "blinds"
     ]
 
+    /// Caja estimada mientras Vision falla unos cuadros: sigue la inercia del
+    /// sujeto en vez de quedarse clavada.
+    private func predecir(_ saltos: Int) -> CGRect? {
+        guard let ultima = ultimaCaja else { return nil }
+        guard saltos > 0 else { return ultima }
+
+        let pasos = CGFloat(min(saltos, 4))
+        let decaimiento = pow(0.8, CGFloat(min(saltos, 8)))
+
+        var caja = ultima.offsetBy(
+            dx: velocidad.x * pasos * decaimiento,
+            dy: velocidad.y * pasos * decaimiento
+        )
+
+        // Que no se vaya fuera del cuadro.
+        caja.origin.x = min(max(caja.origin.x, -caja.width * 0.15), 1 - caja.width * 0.85)
+        caja.origin.y = min(max(caja.origin.y, -caja.height * 0.15), 1 - caja.height * 0.85)
+        return caja
+    }
+
     /// Pasa la caja a coordenadas de pantalla y la suaviza para que no tiemble.
     private func publicar(_ cajaVision: CGRect, esCara: Bool) -> Resultado {
         let nueva = CGRect(
@@ -681,6 +736,20 @@ final class RastreadorSujeto: ObservableObject {
             width: cajaVision.width,
             height: cajaVision.height
         )
+
+        // Velocidad del sujeto medida sobre cajas crudas (sin suavizar), para
+        // poder seguirlo cuando Vision falla un par de cuadros.
+        if let cruda = ultimaCajaCruda {
+            let vx = nueva.midX - cruda.midX
+            let vy = nueva.midY - cruda.midY
+            if hypot(vx, vy) < 0.2 {
+                velocidad = CGPoint(
+                    x: velocidad.x * 0.55 + vx * 0.45,
+                    y: velocidad.y * 0.55 + vy * 0.45
+                )
+            }
+        }
+        ultimaCajaCruda = nueva
 
         let suave: CGRect
 
@@ -691,10 +760,13 @@ final class RastreadorSujeto: ObservableObject {
                 // Otro sujeto: mejor saltar directo que arrastrar el recuadro
                 // por toda la pantalla.
                 suave = nueva
+                velocidad = .zero
             } else {
-                // Posicion responde rapido, tamano cambia mas suave para evitar temblor.
-                let pesoPos: CGFloat = 0.58
-                let pesoTam: CGFloat = 0.35
+                // Si el sujeto se mueve, el recuadro lo sigue de cerca; si esta
+                // quieto, se suaviza mas para que no tiemble.
+                let pesoPos = min(max(0.34 + salto * 9, 0.34), 0.82)
+                let pesoTam = salto > 0.02 ? 0.52 : 0.28
+
                 suave = CGRect(
                     x: anterior.minX + (nueva.minX - anterior.minX) * pesoPos,
                     y: anterior.minY + (nueva.minY - anterior.minY) * pesoPos,
