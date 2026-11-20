@@ -34,6 +34,7 @@ final class RastreadorSujeto: ObservableObject {
     private var perdidos = 0
     private var cuadrosSeguidos = 0
     private var cuadrosEstetica = 0
+    private var revisionesMalas = 0
     private var ultimaCaja: CGRect?
     private var ultimaCara = false
     private var generacion = 0
@@ -69,11 +70,55 @@ final class RastreadorSujeto: ObservableObject {
             self.perdidos = 0
             self.cuadrosSeguidos = 0
             self.cuadrosEstetica = 0
+            self.revisionesMalas = 0
             self.ultimaCaja = nil
             self.ultimaCara = false
             self.ultimaDeteccion = 0
             self.ultimaVezVisto = 0
             self.ultimaClasificacion = 0
+
+            self.cerrojo.lock()
+            self.ocupado = false
+            self.ultimo = 0
+            self.cerrojo.unlock()
+        }
+    }
+
+    /// Suelta la peticion de Vision pero deja la caja en pantalla, para que al
+    /// cambiar el zoom la guia no parpadee. La caja se reescala como si la
+    /// imagen se hubiera ampliado alrededor del centro.
+    func reenganchar(zoom factor: CGFloat) {
+        guard factor > 0.01 else { return }
+
+        let ampliada: (CGRect) -> CGRect = { caja in
+            CGRect(
+                x: (caja.minX - 0.5) * factor + 0.5,
+                y: (caja.minY - 0.5) * factor + 0.5,
+                width: caja.width * factor,
+                height: caja.height * factor
+            )
+        }
+
+        if let actual = caja {
+            caja = ampliada(actual)
+        }
+
+        cerrojo.lock()
+        generacion &+= 1
+        cerrojo.unlock()
+
+        cola.async { [weak self] in
+            guard let self else { return }
+            self.peticion = nil
+            self.perdidos = 0
+            self.cuadrosSeguidos = 0
+            self.cuadrosEstetica = 0
+            self.revisionesMalas = 0
+            self.ultimaDeteccion = 0
+
+            if let anterior = self.ultimaCaja {
+                self.ultimaCaja = ampliada(anterior)
+            }
 
             self.cerrojo.lock()
             self.ocupado = false
@@ -236,7 +281,7 @@ final class RastreadorSujeto: ObservableObject {
 
                 // Corrige deriva cada cierto tiempo, pero solo si la deteccion
                 // sigue cerca del sujeto que ya estamos siguiendo.
-                if cuadrosSeguidos >= 60 {
+                if cuadrosSeguidos >= 120 {
                     cuadrosSeguidos = 0
                     if let corregido = corregirDeriva(buffer, actual: observacion.boundingBox) {
                         peticion.inputObservation = corregido.objeto
@@ -245,21 +290,13 @@ final class RastreadorSujeto: ObservableObject {
                     }
                 }
 
-                // Cada ~4 segundos revisa que el sujeto no sea algo feo
+                // Cada ~8 segundos revisa que el sujeto no sea algo feo
                 // (pared, mesa, texto) y, si lo es, se cambia a algo mejor.
                 cuadrosEstetica += 1
-                if cuadrosEstetica >= 96 {
+                if cuadrosEstetica >= 192 {
                     cuadrosEstetica = 0
-                    if let bonito = revisarEstetica(buffer, actual: observacion.boundingBox) {
-                        let dist = hypot(
-                            bonito.objeto.boundingBox.midX - observacion.boundingBox.midX,
-                            bonito.objeto.boundingBox.midY - observacion.boundingBox.midY
-                        )
-                        if dist > 0.08 {
-                            peticion.inputObservation = bonito.objeto
-                            ultimaCara = bonito.esCara
-                            return publicar(bonito.objeto.boundingBox, esCara: bonito.esCara)
-                        }
+                    if let bonito = revisarSujeto(buffer, actual: observacion.boundingBox) {
+                        return bonito
                     }
                 }
 
@@ -366,10 +403,24 @@ final class RastreadorSujeto: ObservableObject {
         let personas = VNDetectHumanRectanglesRequest()
 
         if (try? manejador.perform([caras, personas])) != nil {
-            if let cara = mejor(caras.results ?? [], preferido: nil) {
+            // Si ya seguimos algo, no saltar a una cara que anda lejos.
+            let cerca: (CGRect) -> Bool = { caja in
+                guard let anterior = self.ultimaCaja else { return true }
+                let d = hypot(caja.midX - anterior.midX, caja.midY - (1 - anterior.midY))
+                return d < 0.45
+            }
+
+            let carasCerca = (caras.results ?? [])
+                .map { $0 as VNDetectedObjectObservation }
+                .filter { cerca($0.boundingBox) }
+            if let cara = mejor(carasCerca, preferido: ultimaCaja) {
                 return (cara, true)
             }
-            if let persona = mejor(personas.results ?? [], preferido: ultimaCaja) {
+
+            let personasCerca = (personas.results ?? [])
+                .map { $0 as VNDetectedObjectObservation }
+                .filter { cerca($0.boundingBox) }
+            if let persona = mejor(personasCerca, preferido: ultimaCaja) {
                 return (persona, false)
             }
         }
@@ -397,19 +448,23 @@ final class RastreadorSujeto: ObservableObject {
 
         guard !candidatos.isEmpty else { return nil }
 
-        // Los 3 mejores por forma/tamano/centro; entre ellos, gana el que
+        // Los 2 mejores por forma/tamano/centro; entre ellos, gana el que
         // se vea mas aesthetic (comida, plantas, arquitectura, arte...).
         let ordenados = candidatos.sorted {
             puntajeForma($0.objeto, definido: $0.definido)
                 > puntajeForma($1.objeto, definido: $1.definido)
         }
-        let finalistas = Array(ordenados.prefix(3))
+        let finalistas = Array(ordenados.prefix(2))
 
         let ahora = CFAbsoluteTimeGetCurrent()
-        let puedeClasificar = ahora - ultimaClasificacion >= 0.8
+        let puedeClasificar = ahora - ultimaClasificacion >= 1.2
         if puedeClasificar {
             ultimaClasificacion = ahora
         }
+
+        // Si ya hay un sujeto, mandan la cercania y la continuidad: lo
+        // aesthetic solo decide cuando se elige de cero.
+        let pesoEstetica: CGFloat = ultimaCaja == nil ? 1.0 : 0.45
 
         var elegido = finalistas[0]
         var mejorPuntaje = -CGFloat.infinity
@@ -421,14 +476,14 @@ final class RastreadorSujeto: ObservableObject {
             if let anterior = ultimaCaja {
                 let c = CGPoint(x: candidato.objeto.boundingBox.midX, y: candidato.objeto.boundingBox.midY)
                 let dist = hypot(c.x - anterior.midX, c.y - (1 - anterior.midY))
-                puntos -= min(dist, 1) * 0.5
+                puntos -= min(dist, 1) * 1.0
             }
 
             if puedeClasificar {
                 puntos += bonusEstetico(
                     candidato.objeto.boundingBox,
                     manejador: manejador
-                )
+                ) * pesoEstetica
             }
 
             if puntos > mejorPuntaje {
@@ -526,7 +581,7 @@ final class RastreadorSujeto: ObservableObject {
 
         // Se miran bastantes etiquetas: la buena suele venir mas abajo que
         // las cuatro primeras (que casi siempre son "wall", "indoor"...).
-        for etiqueta in (clasificar.results ?? []).prefix(40) {
+        for etiqueta in (clasificar.results ?? []).prefix(25) {
             let id = etiqueta.identifier
                 .replacingOccurrences(of: "_", with: " ")
                 .lowercased()
@@ -544,19 +599,49 @@ final class RastreadorSujeto: ObservableObject {
     }
 
     /// Cada tanto revisa que lo que estamos siguiendo no sea una pared, una
-    /// mesa o texto. Si salio feo, busca algo mejor y se cambia.
-    private func revisarEstetica(
+    /// mesa o texto. Si salio feo dos veces seguidas y hay algo claramente
+    /// mejor, se cambia. Nunca cambia por cambiar.
+    private func revisarSujeto(
         _ buffer: CVPixelBuffer,
         actual: CGRect
-    ) -> (objeto: VNDetectedObjectObservation, esCara: Bool)? {
+    ) -> Resultado? {
         let manejador = VNImageRequestHandler(
             cvPixelBuffer: buffer,
             orientation: .up,
             options: [:]
         )
 
-        guard bonusEstetico(actual, manejador: manejador) <= -0.45 else { return nil }
-        return detectar(buffer)
+        let puntos = bonusEstetico(actual, manejador: manejador)
+
+        guard puntos <= -0.3 else {
+            revisionesMalas = 0
+            return nil
+        }
+
+        revisionesMalas += 1
+        guard revisionesMalas >= 2 else { return nil }
+
+        // Que la deteccion pueda clasificar sin esperar el turno.
+        ultimaClasificacion = 0
+        guard let encontrado = detectar(buffer) else { return nil }
+
+        let nuevo = encontrado.objeto.boundingBox
+        let dist = hypot(nuevo.midX - actual.midX, nuevo.midY - actual.midY)
+
+        // Otro sitio y claramente mas lindo, o no vale la pena el salto.
+        guard dist > 0.06 else { return nil }
+        let nuevosPuntos = bonusEstetico(nuevo, manejador: manejador)
+        guard nuevosPuntos >= puntos + 0.5 else { return nil }
+
+        revisionesMalas = 0
+        ultimaCara = encontrado.esCara
+        ultimaVezVisto = CFAbsoluteTimeGetCurrent()
+
+        let nueva = VNTrackObjectRequest(detectedObjectObservation: encontrado.objeto)
+        nueva.trackingLevel = .accurate
+        peticion = nueva
+
+        return publicar(nuevo, esCara: encontrado.esCara)
     }
 
     /// Lo que se ve lindo en una foto (palabras exactas de Vision).
@@ -600,15 +685,23 @@ final class RastreadorSujeto: ObservableObject {
         let suave: CGRect
 
         if let anterior = ultimaCaja, anterior.width > 0.001 {
-            // Posicion responde rapido, tamano cambia mas suave para evitar temblor.
-            let pesoPos: CGFloat = 0.58
-            let pesoTam: CGFloat = 0.35
-            suave = CGRect(
-                x: anterior.minX + (nueva.minX - anterior.minX) * pesoPos,
-                y: anterior.minY + (nueva.minY - anterior.minY) * pesoPos,
-                width: anterior.width + (nueva.width - anterior.width) * pesoTam,
-                height: anterior.height + (nueva.height - anterior.height) * pesoTam
-            )
+            let salto = hypot(nueva.midX - anterior.midX, nueva.midY - anterior.midY)
+
+            if salto > 0.3 {
+                // Otro sujeto: mejor saltar directo que arrastrar el recuadro
+                // por toda la pantalla.
+                suave = nueva
+            } else {
+                // Posicion responde rapido, tamano cambia mas suave para evitar temblor.
+                let pesoPos: CGFloat = 0.58
+                let pesoTam: CGFloat = 0.35
+                suave = CGRect(
+                    x: anterior.minX + (nueva.minX - anterior.minX) * pesoPos,
+                    y: anterior.minY + (nueva.minY - anterior.minY) * pesoPos,
+                    width: anterior.width + (nueva.width - anterior.width) * pesoTam,
+                    height: anterior.height + (nueva.height - anterior.height) * pesoTam
+                )
+            }
         } else {
             suave = nueva
         }

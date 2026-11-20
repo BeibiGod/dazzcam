@@ -416,10 +416,10 @@ enum AestheticAnalyzer {
         var zoom: CGFloat?
         let altoCaja = dibujo.height
 
-        if altoCaja < 0.30 {
-            zoom = min(max(0.52 / max(altoCaja, 0.06), 1.2), 2.0)
-        } else if altoCaja > 0.82 {
-            zoom = max(0.66 / altoCaja, 0.6)
+        if altoCaja < 0.28 {
+            zoom = min(max(0.52 / max(altoCaja, 0.06), 1.2), 1.9)
+        } else if altoCaja > 0.95 {
+            zoom = max(0.72 / altoCaja, 0.6)
         }
 
         return Guia(

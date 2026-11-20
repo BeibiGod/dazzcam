@@ -79,7 +79,7 @@ struct CameraView: View {
     }
 
     private var versionTexto: String {
-        "v1.25.15 · \(FilterPreset.cantidadCamaras) cam"
+        "v1.25.16 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -1434,7 +1434,7 @@ struct CameraView: View {
         let redondeado = (factor * 10).rounded() / 10
 
         if let pendiente = zoomPendiente, abs(pendiente - redondeado) < 0.2 {
-            if ahora.timeIntervalSince(zoomDesde) >= 1.1 {
+            if ahora.timeIntervalSince(zoomDesde) >= 1.3 {
                 aplicarZoom(redondeado)
             }
         } else {
@@ -1445,7 +1445,7 @@ struct CameraView: View {
 
     private func aplicarZoom(_ factor: CGFloat) {
         zoomPendiente = nil
-        zoomEnfriando = Date().addingTimeInterval(2.5)
+        zoomEnfriando = Date().addingTimeInterval(3.5)
 
         let actual = camara.zoom
         let nuevo = min(max(actual * factor, 1), 3)
@@ -1456,8 +1456,9 @@ struct CameraView: View {
         zoomBase = camara.zoom
         volvioA1x = true
 
-        // Con otro zoom, el recuadro se reengancha al sujeto desde cero.
-        rastreador.empezar()
+        // La caja se reescala con el zoom y sigue pegada al sujeto: la guia
+        // no se borra ni se vuelve a buscar de cero.
+        rastreador.reenganchar(zoom: nuevo / max(actual, 0.01))
     }
 
     private func analizarEscena() {
