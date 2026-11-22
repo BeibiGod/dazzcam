@@ -327,12 +327,11 @@ enum FilterEngine {
             a.grano = 0.06; a.vineta = 0.3
 
         case .goldenHour:
-            // Atardecer de verdad: dorado, negros levantados y las luces
-            // derramandose un poco alrededor.
-            a.temperatura = 8100; a.tinte = 4; a.saturacion = 1.07
-            a.contraste = 0.96; a.brillo = 0.02
-            a.desvanecido = 0.055; a.grano = 0.07; a.vineta = 0.26
-            a.halacion = 0.42
+            // Atardecer dorado, pero con la imagen limpia: sin neblina.
+            a.temperatura = 8000; a.tinte = 3; a.saturacion = 1.1
+            a.contraste = 1.0; a.brillo = 0.012
+            a.desvanecido = 0.02; a.grano = 0.06; a.vineta = 0.2
+            a.halacion = 0.14
 
         case .ultramax:
             a.temperatura = 7200; a.saturacion = 1.15; a.contraste = 1.06
@@ -610,23 +609,23 @@ enum FilterEngine {
         case .g7x:
             // Canon G7X: color limpio, un pelin calido y contraste de
             // compacta buena. Casi no se nota el grano.
-            a.temperatura = 6900; a.tinte = 3; a.saturacion = 1.08
-            a.contraste = 1.07; a.grano = 0.03; a.vineta = 0.2
+            a.temperatura = 7000; a.tinte = 2; a.saturacion = 1.12
+            a.contraste = 1.12; a.grano = 0.02; a.vineta = 0.16
 
         case .digitalFlash:
             // Flash directo de compacta: el sujeto queda bien iluminado, el
             // fondo se cae y los blancos se van un poco al frio.
-            a.temperatura = 6100; a.tinte = -3; a.saturacion = 0.96
-            a.contraste = 1.14; a.brillo = 0.035
-            a.grano = 0.07; a.vineta = 0.52
+            a.temperatura = 6100; a.tinte = -2; a.saturacion = 1.02
+            a.contraste = 1.22; a.brillo = 0.012
+            a.grano = 0.055; a.vineta = 0.5
 
         case .tezza99:
-            // Videocamara de 1999: calido, lavado, luces reventadas, optica
-            // blanda y colores que se separan en los bordes.
-            a.temperatura = 7700; a.tinte = 5; a.saturacion = 0.94
-            a.contraste = 0.9; a.brillo = 0.03
-            a.desvanecido = 0.1; a.grano = 0.24; a.vineta = 0.42
-            a.halacion = 0.55; a.aberracion = 0.75; a.suavidad = 0.65
+            // Videocamara de 1999: calido, grano grueso y colores que se
+            // separan en los bordes, pero la imagen se ve entera.
+            a.temperatura = 7600; a.tinte = 4; a.saturacion = 1.02
+            a.contraste = 1.0; a.brillo = 0.008
+            a.desvanecido = 0.03; a.grano = 0.17; a.vineta = 0.3
+            a.halacion = 0.16; a.aberracion = 0.4; a.suavidad = 0.18
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -675,8 +674,10 @@ enum FilterEngine {
             a.fuga = 0.35
         case .vhs, .oldRoll35:
             a.fuga = 0.3
-        case .y2kDigi, .d3d, .tezzaPolaroid, .goldenHour:
+        case .y2kDigi, .d3d, .tezzaPolaroid:
             a.fuga = 0.25
+        case .goldenHour:
+            a.fuga = 0.12
         case .polaroid600, .sx70, .instColor:
             a.fuga = 0.2
         default:
