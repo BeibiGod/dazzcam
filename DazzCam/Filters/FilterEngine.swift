@@ -19,6 +19,11 @@ struct AjusteFoto {
     var vision: CGFloat = 0
     /// Resplandor alrededor de las luces fuertes, como en un intensificador.
     var halacion: CGFloat = 0
+    /// Separacion de color en los bordes: lo que hace una optica vieja o una
+    /// cinta de video mal alineada.
+    var aberracion: CGFloat = 0
+    /// Suavidad de la optica: 0 = nitida, 1 = blanda como una videocamara.
+    var suavidad: CGFloat = 0
 }
 
 /// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
@@ -322,8 +327,12 @@ enum FilterEngine {
             a.grano = 0.06; a.vineta = 0.3
 
         case .goldenHour:
-            a.temperatura = 8300; a.saturacion = 1.15; a.contraste = 1.02
-            a.desvanecido = 0.02; a.grano = 0.05; a.vineta = 0.22
+            // Atardecer de verdad: dorado, negros levantados y las luces
+            // derramandose un poco alrededor.
+            a.temperatura = 8100; a.tinte = 4; a.saturacion = 1.07
+            a.contraste = 0.96; a.brillo = 0.02
+            a.desvanecido = 0.055; a.grano = 0.07; a.vineta = 0.26
+            a.halacion = 0.42
 
         case .ultramax:
             a.temperatura = 7200; a.saturacion = 1.15; a.contraste = 1.06
@@ -596,6 +605,28 @@ enum FilterEngine {
             a.contraste = 1.15; a.brillo = -0.04
             a.vision = 1; a.halacion = 0.95
             a.grano = 0.34; a.vineta = 0.95
+
+        // ---- v1.25.19: looks de Prequel y Tezza ----
+        case .g7x:
+            // Canon G7X: color limpio, un pelin calido y contraste de
+            // compacta buena. Casi no se nota el grano.
+            a.temperatura = 6900; a.tinte = 3; a.saturacion = 1.08
+            a.contraste = 1.07; a.grano = 0.03; a.vineta = 0.2
+
+        case .digitalFlash:
+            // Flash directo de compacta: el sujeto queda bien iluminado, el
+            // fondo se cae y los blancos se van un poco al frio.
+            a.temperatura = 6100; a.tinte = -3; a.saturacion = 0.96
+            a.contraste = 1.14; a.brillo = 0.035
+            a.grano = 0.07; a.vineta = 0.52
+
+        case .tezza99:
+            // Videocamara de 1999: calido, lavado, luces reventadas, optica
+            // blanda y colores que se separan en los bordes.
+            a.temperatura = 7700; a.tinte = 5; a.saturacion = 0.94
+            a.contraste = 0.9; a.brillo = 0.03
+            a.desvanecido = 0.1; a.grano = 0.24; a.vineta = 0.42
+            a.halacion = 0.55; a.aberracion = 0.75; a.suavidad = 0.65
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -680,6 +711,64 @@ enum FilterEngine {
             f.contrast = Float(a.contraste)
             f.brightness = Float(a.brillo)
             if let salida = f.outputImage { actual = salida }
+        }
+
+        // 2b. optica blanda: la imagen pierde filo, como una videocamara.
+        if a.suavidad > 0 {
+            let f = CIFilter.gaussianBlur()
+            f.inputImage = actual.clampedToExtent()
+            f.radius = Float(max(imagen.extent.width * 0.0016 * a.suavidad, 0.6))
+            if let salida = f.outputImage?.cropped(to: imagen.extent) {
+                actual = salida
+            }
+        }
+
+        // 2c. separacion de color: el rojo se abre y el azul se cierra un
+        //     pelo alrededor del centro, como en una optica vieja.
+        if a.aberracion > 0 {
+            let e = imagen.extent
+            let corrimiento = min(max(a.aberracion, 0), 1) * 0.005
+
+            func canal(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> CIImage? {
+                let f = CIFilter.colorMatrix()
+                f.inputImage = actual
+                f.rVector = CIVector(x: r, y: 0, z: 0, w: 0)
+                f.gVector = CIVector(x: 0, y: g, z: 0, w: 0)
+                f.bVector = CIVector(x: 0, y: 0, z: b, w: 0)
+                f.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+                return f.outputImage
+            }
+
+            func escalar(_ capa: CIImage, _ escala: CGFloat) -> CIImage {
+                let giro = CGAffineTransform(translationX: e.midX, y: e.midY)
+                    .concatenating(CGAffineTransform(scaleX: escala, y: escala))
+                    .concatenating(CGAffineTransform(translationX: -e.midX, y: -e.midY))
+                return capa.clampedToExtent().transformed(by: giro)
+            }
+
+            if let rojo = canal(1, 0, 0), let verde = canal(0, 1, 0),
+               let azul = canal(0, 0, 1) {
+
+                let rojoAbierto = escalar(rojo, 1 + corrimiento)
+                let azulCerrado = escalar(azul, 1 - corrimiento)
+
+                var suma = verde
+                let uno = CIFilter.additionCompositing()
+                uno.inputImage = rojoAbierto
+                uno.backgroundImage = suma
+                if let juntos = uno.outputImage {
+                    suma = juntos
+                }
+
+                let dos = CIFilter.additionCompositing()
+                dos.inputImage = azulCerrado
+                dos.backgroundImage = suma
+                if let juntos = dos.outputImage?.cropped(to: e) {
+                    suma = juntos
+                }
+
+                actual = suma
+            }
         }
 
         // 3. blanco y negro

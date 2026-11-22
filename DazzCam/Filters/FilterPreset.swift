@@ -142,6 +142,11 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
     case nightshotVideo
     case nightshotFoto
 
+    // ---- agregadas en la v1.25.19: looks de Prequel y Tezza ----
+    case g7x
+    case digitalFlash
+    case tezza99
+
     var id: String { rawValue }
 
     var nombre: String {
@@ -248,6 +253,10 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
 
         case .nightshotVideo: return "Nightshot Video"
         case .nightshotFoto: return "Nightshot Foto"
+
+        case .g7x: return "G7X"
+        case .digitalFlash: return "Digital Flash"
+        case .tezza99: return "1999"
         }
     }
 
@@ -281,7 +290,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
             return "ISM"
         case .oldRoll35, .oldRollFlash, .oldRoll8, .oldRollInstant:
             return "OLDROLL"
-        case .tezzaClean, .tezzaWarm, .tezzaGrain, .tezzaPolaroid:
+        case .tezzaClean, .tezzaWarm, .tezzaGrain, .tezzaPolaroid, .tezza99:
             return "TEZZA"
         case .swagLive:
             return "SWAG"
@@ -293,7 +302,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
             return "YASHICA"
         case .olympusMju:
             return "OLYMPUS"
-        case .canonSure:
+        case .canonSure, .g7x:
             return "CANON"
         case .nikonFm2:
             return "NIKON"
@@ -342,7 +351,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         case .vhs, .d3d, .tealNight, .vaporwave, .chatarraCCD, .y2kDigi,
              .ismNight, .disco, .neonDream, .powerShot, .cyberShot, .coolpix,
              .exilim, .lumix, .easyShare, .handycam, .nightshotVideo,
-             .nightshotFoto:
+             .nightshotFoto, .digitalFlash, .tezza99:
             return .digital
         case .funSaver, .quickSnap, .sprite35, .leBox, .simpleUse,
              .sportDesechable:
@@ -376,7 +385,8 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         case .vhs, .d3d, .tealNight, .warmFlash, .noir, .vaporwave,
              .chatarraCCD, .y2kDigi, .ismNight, .disco, .neonDream,
              .powerShot, .cyberShot, .coolpix, .exilim, .lumix, .easyShare,
-             .handycam, .nightshotVideo, .nightshotFoto:
+             .handycam, .nightshotVideo, .nightshotFoto, .g7x, .digitalFlash,
+             .tezza99:
             return .underground
         }
     }
@@ -397,7 +407,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         // Digitales y videocamaras: año completo, como en los 2000.
         case .y2kDigi, .chatarraCCD, .vhs, .d3d, .disco, .vaporwave,
              .neonDream, .tealNight, .ismNight, .powerShot, .cyberShot,
-             .coolpix, .exilim, .lumix, .easyShare, .handycam:
+             .coolpix, .exilim, .lumix, .easyShare, .handycam, .tezza99:
             return .anio
 
         // Vision nocturna: el sello de la videocamara, con hora y segundos.
@@ -421,7 +431,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         switch self {
         // ---- calidas de rollo ----
         case .kodakGold, .ultramax, .goldenHour, .contaxT2, .kodakVR,
-             .dazzClassic, .sepiaViejo:
+             .dazzClassic, .sepiaViejo, .g7x, .digitalFlash:
             return .dazz
 
         case .portra, .warmFlash, .yashicaT4, .riviera92, .tezzaWarm,
@@ -449,7 +459,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
             return .noventa
 
         case .y2kDigi, .chatarraCCD, .d3d, .jackboys, .powerShot, .cyberShot,
-             .coolpix, .exilim, .lumix, .easyShare, .handycam:
+             .coolpix, .exilim, .lumix, .easyShare, .handycam, .tezza99:
             return .dosMil
 
         case .funSaver, .quickSnap, .sportDesechable:
@@ -590,6 +600,11 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         // ---- vision nocturna ----
         case .nightshotVideo: return 1998
         case .nightshotFoto: return 1998
+
+        // ---- looks de Prequel y Tezza ----
+        case .g7x: return 2014
+        case .digitalFlash: return 1998
+        case .tezza99: return 1999
         }
     }
 
@@ -607,7 +622,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
     /// true si es una videocamara. El resto son camaras de foto.
     var esVideo: Bool {
         switch self {
-        case .vhs, .d3d, .handycam, .nightshotVideo:
+        case .vhs, .d3d, .handycam, .nightshotVideo, .tezza99:
             return true
         default:
             return false
