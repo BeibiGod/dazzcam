@@ -24,6 +24,12 @@ struct AjusteFoto {
     var aberracion: CGFloat = 0
     /// Suavidad de la optica: 0 = nitida, 1 = blanda como una videocamara.
     var suavidad: CGFloat = 0
+    /// Curva de tono: 5 puntos para x = 0, 0.25, 0.5, 0.75 y 1.
+    var curva: [CGFloat]? = nil
+    /// Flash directo: ilumina el centro y deja caer las orillas.
+    var flash: CGFloat = 0
+    /// Nitidez extra para las camaras que se ven limpias.
+    var nitidez: CGFloat = 0
 }
 
 /// Lo que el usuario puede mover con los dedos. nil = lo que trae la camara.
@@ -328,9 +334,10 @@ enum FilterEngine {
 
         case .goldenHour:
             // Atardecer dorado, pero con la imagen limpia: sin neblina.
-            a.temperatura = 8000; a.tinte = 3; a.saturacion = 1.1
-            a.contraste = 1.0; a.brillo = 0.012
-            a.desvanecido = 0.02; a.grano = 0.06; a.vineta = 0.2
+            a.temperatura = 8000; a.tinte = 4; a.saturacion = 1.12
+            a.contraste = 1.0; a.brillo = 0.008
+            a.curva = [0.03, 0.27, 0.52, 0.79, 1.0]
+            a.grano = 0.06; a.vineta = 0.2
             a.halacion = 0.14
 
         case .ultramax:
@@ -609,23 +616,28 @@ enum FilterEngine {
         case .g7x:
             // Canon G7X: color limpio, un pelin calido y contraste de
             // compacta buena. Casi no se nota el grano.
-            a.temperatura = 7000; a.tinte = 2; a.saturacion = 1.12
-            a.contraste = 1.12; a.grano = 0.02; a.vineta = 0.16
+            a.temperatura = 7000; a.tinte = 2; a.saturacion = 1.1
+            a.contraste = 1.04; a.nitidez = 0.4
+            a.curva = [0.0, 0.24, 0.5, 0.77, 1.0]
+            a.grano = 0.02; a.vineta = 0.16
 
         case .digitalFlash:
             // Flash directo de compacta: el sujeto queda bien iluminado, el
             // fondo se cae y los blancos se van un poco al frio.
-            a.temperatura = 6100; a.tinte = -2; a.saturacion = 1.02
-            a.contraste = 1.22; a.brillo = 0.012
-            a.grano = 0.055; a.vineta = 0.5
+            a.temperatura = 6100; a.tinte = -2; a.saturacion = 1.0
+            a.contraste = 1.1; a.brillo = 0.005
+            a.curva = [0.0, 0.17, 0.5, 0.85, 1.0]
+            a.flash = 0.3; a.nitidez = 0.3
+            a.grano = 0.05; a.vineta = 0.5
 
         case .tezza99:
             // Videocamara de 1999: calido, grano grueso y colores que se
             // separan en los bordes, pero la imagen se ve entera.
             a.temperatura = 7600; a.tinte = 4; a.saturacion = 1.02
-            a.contraste = 1.0; a.brillo = 0.008
-            a.desvanecido = 0.03; a.grano = 0.17; a.vineta = 0.3
-            a.halacion = 0.16; a.aberracion = 0.4; a.suavidad = 0.18
+            a.contraste = 1.0; a.brillo = 0.005
+            a.curva = [0.03, 0.25, 0.51, 0.8, 0.98]
+            a.grano = 0.17; a.vineta = 0.3
+            a.halacion = 0.16; a.aberracion = 0.4; a.suavidad = 0.16
         }
 
         // Rayones de pelicula: apagados por defecto. Se suben a mano en el
@@ -714,7 +726,47 @@ enum FilterEngine {
             if let salida = f.outputImage { actual = salida }
         }
 
-        // 2b. optica blanda: la imagen pierde filo, como una videocamara.
+        // 2a. curva de tono: da el caracter de la camara sin lavar la foto.
+        if let puntos = a.curva, puntos.count == 5 {
+            let f = CIFilter.toneCurve()
+            f.inputImage = actual
+            f.point0 = CGPoint(x: 0, y: puntos[0])
+            f.point1 = CGPoint(x: 0.25, y: puntos[1])
+            f.point2 = CGPoint(x: 0.5, y: puntos[2])
+            f.point3 = CGPoint(x: 0.75, y: puntos[3])
+            f.point4 = CGPoint(x: 1, y: puntos[4])
+            if let salida = f.outputImage { actual = salida }
+        }
+
+        // 2b. flash directo: el centro se ilumina y las orillas se caen.
+        if a.flash > 0 {
+            let e = imagen.extent
+            let gradiente = CIFilter.radialGradient()
+            gradiente.center = CGPoint(x: e.midX, y: e.midY + e.height * 0.06)
+            gradiente.radius0 = 0
+            gradiente.radius1 = Float(max(e.width, e.height) * 0.78)
+            gradiente.color0 = CIColor(red: 1, green: 0.98, blue: 0.95, alpha: 1)
+            gradiente.color1 = CIColor(red: 0, green: 0, blue: 0, alpha: 1)
+
+            if let capa = gradiente.outputImage?.cropped(to: e) {
+                let fuerza = min(max(a.flash, 0), 1)
+                let control = CIFilter.colorMatrix()
+                control.inputImage = capa
+                control.rVector = CIVector(x: fuerza, y: 0, z: 0, w: 0)
+                control.gVector = CIVector(x: 0, y: fuerza, z: 0, w: 0)
+                control.bVector = CIVector(x: 0, y: 0, z: fuerza, w: 0)
+                control.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+
+                if let luz = control.outputImage {
+                    let mezcla = CIFilter.screenBlendMode()
+                    mezcla.inputImage = luz
+                    mezcla.backgroundImage = actual
+                    if let salida = mezcla.outputImage { actual = salida }
+                }
+            }
+        }
+
+        // 2c. optica blanda: la imagen pierde filo, como una videocamara.
         if a.suavidad > 0 {
             let f = CIFilter.gaussianBlur()
             f.inputImage = actual.clampedToExtent()
@@ -724,7 +776,7 @@ enum FilterEngine {
             }
         }
 
-        // 2c. separacion de color: el rojo se abre y el azul se cierra un
+        // 2d. separacion de color: el rojo se abre y el azul se cierra un
         //     pelo alrededor del centro, como en una optica vieja.
         if a.aberracion > 0 {
             let e = imagen.extent
@@ -769,6 +821,16 @@ enum FilterEngine {
                 }
 
                 actual = suma
+            }
+        }
+
+        // 2e. nitidez: devuelve el filo que perdio la optica.
+        if a.nitidez > 0 {
+            let f = CIFilter.sharpenLuminance()
+            f.inputImage = actual
+            f.sharpness = Float(min(max(a.nitidez, 0), 2))
+            if let salida = f.outputImage?.cropped(to: imagen.extent) {
+                actual = salida
             }
         }
 

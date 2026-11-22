@@ -259,7 +259,8 @@ enum AestheticAnalyzer {
         paraCaja caja: CGRect,
         esCara: Bool,
         destinoAnterior: CGPoint? = nil,
-        estabaListo: Bool = false
+        estabaListo: Bool = false,
+        grados: Double = 0
     ) -> Guia? {
         guard caja.width > 0.004, caja.height > 0.004 else { return nil }
         return componerGuia(
@@ -267,7 +268,8 @@ enum AestheticAnalyzer {
             otros: [],
             esCara: esCara,
             destinoAnterior: destinoAnterior,
-            estabaListo: estabaListo
+            estabaListo: estabaListo,
+            grados: grados
         )
     }
 
@@ -310,7 +312,8 @@ enum AestheticAnalyzer {
         otros: [CGRect],
         esCara: Bool,
         destinoAnterior: CGPoint? = nil,
-        estabaListo: Bool = false
+        estabaListo: Bool = false,
+        grados: Double = 0
     ) -> Guia? {
         let centro = CGPoint(x: base.midX, y: base.midY)
 
@@ -393,6 +396,13 @@ enum AestheticAnalyzer {
         var listo = cerca
         var partes: [String] = []
 
+        // Si el telefono esta torcido, no se da por listo aunque el sujeto
+        // ya este en su tercio: la foto saldria chueca.
+        let torcido = abs(grados) > 4.0
+        if torcido {
+            listo = false
+        }
+
         if !cerca {
             // Un solo movimiento a la vez, como Framed: primero el eje que
             // mas falta, y cuando eso queda, el otro.
@@ -416,7 +426,18 @@ enum AestheticAnalyzer {
         if listo {
             instruccion = String(localized: "Buen encuadre. Dispara.")
         } else {
-            let direccion = partes.joined(separator: String(localized: " y "))
+            var orden = partes
+
+            // Una cosa a la vez: si ya no falta mover el encuadre, lo unico
+            // que queda es enderezar el telefono.
+            if torcido, orden.isEmpty {
+                orden = [String(localized: "endereza el telefono")]
+            }
+            if orden.isEmpty {
+                orden = [String(localized: "un poco")]
+            }
+
+            let direccion = orden.joined(separator: String(localized: " y "))
             instruccion = String(
                 format: String(localized: "Apunta el iPhone %@"),
                 direccion

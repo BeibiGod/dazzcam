@@ -413,7 +413,8 @@ struct CameraView: View {
                    paraCaja: caja,
                    esCara: esCara,
                    destinoAnterior: guia?.destino,
-                   estabaListo: guia?.listo ?? false
+                   estabaListo: guia?.listo ?? false,
+                   grados: nivel.angulo * 180 / .pi
                ) {
                 sujetoEsCara = esCara
                 let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
