@@ -92,6 +92,11 @@
 " y " = " and ";
 "Mueve el teléfono %@" = "Move your phone %@";
 "Apunta el iPhone %@" = "Point the iPhone %@";
+"Muévete a la izquierda" = "Move left";
+"Muévete a la derecha" = "Move right";
+"Sube el teléfono" = "Raise your phone";
+"Baja el teléfono" = "Lower your phone";
+"Endereza el teléfono" = "Straighten your phone";
 "endereza el telefono" = "straighten the phone";
 "un poco" = "a little";
 "Buen encuadre. Dispara." = "Good frame. Shoot.";

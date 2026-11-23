@@ -33,7 +33,6 @@ struct CameraView: View {
     @State private var halago: String?
     @State private var cuentaGuia: Int?
     @State private var tareaCuenta: Task<Void, Never>?
-    @State private var zoomIA: CGFloat?
     @State private var volvioA1x = false
     @State private var sujetoEsCara = false
     @State private var zoomPendiente: CGFloat?
@@ -166,8 +165,8 @@ struct CameraView: View {
                         .padding(.bottom, night ? 14 : 6)
                     }
 
-                    if mostrarGuia, let analisis = analisis {
-                        barraGuia(analisis, guia: guia)
+                    if mostrarGuia, analisis != nil {
+                        barraGuia(guia: guia, puntaje: puntajeEnVivo)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 8)
                     }
@@ -386,7 +385,6 @@ struct CameraView: View {
             } else {
                 rastreador.parar()
                 detenerCuentaGuia()
-                zoomIA = nil
                 halago = nil
                 guia = nil
                 analisis = nil
@@ -783,23 +781,33 @@ struct CameraView: View {
         )
 
         return ZStack {
-            // Recuadro fantasma: donde debe quedar el sujeto.
-            if !guia.listo {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(color.opacity(0.55), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-                    .frame(width: destinoRect.width, height: destinoRect.height)
-                    .position(x: destinoRect.midX, y: destinoRect.midY)
+            // Marco de la toma que encontro la IA: esquinas, como el
+            // recuadro de una camara. Ahi debe caer el sujeto.
+            if !guia.encuadrado {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(color.opacity(0.16), lineWidth: 1)
+
+                    MarcoToma()
+                        .stroke(
+                            color.opacity(0.9),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                }
+                .frame(width: destinoRect.width, height: destinoRect.height)
+                .position(x: destinoRect.midX, y: destinoRect.midY)
 
                 // Flechas que indican hacia donde mover el telefono.
                 flechasGuia(guia: guia, sujeto: rect, destino: objetivo, en: tamano, color: color)
             }
 
+            // Recuadro del sujeto. Cuando queda listo se pone verde y se
+            // queda ahi, como el marco que se cierra en Framed.
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(color, lineWidth: 3)
+                .strokeBorder(color, lineWidth: guia.listo ? 3.5 : 3)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
-                .opacity(guia.listo ? 0 : 1)
-                .shadow(color: color.opacity(0.4), radius: 3)
+                .shadow(color: color.opacity(guia.listo ? 0.55 : 0.4), radius: guia.listo ? 6 : 3)
 
             etiquetaSujeto(etiqueta, color: color)
                 .position(
@@ -860,6 +868,34 @@ struct CameraView: View {
             return etiqueta
         }
         return String(localized: "sujeto")
+    }
+
+    /// Puntaje que sube y baja con el encuadre, como en Framed: toma la
+    /// calidad de la escena y le suma que tan bien esta puesto el sujeto.
+    private var puntajeEnVivo: Int {
+        guard let guia else { return analisis?.puntaje ?? 0 }
+
+        let base = Double(analisis?.puntaje ?? 80)
+        let dx = Double(abs(guia.destino.x - guia.sujeto.midX))
+        let dy = Double(abs(guia.destino.y - guia.sujeto.midY))
+
+        // 1 = el recuadro cae justo en su cruce; 0 = anda lejos.
+        let centrado = max(0, 1 - hypot(dx / 0.17, dy / 0.20))
+
+        // 1 = telefono derecho; 0 = 8 grados o mas.
+        let inclinacion = abs(nivel.angulo) * 180 / .pi
+        let derecho = max(0, 1 - inclinacion / 8)
+
+        // 1 = el sujeto ocupa una buena parte del cuadro.
+        let tamano = Double(guia.sujeto.height)
+        let medida = max(0, 1 - abs(tamano - 0.52) / 0.30)
+
+        let calidadBase = centrado * 0.55 + derecho * 0.30 + medida * 0.15
+
+        // Cuando la IA ya dio el encuadre por bueno, el puntaje sube de
+        // golpe: se siente como cerrar la toma, igual que en Framed.
+        let calidad = guia.listo ? max(calidadBase, 0.94) : calidadBase
+        return max(0, min(100, Int((base * 0.45 + 55 * calidad).rounded())))
     }
 
     /// Pasa un punto normalizado de la foto a la pantalla (misma proyeccion que
@@ -978,8 +1014,8 @@ struct CameraView: View {
         .transition(.opacity)
     }
 
-    /// Pastilla de abajo: puntaje, acceso a las camaras y la X.
-    private func barraGuia(_ analisis: Analisis, guia: Guia?) -> some View {
+    /// Pastilla de abajo: puntaje en vivo, acceso a las camaras y la X.
+    private func barraGuia(guia: Guia?, puntaje: Int) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles")
                 .font(.system(size: 11, weight: .semibold))
@@ -987,10 +1023,12 @@ struct CameraView: View {
                     (guia?.listo ?? false) ? Self.verdeGuia : Self.amarilloGuia
                 )
 
-            Text("\(analisis.puntaje)")
+            Text("\(puntaje)")
                 .font(.system(size: 13, weight: .heavy, design: .monospaced))
                 .foregroundStyle(.white)
                 .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.easeOut(duration: 0.25), value: puntaje)
 
             Text("AESTHETIC")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -1398,8 +1436,14 @@ struct CameraView: View {
             guia = nueva
         }
 
-        // La IA acerca sola cuando el sujeto esta lejos.
-        programarZoom(nueva.zoom)
+        // La IA acerca sola cuando el sujeto ya esta encuadrado y aun asi
+        // queda chico. Si todavia hay que mover el telefono, no se mete:
+        // primero acomodas, despues acerca.
+        if nueva.encuadrado {
+            programarZoom(nueva.zoom)
+        } else {
+            zoomPendiente = nil
+        }
 
         if nueva.listo && !antesListo {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -1504,7 +1548,6 @@ struct CameraView: View {
             return
         }
 
-        zoomIA = nil
         halago = nil
         guia = nil
         analisis = nil
@@ -1813,6 +1856,37 @@ private struct BarraExposicion: View {
 
     private var desplazamiento: CGFloat {
         (0.5 - progreso) * alto
+    }
+}
+
+/// Esquinas del marco donde deberia quedar el sujeto. Se ve como el
+/// recuadro de una camara, no como una caja cualquiera.
+private struct MarcoToma: Shape {
+    func path(in rect: CGRect) -> Path {
+        let largo = min(min(rect.width, rect.height) * 0.24, 26)
+        var camino = Path()
+
+        // Arriba izquierda.
+        camino.move(to: CGPoint(x: rect.minX, y: rect.minY + largo))
+        camino.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        camino.addLine(to: CGPoint(x: rect.minX + largo, y: rect.minY))
+
+        // Arriba derecha.
+        camino.move(to: CGPoint(x: rect.maxX - largo, y: rect.minY))
+        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + largo))
+
+        // Abajo derecha.
+        camino.move(to: CGPoint(x: rect.maxX, y: rect.maxY - largo))
+        camino.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        camino.addLine(to: CGPoint(x: rect.maxX - largo, y: rect.maxY))
+
+        // Abajo izquierda.
+        camino.move(to: CGPoint(x: rect.minX + largo, y: rect.maxY))
+        camino.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        camino.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - largo))
+
+        return camino
     }
 }
 

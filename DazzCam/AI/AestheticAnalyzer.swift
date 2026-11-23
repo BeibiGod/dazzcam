@@ -7,10 +7,13 @@ import Vision
 struct Guia {
     /// Caja del sujeto que la IA esta siguiendo.
     var sujeto: CGRect
-    /// Cruce de tercios donde conviene dejarlo.
+    /// Cruce de tercios donde conviene dejar el recuadro.
     var destino: CGPoint
     /// true cuando ya esta en el lugar bueno.
     var listo: Bool
+    /// true cuando el recuadro ya cayo en su cruce, aunque falte enderezar
+    /// o acercarse.
+    var encuadrado: Bool
     /// Que hacer: "Mueve el telefono a la derecha", "Buen encuadre", etc.
     var instruccion: String
     /// Cuanto acercar (o alejar) el zoom para que el sujeto quede bien.
@@ -337,6 +340,11 @@ enum AestheticAnalyzer {
             height: alto
         )
 
+        // El recuadro incluye cabeza y hombros, asi que su centro no es el de
+        // la cara. Todo se mide sobre el recuadro: asi la caja, el marco
+        // fantasma, las flechas y el puntaje dicen exactamente lo mismo.
+        let centroCaja = CGPoint(x: dibujo.midX, y: dibujo.midY)
+
         // Cruces de tercios. Los de abajo se usan menos: casi siempre el
         // sujeto queda mejor arriba.
         let cruces = [
@@ -350,7 +358,7 @@ enum AestheticAnalyzer {
         var mejor = Double.infinity
 
         for cruce in cruces {
-            var puntos = hypot(cruce.x - centro.x, cruce.y - centro.y) * 1.5
+            var puntos = hypot(cruce.x - centroCaja.x, cruce.y - centroCaja.y) * 1.5
 
             // Que el sujeto no se encime con otro objeto que llama la atencion.
             for otro in otros
@@ -365,8 +373,8 @@ enum AestheticAnalyzer {
 
             // Quedarse del mismo lado del cuadro se siente mas natural.
             puntos += cruce.x > 0.5
-                ? (0.5 - centro.x) * 0.24
-                : (centro.x - 0.5) * 0.24
+                ? (0.5 - centroCaja.x) * 0.24
+                : (centroCaja.x - 0.5) * 0.24
 
             // Mantener el mismo destino evita que el punto salte de lado.
             if let anterior = destinoAnterior {
@@ -384,8 +392,8 @@ enum AestheticAnalyzer {
             }
         }
 
-        let dx = destino.x - centro.x
-        let dy = destino.y - centro.y
+        let dx = destino.x - centroCaja.x
+        let dy = destino.y - centroCaja.y
 
         // Una vez listo, se aguanta un poco mas: asi el verde no parpadea
         // cuando el recuadro tiembla un pixel.
@@ -393,72 +401,56 @@ enum AestheticAnalyzer {
         let toleranciaY: CGFloat = estabaListo ? 0.11 : 0.065
         let cerca = abs(dx) < toleranciaX && abs(dy) < toleranciaY
 
-        var listo = cerca
-        var partes: [String] = []
+        // Tamano: si el recuadro queda muy chico conviene acercarse; si se
+        // come el cuadro, retroceder. La IA tambien ajusta el zoom sola.
+        let altoDibujo = dibujo.height
+        let muyLejos = altoDibujo < 0.22
+        let muyCerca = esCara ? base.height > 0.58 : base.height > 0.82
 
         // Si el telefono esta torcido, no se da por listo aunque el sujeto
         // ya este en su tercio: la foto saldria chueca.
         let torcido = abs(grados) > 4.0
-        if torcido {
-            listo = false
-        }
+        let listo = cerca && !torcido && !muyLejos && !muyCerca
 
-        if !cerca {
-            // Un solo movimiento a la vez, como Framed: primero el eje que
-            // mas falta, y cuando eso queda, el otro.
-            if abs(dx) >= abs(dy) {
-                if dx >= 0.045 {
-                    partes.append(String(localized: "a la izquierda"))
-                } else if dx <= -0.045 {
-                    partes.append(String(localized: "a la derecha"))
-                }
-            } else {
-                if dy >= 0.05 {
-                    partes.append(String(localized: "arriba"))
-                } else if dy <= -0.05 {
-                    partes.append(String(localized: "abajo"))
-                }
-            }
-        }
-
+        // Una sola instruccion a la vez, como un fotografo al lado: primero
+        // mover el encuadre, despues enderezar, despues acercarse.
         var instruccion: String
 
         if listo {
             instruccion = String(localized: "Buen encuadre. Dispara.")
+        } else if !cerca {
+            if abs(dx) >= abs(dy) {
+                instruccion = dx >= 0
+                    ? String(localized: "Muévete a la izquierda")
+                    : String(localized: "Muévete a la derecha")
+            } else {
+                instruccion = dy >= 0
+                    ? String(localized: "Sube el teléfono")
+                    : String(localized: "Baja el teléfono")
+            }
+        } else if torcido {
+            instruccion = String(localized: "Endereza el teléfono")
+        } else if muyLejos {
+            instruccion = String(localized: "Acércate un poco")
         } else {
-            var orden = partes
-
-            // Una cosa a la vez: si ya no falta mover el encuadre, lo unico
-            // que queda es enderezar el telefono.
-            if torcido, orden.isEmpty {
-                orden = [String(localized: "endereza el telefono")]
-            }
-            if orden.isEmpty {
-                orden = [String(localized: "un poco")]
-            }
-
-            let direccion = orden.joined(separator: String(localized: " y "))
-            instruccion = String(
-                format: String(localized: "Apunta el iPhone %@"),
-                direccion
-            )
+            instruccion = String(localized: "Aléjate un poco")
         }
 
         // La IA acerca sola: si el sujeto esta lejos, sube el zoom en vez de
         // pedirle al usuario que camine. Si esta muy grande, lo baja.
         var zoom: CGFloat?
-        let altoCaja = dibujo.height
 
-        if altoCaja < 0.28 {
-            zoom = min(max(0.52 / max(altoCaja, 0.06), 1.2), 1.9)
-        } else if altoCaja > 0.95 {
-            zoom = max(0.72 / altoCaja, 0.6)
+        if altoDibujo < 0.30 {
+            zoom = min(max(0.52 / max(altoDibujo, 0.06), 1.2), 1.9)
+        } else if muyCerca {
+            zoom = max(0.60 / max(altoDibujo, 0.2), 0.55)
         }
 
         return Guia(
-            sujeto: recortar(dibujo),
+            sujeto: dibujo,
             destino: destino,
             listo: listo,
+            encuadrado: cerca,
             instruccion: instruccion,
             zoom: zoom
         )
