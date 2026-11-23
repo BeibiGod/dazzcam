@@ -243,9 +243,7 @@ struct CameraView: View {
                         // La foto se acomoda arriba de los controles para
                         // que la fecha quemada nunca quede tapada.
                         VStack(spacing: 0) {
-                            Image(uiImage: imagen)
-                                .resizable()
-                                .scaledToFit()
+                            FotoZoom(imagen: imagen)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .padding(.horizontal, 6)
                                 .padding(.top, insetArriba + 42)
