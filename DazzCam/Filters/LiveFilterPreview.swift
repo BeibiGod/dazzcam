@@ -35,7 +35,9 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
     private let cola = DispatchQueue(label: "com.diego.dazzcam.vivo", qos: .userInitiated)
 
     private var ultimoRender: CFAbsoluteTime = 0
-    private let intervaloMinimo: CFAbsoluteTime = 1.0 / 60.0
+    /// Tiramos cuadros a toda la velocidad que soporta el iPhone (hasta
+    /// 120 fps en los 13 Pro Max) para que el visor se sienta al instante.
+    private let intervaloMinimo: CFAbsoluteTime = 1.0 / 120.0
     private var contadorCuadros = 0
     private var marcaContador: CFAbsoluteTime = 0
 
@@ -77,13 +79,14 @@ final class LiveFilterPreview: NSObject, ObservableObject, AVCaptureVideoDataOut
             connection.videoRotationAngle = 90
         }
 
-        guard ahora - ultimoRender >= intervaloMinimo else { return }
-        ultimoRender = ahora
-
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        // La guia de encuadre sigue al sujeto en cada cuadro, con o sin filtro.
+        // La guia de encuadre sigue al sujeto en cada cuadro, con o sin
+        // filtro y aunque estemos limitando el render: asi no se traba.
         rastreador?.mirar(buffer)
+
+        guard ahora - ultimoRender >= intervaloMinimo else { return }
+        ultimoRender = ahora
 
         // Si el visor no esta mostrando el filtro, no se gasta CPU.
         guard activo else { return }

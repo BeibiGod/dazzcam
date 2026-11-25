@@ -274,18 +274,27 @@ final class CameraSession: NSObject, ObservableObject {
         }
     }
 
-    /// Le pide al iPhone la tasa de cuadros mas alta que aguante su formato.
-    /// Si el formato no llega a 60, se queda como estaba.
+    /// Le pide al iPhone la tasa de cuadros que aguanta su formato activo.
+    /// En los Pro Max llega a 120 fps: pedimos esa, y si no, lo que haya
+    /// de 60 en adelante. Si el formato queda por debajo de 60, dejamos
+    /// como estaba.
     private nonisolated func subirCuadros(_ dispositivo: AVCaptureDevice) {
-        let tope = dispositivo.activeFormat.videoSupportedFrameRateRanges
+        let maximo = dispositivo.activeFormat.videoSupportedFrameRateRanges
             .map { $0.maxFrameRate }
             .max() ?? 30
 
-        guard tope >= 60 else { return }
+        let objetivo: Double
+        if maximo >= 120 {
+            objetivo = 120
+        } else if maximo >= 60 {
+            objetivo = 60
+        } else {
+            return
+        }
 
         do {
             try dispositivo.lockForConfiguration()
-            let duracion = CMTime(value: 1, timescale: 60)
+            let duracion = CMTime(value: 1, timescale: Int32(objetivo))
             dispositivo.activeVideoMinFrameDuration = duracion
             dispositivo.activeVideoMaxFrameDuration = duracion
             dispositivo.unlockForConfiguration()
