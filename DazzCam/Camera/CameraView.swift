@@ -48,7 +48,8 @@ struct CameraView: View {
     @State private var exposicion: Double = 0
     @State private var exposicionInicioArrastre: Double?
     @State private var cuenta: Int?
-    @State private var mostrarCuadricula = true
+    @AppStorage("beibi.cuadricula") private var mostrarCuadricula = true
+    @AppStorage(Idioma.clave) private var idioma: Idioma = .es
     @State private var sello: SelloFecha = .dazz
     @State private var destello: Double = 0
     @State private var mostrarImportar = false
@@ -62,6 +63,7 @@ struct CameraView: View {
     @State private var mostrarRevisionVideo = false
     @State private var controles = ControlesLook()
     @State private var mostrarAjustes = false
+    @State private var mostrarAjustesCamara = false
     @State private var puntoExposicion: CGPoint?
     @State private var barraExposicionVisible = false
     @State private var tokenExposicion = 0
@@ -77,10 +79,6 @@ struct CameraView: View {
         _preset = State(initialValue: guardado?.preset ?? .dazzClassic)
         _sello = State(initialValue: guardado?.sello ?? .dazz)
         _controles = State(initialValue: guardado?.controles ?? ControlesLook())
-    }
-
-    private var versionTexto: String {
-        "v1.25.18 · \(FilterPreset.cantidadCamaras) cam"
     }
 
     private var textoVivo: String {
@@ -221,15 +219,16 @@ struct CameraView: View {
 
                     CameraBar(
                         seleccionado: $preset,
+                        modo: $modo,
                         muestras: miniaturas.muestras,
                         capturando: foto.capturando,
                         grabando: video.grabando,
                         procesando: video.procesando,
                         segundos: video.segundos,
+                        analizando: analizando,
                         listo: guia?.listo ?? false,
                         alDisparar: accionDeDisparo,
-                        alImportar: { mostrarImportar = true },
-                        alAbrirTodas: { mostrarTodas = true }
+                        alIA: analizarEscena
                     )
                     .padding(.bottom, insetAbajo + 6)
                 }
@@ -435,6 +434,13 @@ struct CameraView: View {
         .onChange(of: modoVivo) { _, activo in
             vivo.activo = activo
         }
+        .onChange(of: mostrarCuadricula) { _, activo in
+            if activo {
+                nivel.empezar()
+            } else {
+                nivel.parar()
+            }
+        }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
             // Cada camara prende su sello y su tipografia, como de fabrica.
@@ -509,6 +515,16 @@ struct CameraView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
+        .sheet(isPresented: $mostrarAjustesCamara) {
+            AjustesCamaraView(
+                idioma: $idioma,
+                proporcion: $proporcion,
+                mostrarCuadricula: $mostrarCuadricula
+            )
+            .presentationDetents([.height(430)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
+        }
         .sheet(isPresented: $mostrarIA) {
             if let analisis = analisis {
                 AIView(
@@ -538,14 +554,14 @@ struct CameraView: View {
                         videoImportado = archivo.url
                         mostrarEditorVideo = true
                     } else {
-                        aviso = String(localized: "No pude abrir ese video")
+                        aviso = L("No pude abrir ese video")
                     }
                 } else if let datos = try? await item.loadTransferable(type: Data.self),
                           let imagen = UIImage(data: datos) {
                     fotoImportada = imagen
                     mostrarEditor = true
                 } else {
-                    aviso = String(localized: "No pude abrir esa foto")
+                    aviso = L("No pude abrir esa foto")
                 }
                 fotoElegida = nil
             }
@@ -564,7 +580,7 @@ struct CameraView: View {
                     sello: sello
                 ) { elegido in
                     preset = elegido
-                    aviso = String(localized: "Video guardado con \(elegido.nombre)")
+                    aviso = L("Video guardado con %@", elegido.nombre)
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -593,7 +609,7 @@ struct CameraView: View {
                     esRevision: true
                 ) { elegido in
                     preset = elegido
-                    aviso = String(localized: "Video guardado con \(elegido.nombre)")
+                    aviso = L("Video guardado con %@", elegido.nombre)
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -611,7 +627,7 @@ struct CameraView: View {
                     controles: controles,
                     alGuardar: { _, elegido in
                         preset = elegido
-                        aviso = String(localized: "Copia guardada con \(elegido.nombre)")
+                        aviso = L("Copia guardada con %@", elegido.nombre)
                         Task {
                             try? await Task.sleep(nanoseconds: 2_000_000_000)
                             aviso = nil
@@ -881,12 +897,12 @@ struct CameraView: View {
 
     private var etiquetaGuia: String {
         if sujetoEsCara {
-            return String(localized: "persona")
+            return L("persona")
         }
         if let etiqueta = analisis?.etiqueta, !etiqueta.isEmpty {
             return etiqueta
         }
-        return String(localized: "sujeto")
+        return L("sujeto")
     }
 
     /// Puntaje que sube y baja con el encuadre, como en Framed: toma la
@@ -1012,7 +1028,7 @@ struct CameraView: View {
         Group {
             if let guia {
                 if guia.listo {
-                    Text(halago ?? String(localized: "Listo, dispara"))
+                    Text(halago ?? L("Listo, dispara"))
                         .foregroundStyle(Self.verdeGuia)
                 } else {
                     Text(guia.instruccion)
@@ -1094,7 +1110,7 @@ struct CameraView: View {
                 activo: flashEncendido
             ) {
                 guard camara.tieneFlash || camara.esFrontal else {
-                    aviso = String(localized: "Esta lente no tiene flash")
+                    aviso = L("Esta lente no tiene flash")
                     Task {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         aviso = nil
@@ -1136,14 +1152,20 @@ struct CameraView: View {
             .buttonStyle(.plain)
             .fixedSize()
 
-            Text(versionTexto)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.45), in: Capsule())
+            Button {
+                mostrarAjustesCamara = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(.black.opacity(0.45), in: Circle())
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ajustes")
         }
         .padding(.horizontal, 14)
     }
@@ -1166,11 +1188,6 @@ struct CameraView: View {
                 activo: mostrarCuadricula
             ) {
                 mostrarCuadricula.toggle()
-                if mostrarCuadricula {
-                    nivel.empezar()
-                } else {
-                    nivel.parar()
-                }
             }
 
             // En video el look se ajusta antes de grabar; en foto, despues
@@ -1185,9 +1202,33 @@ struct CameraView: View {
 
             Spacer()
 
-            herramientaIA
+            // Importar de la fototeca y ver todas las camaras.
+            herramientaIcono(icono: "photo.badge.plus") {
+                mostrarImportar = true
+            }
+
+            herramientaIcono(icono: "square.grid.2x2") {
+                mostrarTodas = true
+            }
         }
         .padding(.horizontal, 16)
+    }
+
+    private func herramientaIcono(
+        icono: String,
+        accion: @escaping () -> Void
+    ) -> some View {
+        Button(action: accion) {
+            Image(systemName: icono)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(Color.black.opacity(0.5), in: Circle())
+                .overlay(
+                    Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private func herramienta(
@@ -1279,76 +1320,15 @@ struct CameraView: View {
         .animation(.easeOut(duration: 0.18), value: mostrarGuia)
     }
 
-    /// FOTO o VIDEO, abajo a la derecha.
-    private var barraModos: some View {
-        HStack(spacing: 0) {
-            ForEach(ModoCaptura.allCases) { opcion in
-                Button {
-                    guard !video.grabando else { return }
-                    modo = opcion
-                } label: {
-                    Text(LocalizedStringKey(opcion.rawValue))
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(modo == opcion ? Color.black : Color.white.opacity(0.75))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(
-                            modo == opcion ? Color.white : Color.clear,
-                            in: Capsule()
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(3)
-        .background(Color.black.opacity(0.5), in: Capsule())
-    }
-
-    /// Fila de abajo: 16:9 y cuadricula a la izquierda, IA a la derecha,
-    /// y debajo las lentes centradas con FOTO/VIDEO a la derecha.
+    /// Herramientas y lentes. Los botones FOTO, VIDEO y la IA viven en la
+    /// barra de abajo, junto al disparador.
     private var barraInferior: some View {
         VStack(spacing: 10) {
             barraHerramientas
 
-            ZStack {
-                barraLentes
-
-                HStack {
-                    Spacer()
-                    barraModos
-                }
-            }
-            .padding(.horizontal, 16)
+            barraLentes
+                .padding(.horizontal, 16)
         }
-    }
-
-    // MARK: - Boton IA
-
-    private var herramientaIA: some View {
-        Button {
-            analizarEscena()
-        } label: {
-            HStack(spacing: 5) {
-                if analizando {
-                    ProgressView()
-                        .scaleEffect(0.55)
-                        .tint(.black)
-                        .frame(width: 13, height: 13)
-                } else {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-
-                Text("IA")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-            }
-            .foregroundStyle(.black)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .fixedSize()
     }
 
     // MARK: - Acciones
@@ -1723,9 +1703,9 @@ struct CameraView: View {
         Task {
             do {
                 try await PhotoLibrarySaver.guardar(final)
-                aviso = String(localized: "Guardada en tu fototeca")
+                aviso = L("Guardada en tu fototeca")
             } catch {
-                aviso = String(localized: "No se pudo guardar: \(error.localizedDescription)")
+                aviso = L("No se pudo guardar: %@", error.localizedDescription)
             }
 
             mostrarCaptura = false
@@ -1808,7 +1788,7 @@ struct CameraView: View {
             await camara.voltear()
             zoomBase = camara.zoom
 
-            aviso = camara.esFrontal ? String(localized: "Camara frontal") : String(localized: "Camara trasera")
+            aviso = camara.esFrontal ? L("Camara frontal") : L("Camara trasera")
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             aviso = nil
         }

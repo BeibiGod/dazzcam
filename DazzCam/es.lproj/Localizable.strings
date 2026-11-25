@@ -1,0 +1,9 @@
+/* Beibi Cam - textos en español.
+   Las claves ya estan escritas en español, asi que este archivo solo existe
+   para que el iPhone sepa que el español es un idioma disponible. Las claves
+   que falten se muestran tal cual, sin pasar por el ingles. */
+
+"Idioma" = "Idioma";
+"Español" = "Español";
+"Proporción" = "Proporción";
+"Cuadrícula" = "Cuadrícula";

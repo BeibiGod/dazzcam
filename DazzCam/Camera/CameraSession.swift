@@ -43,11 +43,11 @@ final class CameraSession: NSObject, ObservableObject {
         var descripcion: String {
             switch self {
             case .configurando:
-                return "Preparando camara..."
+                return L("Preparando camara...")
             case .listo:
-                return "Camara lista"
+                return L("Camara lista")
             case .denegado:
-                return "Permiso de camara denegado. Activalo en Ajustes."
+                return L("Permiso de camara denegado. Activalo en Ajustes.")
             case .error(let detalle):
                 return detalle
             }

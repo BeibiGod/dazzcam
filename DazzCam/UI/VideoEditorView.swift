@@ -307,7 +307,7 @@ struct VideoEditorView: View {
                 alGuardar(look)
                 cerrar()
             } catch {
-                self.error = String(localized: "No se pudo guardar: \(error.localizedDescription)")
+                self.error = L("No se pudo guardar: %@", error.localizedDescription)
             }
             guardando = false
         }

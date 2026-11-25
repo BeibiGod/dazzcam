@@ -1,21 +1,23 @@
 import SwiftUI
 
-/// Barra inferior estilo DazzCam: tira de camaritas con muestra,
-/// boton de disparo y accesos.
+/// Barra inferior estilo DazzCam: tira de camaritas con muestra, boton de
+/// disparo al centro, FOTO a la izquierda, VIDEO a la derecha y la IA justo
+/// antes del video.
 struct CameraBar: View {
     @Binding var seleccionado: FilterPreset
+    @Binding var modo: ModoCaptura
     let muestras: [FilterPreset: UIImage]
     let capturando: Bool
     let grabando: Bool
     let procesando: Bool
     let segundos: Int
+    let analizando: Bool
     /// true cuando la IA ya dejo el encuadre listo: el disparador se pone
     /// amarillo, igual que en Framed.
     var listo: Bool = false
 
     var alDisparar: () -> Void
-    var alImportar: () -> Void
-    var alAbrirTodas: () -> Void
+    var alIA: () -> Void
 
     private var tiempoTexto: String {
         let minutos = segundos / 60
@@ -24,7 +26,7 @@ struct CameraBar: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Text(seleccionado.nombre.uppercased())
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -96,71 +98,136 @@ struct CameraBar: View {
                 }
             }
 
-            HStack {
-                Button(action: alImportar) {
-                    VStack(spacing: 3) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 18))
-                        Text("FOTOS")
-                            .font(.system(size: 9, weight: .bold))
+            // FOTO a la izquierda, disparador al centro, IA y VIDEO a la
+            // derecha. El disparador queda centrado de verdad.
+            ZStack {
+                disparador
+
+                HStack(spacing: 8) {
+                    botonModo(.foto)
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 8) {
+                        botonIA
+                        botonModo(.video)
                     }
-                    .foregroundStyle(.white)
-                    .frame(width: 50, height: 50)
-                    .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
                 }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Button(action: alDisparar) {
-                    ZStack {
-                        Circle()
-                            .strokeBorder(
-                                listo ? Color.yellow : .white,
-                                lineWidth: listo ? 5 : 4
-                            )
-                            .frame(width: 78, height: 78)
-                            .shadow(
-                                color: listo ? Color.yellow.opacity(0.65) : .clear,
-                                radius: listo ? 10 : 0
-                            )
-
-                        if grabando {
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(Color.red)
-                                .frame(width: 32, height: 32)
-                        } else {
-                            Circle()
-                                .fill(
-                                    capturando || procesando
-                                        ? Color.gray
-                                        : Color.white
-                                )
-                                .frame(width: 64, height: 64)
-                        }
-                    }
-                    .animation(.easeOut(duration: 0.18), value: listo)
-                }
-                .buttonStyle(.plain)
-                .disabled(capturando || procesando)
-
-                Spacer()
-
-                Button(action: alAbrirTodas) {
-                    VStack(spacing: 3) {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 18))
-                        Text("TODAS")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(width: 50, height: 50)
-                    .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
-                }
-                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 18)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Disparador
+
+    private var disparador: some View {
+        Button(action: alDisparar) {
+            ZStack {
+                // Halo suave: da area de toque y separa el boton del fondo.
+                Circle()
+                    .fill(Color.white.opacity(0.07))
+                    .frame(width: 92, height: 92)
+
+                Circle()
+                    .strokeBorder(
+                        listo ? Color.yellow : Color.white,
+                        lineWidth: listo ? 5 : 4
+                    )
+                    .frame(width: 76, height: 76)
+                    .shadow(
+                        color: listo ? Color.yellow.opacity(0.65) : .black.opacity(0.25),
+                        radius: listo ? 12 : 4
+                    )
+
+                if grabando {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(Color.red)
+                        .frame(width: 32, height: 32)
+                        .shadow(color: .red.opacity(0.35), radius: 6)
+                } else {
+                    Circle()
+                        .fill(
+                            capturando || procesando
+                                ? Color.gray
+                                : Color.white
+                        )
+                        .frame(width: 62, height: 62)
+                        .overlay(
+                            Circle().strokeBorder(
+                                Color.black.opacity(0.08),
+                                lineWidth: 1
+                            )
+                        )
+                }
+            }
+            .frame(width: 92, height: 92)
+            .contentShape(Circle())
+            .scaleEffect(capturando || procesando ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.18), value: listo)
+        }
+        .buttonStyle(.plain)
+        .disabled(capturando || procesando)
+        .accessibilityLabel(grabando ? "Detener" : "Disparar")
+    }
+
+    // MARK: - Modos y IA
+
+    private func botonModo(_ opcion: ModoCaptura) -> some View {
+        let activo = modo == opcion
+
+        return Button {
+            guard !grabando else { return }
+            modo = opcion
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: opcion == .foto ? "camera.fill" : "video.fill")
+                    .font(.system(size: 11, weight: .bold))
+
+                Text(LocalizedStringKey(opcion.rawValue))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+            }
+            .foregroundStyle(activo ? Color.black : Color.white.opacity(0.85))
+            .padding(.horizontal, 11)
+            .frame(height: 36)
+            .background(
+                activo ? Color.white : Color.black.opacity(0.5),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    Color.white.opacity(activo ? 0 : 0.22),
+                    lineWidth: 1
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .opacity(grabando && !activo ? 0.45 : 1)
+    }
+
+    private var botonIA: some View {
+        Button(action: alIA) {
+            HStack(spacing: 5) {
+                if analizando {
+                    ProgressView()
+                        .scaleEffect(0.55)
+                        .tint(.black)
+                        .frame(width: 13, height: 13)
+                } else {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+
+                Text("IA")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, 10)
+            .frame(height: 36)
+            .background(Color(red: 1.0, green: 0.30, blue: 0.55), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
     }
 }

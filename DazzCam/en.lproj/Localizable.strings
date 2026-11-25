@@ -145,3 +145,19 @@
 
 "persona" = "person";
 "sujeto" = "subject";
+
+/* ---- paso 66: ajustes, idioma y barra ---- */
+"AJUSTES" = "SETTINGS";
+"Ajustes" = "Settings";
+"IDIOMA" = "LANGUAGE";
+"Toda la app cambia al instante" = "The whole app changes instantly";
+"PROPORCION" = "ASPECT RATIO";
+"16:9 es la de cine; 4:3 usa todo el sensor" = "16:9 is the cinematic one; 4:3 uses the whole sensor";
+"CUADRICULA" = "GRID";
+"Lineas de tercios y nivel para no torcer la foto" = "Thirds lines and a level so the photo is not tilted";
+"ENCENDIDA" = "ON";
+"APAGADA" = "OFF";
+"Disparar" = "Shoot";
+"Detener" = "Stop";
+"Camara lista" = "Camera ready";
+"Fallo el video: %@" = "Video failed: %@";

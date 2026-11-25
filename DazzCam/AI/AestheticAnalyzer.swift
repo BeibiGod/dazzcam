@@ -156,10 +156,10 @@ enum AestheticAnalyzer {
                 puntos += 20
             } else if distancia <= 0.22 {
                 puntos += 18
-                consejos.append(String(localized: "Mueve el sujeto un poco para que caiga en un cruce de tercios."))
+                consejos.append(L("Mueve el sujeto un poco para que caiga en un cruce de tercios."))
             } else {
                 puntos += 16
-                consejos.append(String(localized: "El sujeto esta centrado: recorrelo a un tercio del cuadro."))
+                consejos.append(L("El sujeto esta centrado: recorrelo a un tercio del cuadro."))
             }
         } else {
             puntos += 17
@@ -172,28 +172,28 @@ enum AestheticAnalyzer {
             puntos += 9
         } else {
             puntos += 8
-            consejos.append(String(localized: "Hay varias caras: acerca o enfoca a una sola."))
+            consejos.append(L("Hay varias caras: acerca o enfoca a una sola."))
         }
 
         // 6. horizonte torcido: resta poco, solo para avisar del nivel
         let inclinacion = horizonte ?? 0
         if inclinacion > 1.5 {
             puntos -= min(5, Int(inclinacion))
-            consejos.append(String(
-                format: String(localized: "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula."),
+            consejos.append(L(
+                "El horizonte esta %.0f grados torcido: usa el nivel de la cuadricula.",
                 inclinacion
             ))
         }
 
         // 7. consejos de luz: cortos y utiles.
         if luz > 0.78 {
-            consejos.append(String(localized: "Hay mucha luz: baja un poco la exposicion para no quemar el cielo."))
+            consejos.append(L("Hay mucha luz: baja un poco la exposicion para no quemar el cielo."))
         } else if luz < 0.20 {
-            consejos.append(String(localized: "Hay poca luz: acerca o prende el flash calido."))
+            consejos.append(L("Hay poca luz: acerca o prende el flash calido."))
         }
 
         if consejos.isEmpty {
-            consejos.append(String(localized: "Todo bien: dispara y elige el look que mas te guste."))
+            consejos.append(L("Todo bien: dispara y elige el look que mas te guste."))
         }
 
         let puntaje = min(max(puntos, 0), 100)
@@ -218,7 +218,7 @@ enum AestheticAnalyzer {
             contraste: min(Int((contraste / 0.30 * 100).rounded()), 100),
             color: min(Int((color / 0.35 * 100).rounded()), 100),
             horizonte: Int(inclinacion.rounded()),
-            etiqueta: etiquetas.first ?? String(localized: "el sujeto"),
+            etiqueta: etiquetas.first ?? L("el sujeto"),
             guia: componerGuia(caras: caras, objetos: objetos)
         )
     }
@@ -417,23 +417,23 @@ enum AestheticAnalyzer {
         var instruccion: String
 
         if listo {
-            instruccion = String(localized: "Buen encuadre. Dispara.")
+            instruccion = L("Buen encuadre. Dispara.")
         } else if !cerca {
             if abs(dx) >= abs(dy) {
                 instruccion = dx >= 0
-                    ? String(localized: "Mueve el teléfono hacia la izquierda")
-                    : String(localized: "Mueve el teléfono hacia la derecha")
+                    ? L("Mueve el teléfono hacia la izquierda")
+                    : L("Mueve el teléfono hacia la derecha")
             } else {
                 instruccion = dy >= 0
-                    ? String(localized: "Mueve el teléfono hacia arriba")
-                    : String(localized: "Mueve el teléfono hacia abajo")
+                    ? L("Mueve el teléfono hacia arriba")
+                    : L("Mueve el teléfono hacia abajo")
             }
         } else if torcido {
-            instruccion = String(localized: "Endereza el teléfono")
+            instruccion = L("Endereza el teléfono")
         } else if muyLejos {
-            instruccion = String(localized: "Acércate un poco")
+            instruccion = L("Acércate un poco")
         } else {
-            instruccion = String(localized: "Aléjate un poco")
+            instruccion = L("Aléjate un poco")
         }
 
         // La IA acerca sola: si el sujeto esta lejos, sube el zoom en vez de
@@ -514,9 +514,9 @@ enum AestheticAnalyzer {
 
     private static func resumenPara(_ puntaje: Int) -> String {
         switch puntaje {
-        case 88...100: return String(localized: "Muy aesthetic. Dispara ya.")
-        case 78..<88: return String(localized: "Buen cuadro. Elige una de estas camaras.")
-        default: return String(localized: "Listo para disparar. Cualquiera de estas le queda.")
+        case 88...100: return L("Muy aesthetic. Dispara ya.")
+        case 78..<88: return L("Buen cuadro. Elige una de estas camaras.")
+        default: return L("Listo para disparar. Cualquiera de estas le queda.")
         }
     }
 

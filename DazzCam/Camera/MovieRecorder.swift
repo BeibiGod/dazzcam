@@ -40,7 +40,7 @@ final class MovieRecorder: NSObject, ObservableObject {
             return
         }
         guard sesion.canAddOutput(salida) else {
-            error = "No se pudo preparar la grabacion de video"
+            error = L("No se pudo preparar la grabacion de video")
             return
         }
 
@@ -61,7 +61,7 @@ final class MovieRecorder: NSObject, ObservableObject {
 
         let conMicro = await pedirMicrofono()
         if !conMicro {
-            error = "Sin permiso de microfono: el video saldra sin sonido"
+            error = L("Sin permiso de microfono: el video saldra sin sonido")
         }
 
         sesion.beginConfiguration()
@@ -181,7 +181,7 @@ extension MovieRecorder: AVCaptureFileOutputRecordingDelegate {
             let ns = error as NSError
             let terminoBien = ns.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool ?? false
             if !terminoBien {
-                self.error = "Fallo el video: \(error.localizedDescription)"
+                self.error = L("Fallo el video: %@", error.localizedDescription)
                 try? FileManager.default.removeItem(at: url)
                 return
             }
