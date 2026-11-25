@@ -511,14 +511,10 @@ struct CameraView: View {
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
         .sheet(isPresented: $mostrarAjustesCamara) {
-            AjustesCamaraView(
-                idioma: $idioma,
-                proporcion: $proporcion,
-                mostrarCuadricula: $mostrarCuadricula
-            )
-            .presentationDetents([.height(430)])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
+            AjustesCamaraView(idioma: $idioma)
+                .presentationDetents([.height(340)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
         .sheet(isPresented: $mostrarIA) {
             if let analisis = analisis {
@@ -1185,15 +1181,13 @@ struct CameraView: View {
                 mostrarCuadricula.toggle()
             }
 
-            // En video el look se ajusta antes de grabar; en foto, despues
-            // de disparar. Este boton siempre esta a mano.
-            herramienta(
+            // El look se ajusta aparte, asi que esta herramienta es solo un
+            // icono pequeno: la app sigue teniendo el boton de proteccion.
+            herramientaIcono(
                 icono: "slider.horizontal.3",
-                texto: controles.automatico ? nil : "LOOK",
-                activo: !controles.automatico
-            ) {
-                mostrarAjustes = true
-            }
+                activo: !controles.automatico,
+                accion: { mostrarAjustes = true }
+            )
 
             Spacer()
 
@@ -1211,14 +1205,15 @@ struct CameraView: View {
 
     private func herramientaIcono(
         icono: String,
+        activo: Bool = false,
         accion: @escaping () -> Void
     ) -> some View {
         Button(action: accion) {
             Image(systemName: icono)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(activo ? Color.black : Color.white)
                 .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.5), in: Circle())
+                .background(activo ? Color.yellow : Color.black.opacity(0.5), in: Circle())
                 .overlay(
                     Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
                 )
