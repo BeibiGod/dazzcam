@@ -1190,10 +1190,6 @@ struct CameraView: View {
 
             Spacer()
 
-            herramientaIcono(icono: "photo.badge.plus") {
-                mostrarImportar = true
-            }
-
             herramientaIcono(icono: "square.grid.2x2") {
                 mostrarTodas = true
             }
@@ -1313,13 +1309,6 @@ struct CameraView: View {
     private var barraInferior: some View {
         VStack(spacing: 10) {
             barraHerramientas
-
-            HStack {
-                herramientaIcono(icono: "square.grid.2x2") {
-                    mostrarTodas = true
-                }
-                Spacer()
-            }
 
             barraLentes
                 .padding(.horizontal, 16)
