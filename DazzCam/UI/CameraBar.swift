@@ -19,7 +19,6 @@ struct CameraBar: View {
 
     var alDisparar: () -> Void
     var alIA: () -> Void
-    var alEscanear: () -> Void
     var alFavorita: (FilterPreset) -> Void
     var alImportar: (() -> Void)?
     var alSelector: (() -> Void)?
@@ -148,8 +147,6 @@ struct CameraBar: View {
 
                     botonIA
 
-                    botonEscanear
-
                     botonModo(.video)
                 }
             }
@@ -271,26 +268,6 @@ struct CameraBar: View {
     }
 
     /// Botón de "escanear" (Framed): escanea la escena actual y abre el
-    /// resultado con luz, contraste, color, horizonte, caras y el sujeto.
-    private var botonEscanear: some View {
-        Button(action: alEscanear) {
-            HStack(spacing: 5) {
-                Image(systemName: "loupe.fill")
-                    .font(.system(size: 10, weight: .semibold))
-
-                Text(L("ESCANEAR"))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .frame(height: 36)
-            .background(Color.white.opacity(0.13), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .fixedSize()
-    }
-
     private var botonImportar: some View {
         Button {
             alImportar?()

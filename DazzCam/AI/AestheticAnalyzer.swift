@@ -424,12 +424,12 @@ enum AestheticAnalyzer {
         } else if !cerca {
             if abs(dx) >= abs(dy) {
                 instruccion = dx >= 0
-                    ? L("Mueve el teléfono hacia la izquierda")
-                    : L("Mueve el teléfono hacia la derecha")
+                    ? L("Mueve a la izquierda el teléfono")
+                    : L("Mueve a la derecha el teléfono")
             } else {
                 instruccion = dy >= 0
-                    ? L("Mueve el teléfono hacia arriba")
-                    : L("Mueve el teléfono hacia abajo")
+                    ? L("Mueve hacia arriba el teléfono")
+                    : L("Mueve hacia abajo el teléfono")
             }
         } else if torcido {
             instruccion = L("Endereza el teléfono")

@@ -1415,7 +1415,6 @@ struct CameraView: View {
             listo: guia?.listo ?? false,
             alDisparar: accionDeDisparo,
             alIA: analizarEscena,
-            alEscanear: { alEscanear() },
             alFavorita: alternarFavorita,
             alImportar: { mostrarImportar = true },
             alSelector: { mostrarTodas = true }
