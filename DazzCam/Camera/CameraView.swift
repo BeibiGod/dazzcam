@@ -218,28 +218,7 @@ struct CameraView: View {
                             .padding(.bottom, 6)
                     }
 
-                    CameraBar(
-                        seleccionado: $preset,
-                        modo: $modo,
-                        muestras: miniaturas.muestras,
-                        capturando: foto.capturando,
-                        grabando: video.grabando,
-                        procesando: video.procesando,
-                        segundos: video.segundos,
-                        analizando: analizando,
-                        listo: guia?.listo ?? false,
-                        favoritas: favoritas,
-                        alDisparar: accionDeDisparo,
-                        alIA: analizarEscena,
-                        alFavorita: { preset in
-                            if favoritas.contains(preset) {
-                                favoritas.remove(preset)
-                            } else {
-                                favoritas.insert(preset)
-                            }
-                        }
-                    )
-                    .padding(.bottom, insetAbajo + 6)
+                    barraCamaras
                 }
                 .frame(width: geo.size.width)
 
@@ -1344,6 +1323,34 @@ struct CameraView: View {
 
             barraLentes
                 .padding(.horizontal, 16)
+        }
+    }
+
+    /// Barra de abajo: tira de camaras, disparador, FOTO, IA y VIDEO.
+    private var barraCamaras: some View {
+        CameraBar(
+            seleccionado: $preset,
+            modo: $modo,
+            muestras: miniaturas.muestras,
+            capturando: foto.capturando,
+            grabando: video.grabando,
+            procesando: video.procesando,
+            segundos: video.segundos,
+            analizando: analizando,
+            listo: guia?.listo ?? false,
+            favoritas: favoritas,
+            alDisparar: accionDeDisparo,
+            alIA: analizarEscena,
+            alFavorita: alternarFavorita
+        )
+        .padding(.bottom, insetAbajo + 6)
+    }
+
+    private func alternarFavorita(_ preset: FilterPreset) {
+        if favoritas.contains(preset) {
+            favoritas.remove(preset)
+        } else {
+            favoritas.insert(preset)
         }
     }
 
