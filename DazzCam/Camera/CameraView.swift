@@ -511,10 +511,14 @@ struct CameraView: View {
                 .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
         .sheet(isPresented: $mostrarAjustesCamara) {
-            AjustesCamaraView(idioma: $idioma)
-                .presentationDetents([.height(340)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
+            AjustesCamaraView(
+                idioma: $idioma,
+                proporcion: $proporcion,
+                mostrarCuadricula: $mostrarCuadricula
+            )
+            .presentationDetents([.height(430)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color(red: 0.06, green: 0.06, blue: 0.08))
         }
         .sheet(isPresented: $mostrarIA) {
             if let analisis = analisis {
@@ -1176,24 +1180,8 @@ struct CameraView: View {
 
     private var barraHerramientas: some View {
         HStack(spacing: 6) {
-            herramienta(
-                icono: "crop",
-                texto: proporcion.etiqueta,
-                activo: proporcion == .dieciseisNueve
-            ) {
-                proporcion = proporcion.alterna
-            }
-
-            herramienta(
-                icono: "square.grid.3x3",
-                texto: nil,
-                activo: mostrarCuadricula
-            ) {
-                mostrarCuadricula.toggle()
-            }
-
-            // El look se ajusta aparte, asi que esta herramienta es solo un
-            // icono pequeno: la app sigue teniendo el boton de proteccion.
+            // Proporcion y cuadricula quedan solo en el engranaje de arriba
+            // a la derecha, asi que aqui va el resto del visor.
             herramientaIcono(
                 icono: "slider.horizontal.3",
                 activo: !controles.automatico,
@@ -1202,7 +1190,6 @@ struct CameraView: View {
 
             Spacer()
 
-            // Importar de la fototeca y ver todas las camaras.
             herramientaIcono(icono: "photo.badge.plus") {
                 mostrarImportar = true
             }
@@ -1326,6 +1313,13 @@ struct CameraView: View {
     private var barraInferior: some View {
         VStack(spacing: 10) {
             barraHerramientas
+
+            HStack {
+                herramientaIcono(icono: "square.grid.2x2") {
+                    mostrarTodas = true
+                }
+                Spacer()
+            }
 
             barraLentes
                 .padding(.horizontal, 16)

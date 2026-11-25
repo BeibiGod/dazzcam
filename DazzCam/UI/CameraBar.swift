@@ -148,8 +148,6 @@ struct CameraBar: View {
                     botonIA
 
                     botonModo(.video)
-
-                    botonSelector
                 }
             }
             .padding(.horizontal, 18)
@@ -274,20 +272,6 @@ struct CameraBar: View {
             alImportar?()
         } label: {
             Image(systemName: "photo.badge.plus")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.black.opacity(0.45), in: Circle())
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var botonSelector: some View {
-        Button {
-            alSelector?()
-        } label: {
-            Image(systemName: "square.grid.2x2")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 30, height: 30)
