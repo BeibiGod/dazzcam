@@ -161,3 +161,9 @@
 "Detener" = "Stop";
 "Camara lista" = "Camera ready";
 "Fallo el video: %@" = "Video failed: %@";
+
+/* ---- paso 67: favoritas ---- */
+"FAVORITAS" = "FAVORITES";
+"Toca la estrella para que salga primero." = "Tap the star to make it come first.";
+"Marcar favorita" = "Mark as favorite";
+"Quitar de favoritas" = "Remove from favorites";

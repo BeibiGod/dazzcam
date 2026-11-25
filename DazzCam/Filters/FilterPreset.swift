@@ -636,9 +636,18 @@ enum FilterPreset: String, CaseIterable, Identifiable, Codable {
         let camaras: [FilterPreset]
     }
 
+    /// Pone las favoritas adelante sin cambiar el orden del resto.
+    static func ordenadas(
+        _ lista: [FilterPreset],
+        favoritas: Set<FilterPreset>
+    ) -> [FilterPreset] {
+        let primeras = lista.filter { favoritas.contains($0) }
+        let resto = lista.filter { !favoritas.contains($0) }
+        return primeras + resto
+    }
+
     /// Camaras separadas en foto y video, de la mas vieja a la mas reciente.
-    static var porTipo: [GrupoTipo] {
-        let resto = allCases.filter { $0 != .original }
+    static var porTipo: [GrupoTipo] {        let resto = allCases.filter { $0 != .original }
         let fotos = resto.filter { !$0.esVideo }.sorted { a, b in
             a.anio == b.anio ? a.nombre < b.nombre : a.anio < b.anio
         }

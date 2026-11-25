@@ -64,6 +64,7 @@ struct CameraView: View {
     @State private var controles = ControlesLook()
     @State private var mostrarAjustes = false
     @State private var mostrarAjustesCamara = false
+    @State private var favoritas = Preferencias.cargarFavoritas()
     @State private var puntoExposicion: CGPoint?
     @State private var barraExposicionVisible = false
     @State private var tokenExposicion = 0
@@ -227,8 +228,16 @@ struct CameraView: View {
                         segundos: video.segundos,
                         analizando: analizando,
                         listo: guia?.listo ?? false,
+                        favoritas: favoritas,
                         alDisparar: accionDeDisparo,
-                        alIA: analizarEscena
+                        alIA: analizarEscena,
+                        alFavorita: { preset in
+                            if favoritas.contains(preset) {
+                                favoritas.remove(preset)
+                            } else {
+                                favoritas.insert(preset)
+                            }
+                        }
                     )
                     .padding(.bottom, insetAbajo + 6)
                 }
@@ -441,6 +450,9 @@ struct CameraView: View {
                 nivel.parar()
             }
         }
+        .onChange(of: favoritas) { _, nuevas in
+            Preferencias.guardarFavoritas(nuevas)
+        }
         .onChange(of: preset) { _, nuevo in
             vivo.preset = nuevo
             // Cada camara prende su sello y su tipografia, como de fabrica.
@@ -507,7 +519,11 @@ struct CameraView: View {
             miniaturas.generar(desde: imagen)
         }
         .sheet(isPresented: $mostrarTodas) {
-            CameraPickerSheet(seleccionado: $preset, muestras: miniaturas.muestras)
+            CameraPickerSheet(
+                seleccionado: $preset,
+                favoritas: $favoritas,
+                muestras: miniaturas.muestras
+            )
         }
         .sheet(isPresented: $mostrarAjustes) {
             AjustesLookView(controles: $controles, sello: $sello, preset: preset)

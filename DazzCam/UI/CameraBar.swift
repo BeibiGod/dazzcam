@@ -12,12 +12,18 @@ struct CameraBar: View {
     let procesando: Bool
     let segundos: Int
     let analizando: Bool
+    let favoritas: Set<FilterPreset>
     /// true cuando la IA ya dejo el encuadre listo: el disparador se pone
     /// amarillo, igual que en Framed.
     var listo: Bool = false
 
     var alDisparar: () -> Void
     var alIA: () -> Void
+    var alFavorita: (FilterPreset) -> Void
+
+    private var camaras: [FilterPreset] {
+        FilterPreset.ordenadas(FilterPreset.allCases, favoritas: favoritas)
+    }
 
     private var tiempoTexto: String {
         let minutos = segundos / 60
@@ -57,7 +63,7 @@ struct CameraBar: View {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
-                        ForEach(FilterPreset.allCases) { preset in
+                        ForEach(camaras) { preset in
                             Button {
                                 seleccionado = preset
                             } label: {
@@ -83,8 +89,34 @@ struct CameraBar: View {
                                         lineWidth: seleccionado == preset ? 3 : 1
                                     )
                                 )
+                                .overlay(alignment: .topTrailing) {
+                                    if favoritas.contains(preset) {
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(.black)
+                                            .frame(width: 16, height: 16)
+                                            .background(Color.yellow, in: Circle())
+                                            .offset(x: 1, y: -1)
+                                    }
+                                }
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    alFavorita(preset)
+                                } label: {
+                                    Label(
+                                        LocalizedStringKey(
+                                            favoritas.contains(preset)
+                                                ? "Quitar de favoritas"
+                                                : "Marcar favorita"
+                                        ),
+                                        systemImage: favoritas.contains(preset)
+                                            ? "star.slash"
+                                            : "star"
+                                    )
+                                }
+                            }
                             .id(preset)
                         }
                     }

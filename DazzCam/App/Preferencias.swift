@@ -36,4 +36,24 @@ enum Preferencias {
         guard let datos = try? JSONEncoder().encode(guardado) else { return }
         UserDefaults.standard.set(datos, forKey: clave)
     }
+
+    // MARK: - Favoritas
+
+    private static let claveFavoritas = "beibi.favoritas.v1"
+
+    /// Camaras marcadas con la estrella. Siempre salen primero.
+    static func cargarFavoritas() -> Set<FilterPreset> {
+        guard let datos = UserDefaults.standard.data(forKey: claveFavoritas),
+              let lista = try? JSONDecoder().decode([FilterPreset].self, from: datos)
+        else { return [] }
+
+        return Set(lista)
+    }
+
+    static func guardarFavoritas(_ favoritas: Set<FilterPreset>) {
+        // Se guardan en el orden del catalogo para que el selector no baile.
+        let lista = FilterPreset.allCases.filter { favoritas.contains($0) }
+        guard let datos = try? JSONEncoder().encode(lista) else { return }
+        UserDefaults.standard.set(datos, forKey: claveFavoritas)
+    }
 }
