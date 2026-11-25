@@ -43,6 +43,8 @@
 "VIVO" = "LIVE";
 "LOOK" = "LOOK";
 "IA" = "AI";
+"ESCANEAR" = "SCAN";
+"Escaneo local: nada de esta escena sale a internet." = "Local scan: nothing from this scene leaves the internet.";
 "OFF" = "OFF";
 "Listo" = "Done";
 

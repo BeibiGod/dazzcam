@@ -17,6 +17,9 @@ final class RastreadorSujeto: ObservableObject {
     @Published private(set) var esCara = false
     /// true mientras busca un sujeto nuevo despues de perderlo.
     @Published private(set) var buscando = false
+    /// Recuadro definido por el usuario (arrastrado en el visor). Una vez
+    /// fijado, el rastreador lo sigue sobre el sujeto, como en Framed.
+    @Published private(set) var recuadro: CGRect?
 
     /// Lo prende la vista cuando la guia esta abierta.
     var activo = false
@@ -123,6 +126,33 @@ final class RastreadorSujeto: ObservableObject {
             if let anterior = self.ultimaCaja {
                 self.ultimaCaja = ampliada(anterior)
             }
+            self.ultimaCajaCruda = nil
+            self.velocidad = .zero
+
+            self.cerrojo.lock()
+            self.ocupado = false
+            self.ultimo = 0
+            self.cerrojo.unlock()
+        }
+    }
+
+    /// Fija o limpia el recuadro definido por el usuario. Las coordenadas
+    /// son de la foto (0 a 1, arriba a la izquierda), de forma libre: el
+    /// visor lo pega al sujeto una vez que hay caja.
+    func fijarRecuadro(_ r: CGRect?) {
+        cerrojo.lock()
+        generacion &+= 1
+        cerrojo.unlock()
+
+        cola.async { [weak self] in
+            guard let self else { return }
+            self.recuadro = r
+            self.peticion = nil
+            self.perdidos = 0
+            self.cuadrosSeguidos = 0
+            self.cuadrosEstetica = 0
+            self.revisionesMalas = 0
+            self.ultimaCaja = nil
             self.ultimaCajaCruda = nil
             self.velocidad = .zero
 
@@ -728,13 +758,24 @@ final class RastreadorSujeto: ObservableObject {
         return caja
     }
 
+    /// Si el usuario fijó un recuadro, pega su centro al del sujeto que
+    /// acaba de detectarse: el recuadro dibujado sigue al sujeto, para
+    /// encadrarse de verdad.
+    private func aplicarRecuadroUsuario(_ caja: CGRect) -> CGRect {
+        guard let r = recuadro, r.width > 0.004, r.height > 0.004 else { return caja }
+        let sujeto = CGPoint(x: caja.midX, y: caja.midY)
+        let fijado = CGPoint(x: r.midX, y: r.midY)
+        return r.offsetBy(dx: sujeto.x - fijado.x, dy: sujeto.y - fijado.y)
+    }
+
     /// Pasa la caja a coordenadas de pantalla y la suaviza para que no tiemble.
     private func publicar(_ cajaVision: CGRect, esCara: Bool) -> Resultado {
+        let vision = aplicarRecuadroUsuario(cajaVision)
         let nueva = CGRect(
-            x: cajaVision.minX,
-            y: 1 - cajaVision.maxY,
-            width: cajaVision.width,
-            height: cajaVision.height
+            x: vision.minX,
+            y: 1 - vision.maxY,
+            width: vision.width,
+            height: vision.height
         )
 
         // Velocidad del sujeto medida sobre cajas crudas (sin suavizar), para

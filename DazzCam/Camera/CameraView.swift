@@ -65,6 +65,10 @@ struct CameraView: View {
     @State private var mostrarAjustes = false
     @State private var mostrarAjustesCamara = false
     @State private var favoritas = Preferencias.cargarFavoritas()
+    @State private var mostrarEscaneo = false
+    @State private var escaneo: EscaneoFramed.Escaneo?
+    @State private var dibujandoFrame = false
+    @State private var rectDibujado: CGRect?
     @State private var puntoExposicion: CGPoint?
     @State private var barraExposicionVisible = false
     @State private var tokenExposicion = 0
@@ -535,6 +539,13 @@ struct CameraView: View {
                 )
             }
         }
+        .sheet(isPresented: $mostrarEscaneo) {
+            if let escaneo {
+                EscaneoFramedView(escaneo: escaneo) {
+                    mostrarEscaneo = false
+                }
+            }
+        }
         .photosPicker(
             isPresented: $mostrarImportar,
             selection: $fotoElegida,
@@ -698,6 +709,15 @@ struct CameraView: View {
                 miraIA
             }
 
+            if dibujandoFrame, let rect = rectDibujado {
+                let pantalla = rectDePantalla(rect, en: geo.size)
+                Rectangle()
+                    .stroke(Color.white, lineWidth: 2)
+                    .frame(width: pantalla.width, height: pantalla.height)
+                    .position(x: pantalla.midX, y: pantalla.midY)
+                    .shadow(color: .black.opacity(0.5), radius: 3)
+            }
+
             if let punto = puntoExposicion, barraExposicionVisible {
                 BarraExposicion(valor: exposicion)
                     .position(
@@ -741,6 +761,32 @@ struct CameraView: View {
                     guard exposicionInicioArrastre != nil else { return }
                     exposicionInicioArrastre = nil
                     mantenerBarraExposicion()
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { gesto in
+                    guard dibujandoFrame, modoVivo, !mostrarCaptura, !video.grabando else { return }
+                    rectDibujado = rectEntre(gesto.startLocation, gesto.location, en: geo.size)
+                }
+                .onEnded { _ in
+                    guard dibujandoFrame, let rect = rectDibujado else {
+                        dibujandoFrame = false
+                        rectDibujado = nil
+                        return
+                    }
+                    dibujandoFrame = false
+                    rectDibujado = nil
+
+                    // El usuario dibujó su recuadro: lo fija y la IA lo
+                    // sigue sobre el sujeto, igual que en Framed.
+                    rastreador.fijarRecuadro(rect)
+                    rastreador.empezar()
+                    sujetoEsCara = false
+
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        mostrarGuia = true
+                    }
                 }
         )
     }
@@ -1015,6 +1061,45 @@ struct CameraView: View {
             width: normalizado.width * dibujo.width,
             height: normalizado.height * dibujo.height
         )
+    }
+
+    /// Pasa un punto de pantalla a coordenadas normalizadas de foto, con la
+    /// misma proyeccion que rectDePantalla.
+    private func normalizadoPunto(_ punto: CGPoint, en tamano: CGSize) -> CGPoint {
+        let foto = tamanoGuia ?? vivo.imagen?.size ?? CGSize(width: 9, height: 16)
+
+        guard foto.width > 1, foto.height > 1 else {
+            return CGPoint(
+                x: max(0, min(1, punto.x / max(tamano.width, 1))),
+                y: max(0, min(1, punto.y / max(tamano.height, 1)))
+            )
+        }
+
+        let escala = max(tamano.width / foto.width, tamano.height / foto.height)
+        let dibujo = CGSize(
+            width: foto.width * escala,
+            height: foto.height * escala
+        )
+        let x0 = (tamano.width - dibujo.width) / 2
+        let y0 = (tamano.height - dibujo.height) / 2
+
+        return CGPoint(
+            x: max(0, min(1, (punto.x - x0) / dibujo.width)),
+            y: max(0, min(1, (punto.y - y0) / dibujo.height))
+        )
+    }
+
+    /// Rectangulo entre dos puntos de pantalla, en coordenadas normalizadas
+    /// de foto. nil si el arrastre no llega a ser un recuadro.
+    private func rectEntre(_ a: CGPoint, _ b: CGPoint, en tamano: CGSize) -> CGRect? {
+        let na = normalizadoPunto(a, en: tamano)
+        let nb = normalizadoPunto(b, en: tamano)
+        let x = min(na.x, nb.x)
+        let y = min(na.y, nb.y)
+        let w = abs(na.x - nb.x)
+        let h = abs(na.y - nb.y)
+        guard w > 0.02, h > 0.03 else { return nil }
+        return CGRect(x: x, y: y, width: w, height: h)
     }
 
     /// Texto de abajo, como en Framed: "Buscando tu toma...", la instruccion
@@ -1330,6 +1415,7 @@ struct CameraView: View {
             listo: guia?.listo ?? false,
             alDisparar: accionDeDisparo,
             alIA: analizarEscena,
+            alEscanear: { alEscanear() },
             alFavorita: alternarFavorita,
             alImportar: { mostrarImportar = true },
             alSelector: { mostrarTodas = true }
@@ -1626,6 +1712,28 @@ struct CameraView: View {
                         analisis = resultado
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: - Escaneo estilo Framed
+
+    /// Escanea la escena actual con luz, contraste, color, horizonte y
+    /// caras, y abre la hoja con el resultado. Todo sale del visor: no se
+    /// sube nada a internet.
+    private func alEscanear() {
+        escaneo = nil
+        mostrarEscaneo = true
+
+        guard let imagen = vivo.imagen ?? foto.ultimaFoto else {
+            mostrarEscaneo = false
+            return
+        }
+
+        Task {
+            let resultado = await EscaneoFramed.escanear(imagen)
+            if mostrarEscaneo {
+                escaneo = resultado
             }
         }
     }
