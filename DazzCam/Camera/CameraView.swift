@@ -784,6 +784,19 @@ struct CameraView: View {
             // Marco de la toma que encontro la IA: esquinas, como el
             // recuadro de una camara. Ahi debe caer el sujeto.
             if !guia.encuadrado {
+                // Linea punteada: de donde esta el sujeto a donde debe caer.
+                if hypot(objetivo.x - rect.midX, objetivo.y - rect.midY) > 34 {
+                    Path { camino in
+                        camino.move(to: CGPoint(x: rect.midX, y: rect.midY))
+                        camino.addLine(to: objetivo)
+                    }
+                    .stroke(
+                        color.opacity(0.55),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [5, 5])
+                    )
+                    .allowsHitTesting(false)
+                }
+
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(color.opacity(0.16), lineWidth: 1)
@@ -797,8 +810,15 @@ struct CameraView: View {
                 .frame(width: destinoRect.width, height: destinoRect.height)
                 .position(x: destinoRect.midX, y: destinoRect.midY)
 
-                // Flechas que indican hacia donde mover el telefono.
-                flechasGuia(guia: guia, sujeto: rect, destino: objetivo, en: tamano, color: color)
+                // Punto donde debe caer el centro del sujeto.
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(color.opacity(0.9))
+                    .shadow(color: .black.opacity(0.5), radius: 2)
+                    .position(x: objetivo.x, y: objetivo.y)
+
+                // Flecha en el borde: hacia donde mover el telefono.
+                flechasGuia(sujeto: rect, destino: objetivo, en: tamano, color: color)
             }
 
             // Recuadro del sujeto. Cuando queda listo se pone verde y se
@@ -823,9 +843,9 @@ struct CameraView: View {
         .allowsHitTesting(false)
     }
 
-    /// Flechas sutiles que muestran hacia donde hay que mover el telefono.
+    /// Flecha en el borde que muestra hacia donde mover el telefono. Una
+    /// sola, en el eje que mas falta, como en Framed.
     private func flechasGuia(
-        guia: Guia,
         sujeto: CGRect,
         destino: CGPoint,
         en tamano: CGSize,
@@ -835,26 +855,25 @@ struct CameraView: View {
         let dy = destino.y - sujeto.midY
 
         return ZStack {
-            if abs(dx) > 18 {
-                // Mover telefono en direccion opuesta al desplazamiento del sujeto en pantalla.
+            if abs(dx) >= abs(dy), abs(dx) > 18 {
+                // El sujeto tiene que ir a la derecha: el telefono va a la
+                // izquierda, por eso la flecha va al borde izquierdo.
                 Image(systemName: dx > 0 ? "chevron.left" : "chevron.right")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(color.opacity(0.95))
-                    .shadow(color: .black.opacity(0.55), radius: 4)
+                    .shadow(color: .black.opacity(0.55), radius: 5)
                     .position(
-                        x: dx > 0 ? max(sujeto.minX - 32, 28) : min(sujeto.maxX + 32, tamano.width - 28),
-                        y: sujeto.midY
+                        x: dx > 0 ? 26 : tamano.width - 26,
+                        y: tamano.height * 0.46
                     )
-            }
-
-            if abs(dy) > 18 {
+            } else if abs(dy) > 18 {
                 Image(systemName: dy > 0 ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(color.opacity(0.95))
-                    .shadow(color: .black.opacity(0.55), radius: 4)
+                    .shadow(color: .black.opacity(0.55), radius: 5)
                     .position(
-                        x: sujeto.midX,
-                        y: dy > 0 ? max(sujeto.minY - 32, 110) : min(sujeto.maxY + 32, tamano.height - 210)
+                        x: tamano.width * 0.5,
+                        y: dy > 0 ? 118 : tamano.height - 214
                     )
             }
         }
@@ -880,22 +899,23 @@ struct CameraView: View {
         let dy = Double(abs(guia.destino.y - guia.sujeto.midY))
 
         // 1 = el recuadro cae justo en su cruce; 0 = anda lejos.
-        let centrado = max(0, 1 - hypot(dx / 0.17, dy / 0.20))
+        let desvio = min(1, hypot(dx / 0.30, dy / 0.34))
+        let centrado = 1 - desvio
 
-        // 1 = telefono derecho; 0 = 8 grados o mas.
+        // 1 = telefono derecho; 0 = 10 grados o mas.
         let inclinacion = abs(nivel.angulo) * 180 / .pi
-        let derecho = max(0, 1 - inclinacion / 8)
+        let derecho = 1 - min(1, inclinacion / 10)
 
         // 1 = el sujeto ocupa una buena parte del cuadro.
         let tamano = Double(guia.sujeto.height)
-        let medida = max(0, 1 - abs(tamano - 0.52) / 0.30)
+        let medida = max(0, 1 - abs(tamano - 0.52) / 0.34)
 
         let calidadBase = centrado * 0.55 + derecho * 0.30 + medida * 0.15
 
         // Cuando la IA ya dio el encuadre por bueno, el puntaje sube de
         // golpe: se siente como cerrar la toma, igual que en Framed.
         let calidad = guia.listo ? max(calidadBase, 0.94) : calidadBase
-        return max(0, min(100, Int((base * 0.45 + 55 * calidad).rounded())))
+        return max(0, min(100, Int((base - 18 + 26 * calidad).rounded())))
     }
 
     /// Pasa un punto normalizado de la foto a la pantalla (misma proyeccion que
@@ -1027,8 +1047,6 @@ struct CameraView: View {
                 .font(.system(size: 13, weight: .heavy, design: .monospaced))
                 .foregroundStyle(.white)
                 .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.25), value: puntaje)
 
             Text("AESTHETIC")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -1436,14 +1454,8 @@ struct CameraView: View {
             guia = nueva
         }
 
-        // La IA acerca sola cuando el sujeto ya esta encuadrado y aun asi
-        // queda chico. Si todavia hay que mover el telefono, no se mete:
-        // primero acomodas, despues acerca.
-        if nueva.encuadrado {
-            programarZoom(nueva.zoom)
-        } else {
-            zoomPendiente = nil
-        }
+        // La IA acerca sola cuando el sujeto esta lejos.
+        programarZoom(nueva.zoom)
 
         if nueva.listo && !antesListo {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()

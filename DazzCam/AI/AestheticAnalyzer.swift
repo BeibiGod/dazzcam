@@ -403,9 +403,9 @@ enum AestheticAnalyzer {
 
         // Tamano: si el recuadro queda muy chico conviene acercarse; si se
         // come el cuadro, retroceder. La IA tambien ajusta el zoom sola.
-        let altoDibujo = dibujo.height
-        let muyLejos = altoDibujo < 0.22
-        let muyCerca = esCara ? base.height > 0.58 : base.height > 0.82
+        let altoSujeto = base.height
+        let muyLejos = esCara ? altoSujeto < 0.075 : altoSujeto < 0.18
+        let muyCerca = esCara ? altoSujeto > 0.55 : altoSujeto > 0.80
 
         // Si el telefono esta torcido, no se da por listo aunque el sujeto
         // ya este en su tercio: la foto saldria chueca.
@@ -421,12 +421,12 @@ enum AestheticAnalyzer {
         } else if !cerca {
             if abs(dx) >= abs(dy) {
                 instruccion = dx >= 0
-                    ? String(localized: "Muévete a la izquierda")
-                    : String(localized: "Muévete a la derecha")
+                    ? String(localized: "Mueve el teléfono hacia la izquierda")
+                    : String(localized: "Mueve el teléfono hacia la derecha")
             } else {
                 instruccion = dy >= 0
-                    ? String(localized: "Sube el teléfono")
-                    : String(localized: "Baja el teléfono")
+                    ? String(localized: "Mueve el teléfono hacia arriba")
+                    : String(localized: "Mueve el teléfono hacia abajo")
             }
         } else if torcido {
             instruccion = String(localized: "Endereza el teléfono")
@@ -440,10 +440,18 @@ enum AestheticAnalyzer {
         // pedirle al usuario que camine. Si esta muy grande, lo baja.
         var zoom: CGFloat?
 
-        if altoDibujo < 0.30 {
-            zoom = min(max(0.52 / max(altoDibujo, 0.06), 1.2), 1.9)
+        if esCara {
+            // Retratos: solo acerca si la cara quedo muy chica; asi no
+            // recorta un plano de cuerpo entero.
+            if altoSujeto < 0.075 {
+                zoom = min(max(0.16 / max(altoSujeto, 0.03), 1.2), 2.2)
+            } else if muyCerca {
+                zoom = max(0.40 / max(altoSujeto, 0.1), 0.55)
+            }
+        } else if altoSujeto < 0.18 {
+            zoom = min(max(0.42 / max(altoSujeto, 0.05), 1.2), 2.2)
         } else if muyCerca {
-            zoom = max(0.60 / max(altoDibujo, 0.2), 0.55)
+            zoom = max(0.55 / max(altoSujeto, 0.2), 0.55)
         }
 
         return Guia(
