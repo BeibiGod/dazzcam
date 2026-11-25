@@ -65,16 +65,28 @@ enum VideoBaker {
                 ? UInt64(max(0, segundos) * 24)
                 : 0
 
+            // Color primero, fecha despues y el dano de pelicula al final:
+            // el grano y los rayones tambien pasan sobre la fecha.
             let filtrada = FilterEngine.cadena(
                 preset,
                 entrada: peticion.sourceImage,
                 controles: controles,
                 semilla: semilla,
-                momento: momento
+                momento: momento,
+                conTextura: false
             )
 
             let base = filtrada ?? peticion.sourceImage
-            peticion.finish(with: capa.aplicar(sobre: base), context: nil)
+            let conFecha = capa.aplicar(sobre: base)
+            let final = FilterEngine.textura(
+                preset,
+                a: conFecha,
+                controles: controles,
+                semilla: semilla,
+                momento: momento
+            ) ?? conFecha
+
+            peticion.finish(with: final, context: nil)
         }
     }
 

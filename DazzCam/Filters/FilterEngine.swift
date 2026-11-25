@@ -88,7 +88,8 @@ enum FilterEngine {
         a imagen: UIImage,
         controles: ControlesLook = ControlesLook(),
         semilla: UInt64 = 0,
-        momento: UInt64 = 0
+        momento: UInt64 = 0,
+        conTextura: Bool = true
     ) -> UIImage {
         guard preset != .original else { return imagen }
 
@@ -99,7 +100,8 @@ enum FilterEngine {
             entrada: entrada,
             controles: controles,
             semilla: semilla,
-            momento: momento
+            momento: momento,
+            conTextura: conTextura
         ) else { return imagen }
 
         guard let cg = contexto.createCGImage(salida, from: salida.extent) else {
@@ -111,28 +113,21 @@ enum FilterEngine {
     /// `momento` es el numero de cuadro. En foto vale 0 y el patron queda
     /// quieto; en video cambia cuadro a cuadro para que los rayones se muevan
     /// como en un negativo de verdad.
+    ///
+    /// `conTextura` se apaga cuando la fecha se quema antes del dano de
+    /// pelicula: asi el grano, los rayones y la fuga tambien pasan por encima
+    /// de la fecha y no queda pegada como calcomania.
     static func cadena(
         _ preset: FilterPreset,
         entrada: CIImage,
         controles: ControlesLook = ControlesLook(),
         semilla: UInt64 = 0,
-        momento: UInt64 = 0
+        momento: UInt64 = 0,
+        conTextura: Bool = true
     ) -> CIImage? {
         guard preset != .original else { return entrada }
 
-        // La intensidad no va en linea recta: abajo se siente de verdad
-        // suave y arriba se queda un poquito antes del tope. Asi el 100%
-        // no revienta y el 30% ya se nota ligero.
-        let punto = min(max(controles.intensidad, 0), 1)
-        let fuerza = CGFloat(pow(Double(punto), 1.3) * 0.85)
-
-        var a = afinado(ajuste(preset))
-
-        // Lo que trae la camara de fabrica (fuga y grano) se apaga junto con
-        // la intensidad. Lo que muevas a mano se queda como lo pusiste.
-        a.rayones = controles.rayones ?? (a.rayones * fuerza)
-        a.fuga = controles.fuga ?? (a.fuga * fuerza)
-        a.grano = controles.grano ?? (a.grano * fuerza)
+        let (a, fuerza) = ajusteEfectivo(preset, controles: controles)
 
         guard let mirado = aplicarLook(a, a: entrada) else { return nil }
 
@@ -149,12 +144,75 @@ enum FilterEngine {
             base = mirado
         }
 
+        guard conTextura else { return base }
+
         return aplicarTextura(
             a,
             a: base,
             semilla: semilla,
             momento: momento
         )
+    }
+
+    /// Solo el dano de pelicula (grano, rayones y fuga). Se usa para ponerlo
+    /// encima de la fecha ya quemada, sin volver a aplicar el color.
+    static func textura(
+        _ preset: FilterPreset,
+        a imagen: CIImage,
+        controles: ControlesLook = ControlesLook(),
+        semilla: UInt64 = 0,
+        momento: UInt64 = 0
+    ) -> CIImage? {
+        guard preset != .original else { return imagen }
+
+        let (a, _) = ajusteEfectivo(preset, controles: controles)
+        return aplicarTextura(a, a: imagen, semilla: semilla, momento: momento)
+    }
+
+    static func textura(
+        _ preset: FilterPreset,
+        a imagen: UIImage,
+        controles: ControlesLook = ControlesLook(),
+        semilla: UInt64 = 0,
+        momento: UInt64 = 0
+    ) -> UIImage {
+        guard preset != .original else { return imagen }
+
+        let base = normalizar(imagen)
+        guard let entrada = CIImage(image: base),
+              let salida = textura(
+                  preset,
+                  a: entrada,
+                  controles: controles,
+                  semilla: semilla,
+                  momento: momento
+              ),
+              let cg = contexto.createCGImage(salida, from: salida.extent)
+        else { return imagen }
+
+        return UIImage(cgImage: cg, scale: base.scale, orientation: .up)
+    }
+
+    /// Resuelve lo que trae la camara y lo que el usuario movio a mano.
+    private static func ajusteEfectivo(
+        _ preset: FilterPreset,
+        controles: ControlesLook
+    ) -> (AjusteFoto, CGFloat) {
+        // La intensidad no va en linea recta: abajo se siente de verdad
+        // suave y arriba se queda un poquito antes del tope. Asi el 100%
+        // no revienta y el 30% ya se nota ligero.
+        let punto = min(max(controles.intensidad, 0), 1)
+        let fuerza = CGFloat(pow(Double(punto), 1.3) * 0.85)
+
+        var a = afinado(ajuste(preset))
+
+        // Lo que trae la camara de fabrica (fuga y grano) se apaga junto con
+        // la intensidad. Lo que muevas a mano se queda como lo pusiste.
+        a.rayones = controles.rayones ?? (a.rayones * fuerza)
+        a.fuga = controles.fuga ?? (a.fuga * fuerza)
+        a.grano = controles.grano ?? (a.grano * fuerza)
+
+        return (a, fuerza)
     }
 
     /// Acomodo fino del look: los valores mas duros se acercan un poco al
@@ -841,8 +899,10 @@ enum FilterEngine {
             if let salida = f.outputImage { actual = salida }
         }
 
-        // 3b. vision nocturna: intensificador de luz, verde, negros aplastados
-        //     y luces que revientan, como la videocamara de noche.
+        // 3b. vision nocturna: intensificador de luz, verde apagado de los
+        //     2000, negros aplastados y luces que revientan. El verde no es
+        //     fosforo puro: es casi un blanco y negro con un tinte salvia,
+        //     como en las videocamaras Sony de noche.
         if a.vision > 0 {
             let mono = CIFilter.photoEffectMono()
             mono.inputImage = actual
@@ -850,20 +910,21 @@ enum FilterEngine {
             if let gris = mono.outputImage {
                 let tinte = CIFilter.colorMatrix()
                 tinte.inputImage = gris
-                // Fosforo verde: casi monocromo, con muy poco rojo/azul.
-                tinte.rVector = CIVector(x: 0.12, y: 0, z: 0, w: 0)
-                tinte.gVector = CIVector(x: 0, y: 1.0, z: 0, w: 0)
-                tinte.bVector = CIVector(x: 0, y: 0, z: 0.16, w: 0)
-                tinte.biasVector = CIVector(x: 0.0, y: 0.008, z: 0.0, w: 0)
+                // Tinte suave: el verde apenas se separa del gris.
+                tinte.rVector = CIVector(x: 0.80, y: 0, z: 0, w: 0)
+                tinte.gVector = CIVector(x: 0, y: 0.88, z: 0, w: 0)
+                tinte.bVector = CIVector(x: 0, y: 0, z: 0.82, w: 0)
+                tinte.biasVector = CIVector(x: 0.012, y: 0.014, z: 0.012, w: 0)
 
                 if let verde = tinte.outputImage {
                     let curva = CIFilter.toneCurve()
                     curva.inputImage = verde
-                    // Negros aplastados y luces que revientan.
+                    // Negros aplastados, medios con cuerpo y luces que se
+                    // van a blanco: asi el verde no queda plano ni falso.
                     curva.point0 = CGPoint(x: 0.0, y: 0.0)
-                    curva.point1 = CGPoint(x: 0.16, y: 0.01)
-                    curva.point2 = CGPoint(x: 0.40, y: 0.22)
-                    curva.point3 = CGPoint(x: 0.70, y: 0.88)
+                    curva.point1 = CGPoint(x: 0.16, y: 0.035)
+                    curva.point2 = CGPoint(x: 0.46, y: 0.50)
+                    curva.point3 = CGPoint(x: 0.72, y: 0.93)
                     curva.point4 = CGPoint(x: 1.0, y: 1.0)
 
                     let crudo = curva.outputImage ?? verde

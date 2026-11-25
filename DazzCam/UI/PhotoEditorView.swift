@@ -243,7 +243,8 @@ struct PhotoEditorView: View {
                     elegido,
                     a: base,
                     controles: ajustes,
-                    semilla: azar
+                    semilla: azar,
+                    conTextura: false
                 )
                 if let relacion = relacion {
                     salida = FilterEngine.recortar(salida, relacion: relacion)
@@ -253,6 +254,12 @@ struct PhotoEditorView: View {
                     modo: marca,
                     estilo: ajustes.estiloFecha,
                     rotulo: elegido.rotulo
+                )
+                salida = FilterEngine.textura(
+                    elegido,
+                    a: salida,
+                    controles: ajustes,
+                    semilla: azar
                 )
 
                 DispatchQueue.main.async {

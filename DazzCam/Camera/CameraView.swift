@@ -1337,8 +1337,8 @@ struct CameraView: View {
             procesando: video.procesando,
             segundos: video.segundos,
             analizando: analizando,
-            listo: guia?.listo ?? false,
             favoritas: favoritas,
+            listo: guia?.listo ?? false,
             alDisparar: accionDeDisparo,
             alIA: analizarEscena,
             alFavorita: alternarFavorita
@@ -1785,22 +1785,33 @@ struct CameraView: View {
         marca: SelloFecha,
         semilla: UInt64
     ) -> UIImage {
+        // Primero el color, despues la fecha y al final el dano de pelicula:
+        // asi el grano, los rayones y la fuga tambien caen sobre la fecha y
+        // se siente quemada en el negativo, no pegada encima.
         var procesada = FilterEngine.aplicar(
             look,
             a: base,
             controles: ajustes,
-            semilla: semilla
+            semilla: semilla,
+            conTextura: false
         )
 
         if let relacion = relacion {
             procesada = FilterEngine.recortar(procesada, relacion: relacion)
         }
 
-        return SelloFecha.estampar(
+        let estampada = SelloFecha.estampar(
             procesada,
             modo: marca,
             estilo: ajustes.estiloFecha,
             rotulo: look.rotulo
+        )
+
+        return FilterEngine.textura(
+            look,
+            a: estampada,
+            controles: ajustes,
+            semilla: semilla
         )
     }
 
