@@ -1031,6 +1031,17 @@ struct CameraView: View {
                      : "No veo un sujeto claro: apunta a algo con detalle.")
                     .foregroundStyle(.white.opacity(0.9))
             }
+
+            // El zoom recomendado para esta escena, uno a uno.
+            if let zoomRec = guia?.zoomRecomendado,
+               String(format: "%.1fx", camara.zoom) != zoomRec {
+                Text(zoomRec)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.yellow)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.black.opacity(0.6), in: Capsule())
+            }
         }
         .font(.system(size: 12, weight: .semibold, design: .rounded))
         .multilineTextAlignment(.center)
@@ -1336,7 +1347,9 @@ struct CameraView: View {
             listo: guia?.listo ?? false,
             alDisparar: accionDeDisparo,
             alIA: analizarEscena,
-            alFavorita: alternarFavorita
+            alFavorita: alternarFavorita,
+            alImportar: { mostrarImportar = true },
+            alSelector: { mostrarTodas = true }
         )
         .padding(.bottom, insetAbajo + 6)
     }

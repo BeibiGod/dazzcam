@@ -19,6 +19,9 @@ struct Guia {
     /// Cuanto acercar (o alejar) el zoom para que el sujeto quede bien.
     /// nil = ya esta bien. Ej: 1.6 = acercar 1.6x.
     var zoom: CGFloat?
+    /// Texto del zoom que daria un buen encuadre ("0.5x", "1x", "3x"):
+    /// ela poe decir si esta bien o si se ve mejor en otro.
+    var zoomRecomendado: String?
 }
 
 /// Lo que devuelve el analisis de una escena.
@@ -454,13 +457,18 @@ enum AestheticAnalyzer {
             zoom = max(0.55 / max(altoSujeto, 0.2), 0.55)
         }
 
+        // Tipo de zoom que conviene dejar puesto, para que la IA pueda decir
+        // si esta bien la distancia o se ve mejor en otro nivel.
+        let zoomRecomendado = String(format: "%.1fx", zoom ?? 1.0)
+
         return Guia(
             sujeto: dibujo,
             destino: destino,
             listo: listo,
             encuadrado: cerca,
             instruccion: instruccion,
-            zoom: zoom
+            zoom: zoom,
+            zoomRecomendado: zoomRecomendado
         )
     }
 

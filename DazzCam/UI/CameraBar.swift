@@ -20,6 +20,8 @@ struct CameraBar: View {
     var alDisparar: () -> Void
     var alIA: () -> Void
     var alFavorita: (FilterPreset) -> Void
+    var alImportar: (() -> Void)?
+    var alSelector: (() -> Void)?
 
     private var camaras: [FilterPreset] {
         FilterPreset.ordenadas(FilterPreset.allCases, favoritas: favoritas)
@@ -130,20 +132,24 @@ struct CameraBar: View {
                 }
             }
 
-            // FOTO a la izquierda, disparador al centro, IA y VIDEO a la
-            // derecha. El disparador queda centrado de verdad.
+            // FOTO abajo a la izquierda, la IA a su lado, VIDEO a la
+            // derecha y el selector de camaras al extremo de la derecha.
+            // El disparador queda centrado de verdad.
             ZStack {
                 disparador
 
                 HStack(spacing: 8) {
+                    botonImportar
+
                     botonModo(.foto)
 
                     Spacer(minLength: 0)
 
-                    HStack(spacing: 8) {
-                        botonIA
-                        botonModo(.video)
-                    }
+                    botonIA
+
+                    botonModo(.video)
+
+                    botonSelector
                 }
             }
             .padding(.horizontal, 18)
@@ -261,5 +267,33 @@ struct CameraBar: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
+    }
+
+    private var botonImportar: some View {
+        Button {
+            alImportar?()
+        } label: {
+            Image(systemName: "photo.badge.plus")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var botonSelector: some View {
+        Button {
+            alSelector?()
+        } label: {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }
