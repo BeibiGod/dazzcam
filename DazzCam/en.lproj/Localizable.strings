@@ -177,3 +177,11 @@
 "SIN MARCO" = "NO FRAME";
 "PAPEL" = "PAPER";
 "POSTAL" = "POSTCARD";
+
+/* ---- paso 77: mas marcos ---- */
+"PUNTOS" = "SPOTS";
+"NEGATIVO" = "NEGATIVE";
+"INSTANTANEO" = "INSTANT";
+"DIGITAL" = "DIGITAL";
+"FLORAL" = "FLORAL";
+"SHOT ON" = "SHOT ON";

@@ -27,6 +27,8 @@ struct CameraView: View {
     @State private var anillo: CGPoint?
     @State private var analisis: Analisis?
     @State private var guia: Guia?
+    @State private var instruccionEstable = ""
+    @State private var tokenInstruccion = 0
     @State private var mostrarGuia = false
     @State private var tamanoGuia: CGSize?
     @State private var analizando = false
@@ -414,6 +416,8 @@ struct CameraView: View {
                 withAnimation(.easeOut(duration: 0.18)) {
                     guia = nil
                 }
+                tokenInstruccion += 1
+                instruccionEstable = ""
             }
         }
         .onChange(of: fase) { _, nueva in
@@ -1126,7 +1130,7 @@ struct CameraView: View {
                     Text(halago ?? L("Listo, dispara"))
                         .foregroundStyle(Self.verdeGuia)
                 } else {
-                    Text(guia.instruccion)
+                    Text(instruccionEstable.isEmpty ? guia.instruccion : instruccionEstable)
                         .foregroundStyle(.white.opacity(0.95))
                 }
             } else {
@@ -1546,6 +1550,18 @@ struct CameraView: View {
             }
         } else {
             guia = nueva
+        }
+
+        // El texto no parpadea: espera 120 ms y solo cambia si la nueva
+        // instruccion sigue siendo la misma al soltar. La flecha y la caja
+        // siguen al cuadro en vivo; solo el texto se calma.
+        let instruccionNueva = nueva.instruccion
+        tokenInstruccion += 1
+        let mioInstruccion = tokenInstruccion
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard mioInstruccion == tokenInstruccion else { return }
+            instruccionEstable = instruccionNueva
         }
 
         // La IA acerca sola cuando el sujeto esta lejos.

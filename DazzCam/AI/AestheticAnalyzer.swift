@@ -411,8 +411,8 @@ enum AestheticAnalyzer {
 
         // Una vez listo, se aguanta un poco mas: asi el verde no parpadea
         // cuando el recuadro tiembla un pixel.
-        let toleranciaX: CGFloat = estabaListo ? 0.10 : 0.06
-        let toleranciaY: CGFloat = estabaListo ? 0.11 : 0.065
+        let toleranciaX: CGFloat = estabaListo ? 0.11 : 0.075
+        let toleranciaY: CGFloat = estabaListo ? 0.12 : 0.08
         let cerca = abs(dx) < toleranciaX && abs(dy) < toleranciaY
 
         // Tamano: si el recuadro queda muy chico conviene acercarse; si se
