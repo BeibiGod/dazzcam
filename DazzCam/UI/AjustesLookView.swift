@@ -31,6 +31,30 @@ struct AjustesLookView: View {
                         maximo: 1
                     )
 
+                    filaAjuste(
+                        titulo: "EXPOSICION",
+                        detalle: "Aclara u oscurece toda la foto",
+                        clave: \.exposicion
+                    )
+
+                    filaAjuste(
+                        titulo: "CONTRASTE",
+                        detalle: "Separa mas las luces de las sombras",
+                        clave: \.contraste
+                    )
+
+                    filaAjuste(
+                        titulo: "SATURACION",
+                        detalle: "De gris apagado a color intenso",
+                        clave: \.saturacion
+                    )
+
+                    filaAjuste(
+                        titulo: "TEMPERATURA",
+                        detalle: "Azul de noche a calido de tarde",
+                        clave: \.temperatura
+                    )
+
                     fila(
                         titulo: "RAYONES",
                         detalle: "Rayones finos de pelicula vieja",
@@ -251,14 +275,52 @@ struct AjustesLookView: View {
         )
     }
 
+    /// Fila de -100 a +100 para los ajustes finos del editor.
+    private func filaAjuste(
+        titulo: String,
+        detalle: String,
+        clave: WritableKeyPath<ControlesLook, CGFloat?>
+    ) -> some View {
+        let valor = Binding(
+            get: { controles[keyPath: clave] ?? 0 },
+            set: { controles[keyPath: clave] = $0 }
+        )
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titulo)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text(textoAjuste(valor.wrappedValue))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .monospacedDigit()
+            }
+
+            Slider(value: valor, in: -1...1)
+                .tint(.white)
+
+            Text(detalle)
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+    }
+
+    private func textoAjuste(_ valor: CGFloat) -> String {
+        let numero = Int((valor * 100).rounded())
+        return numero > 0 ? "+\(numero)" : "\(numero)"
+    }
+
     private func fila(
         titulo: String,
         detalle: String,
         valor: Binding<CGFloat>,
         rango: ClosedRange<CGFloat>,
         maximo: CGFloat
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+    ) -> some View {        VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
                 Text(titulo)
                     .font(.system(size: 11, weight: .bold, design: .monospaced))

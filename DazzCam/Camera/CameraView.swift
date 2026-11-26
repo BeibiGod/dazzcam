@@ -62,6 +62,7 @@ struct CameraView: View {
     @State private var fechaVideoGrabado = Date()
     @State private var mostrarRevisionVideo = false
     @State private var controles = ControlesLook()
+    @State private var marco: Marco = .ninguno
     @State private var mostrarAjustes = false
     @State private var mostrarAjustesCamara = false
     @State private var favoritas = Preferencias.cargarFavoritas()
@@ -289,6 +290,30 @@ struct CameraView: View {
                                         .frame(width: 38, alignment: .trailing)
                                 }
 
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 7) {
+                                        ForEach(Marco.allCases) { opcion in
+                                            Button {
+                                                marco = opcion
+                                            } label: {
+                                                Text(LocalizedStringKey(opcion.nombre))
+                                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                                    .foregroundStyle(
+                                                        marco == opcion ? Color.black : Color.white.opacity(0.85)
+                                                    )
+                                                    .padding(.horizontal, 9)
+                                                    .padding(.vertical, 6)
+                                                    .background(
+                                                        marco == opcion ? Color.white : Color.white.opacity(0.12),
+                                                        in: Capsule()
+                                                    )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                                .frame(height: 28)
+
                                 HStack(spacing: 10) {
                                     Button {
                                         mostrarAjustes = true
@@ -460,6 +485,11 @@ struct CameraView: View {
                 programarRecalculo()
             }
         }
+        .onChange(of: marco) { _, _ in
+            if mostrarCaptura {
+                programarRecalculo()
+            }
+        }
         .onChange(of: video.grabando) { _, grabando in
             if grabando {
                 vivoAntesDeGrabar = modoVivo
@@ -489,7 +519,8 @@ struct CameraView: View {
                 ajustes: controles,
                 relacion: proporcion.relacion,
                 marca: sello,
-                semilla: semillaCaptura
+                semilla: semillaCaptura,
+                marco: marco
             )
             mostrarGuia = false
             mostrarCaptura = true
@@ -1828,7 +1859,8 @@ struct CameraView: View {
             ajustes: controles,
             relacion: proporcion.relacion,
             marca: sello,
-            semilla: semillaCaptura
+            semilla: semillaCaptura,
+            marco: marco
         )
         fotoFiltrada = final
 
@@ -1858,6 +1890,7 @@ struct CameraView: View {
         let relacion = proporcion.relacion
         let marca = sello
         let azar = semillaCaptura
+        let borde = marco
 
         tokenAjuste += 1
         let mio = tokenAjuste
@@ -1873,7 +1906,8 @@ struct CameraView: View {
                     ajustes: ajustes,
                     relacion: relacion,
                     marca: marca,
-                    semilla: azar
+                    semilla: azar,
+                    marco: borde
                 )
 
                 DispatchQueue.main.async {
@@ -1892,7 +1926,8 @@ struct CameraView: View {
         ajustes: ControlesLook,
         relacion: CGFloat?,
         marca: SelloFecha,
-        semilla: UInt64
+        semilla: UInt64,
+        marco: Marco = .ninguno
     ) -> UIImage {
         // Primero el color, despues la fecha y al final el dano de pelicula:
         // asi el grano, los rayones y la fuga tambien caen sobre la fecha y
@@ -1916,12 +1951,12 @@ struct CameraView: View {
             rotulo: look.rotulo
         )
 
-        return FilterEngine.textura(
+        return marco.aplicar(a: FilterEngine.textura(
             look,
             a: estampada,
             controles: ajustes,
             semilla: semilla
-        )
+        ))
     }
 
     private func voltearCamara() {

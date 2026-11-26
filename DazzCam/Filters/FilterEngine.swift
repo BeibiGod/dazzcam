@@ -40,10 +40,19 @@ struct ControlesLook: Equatable, Codable {
     var grano: CGFloat? = nil
     var estiloFecha: EstiloFecha = .dazz
 
+    // Ajustes finos del editor. nil = como viene de fabrica. Son opcionales
+    // para que los ajustes guardados de antes se sigan leyendo.
+    var exposicion: CGFloat? = nil
+    var contraste: CGFloat? = nil
+    var saturacion: CGFloat? = nil
+    var temperatura: CGFloat? = nil
+
     /// true si el usuario no ha tocado nada.
     var automatico: Bool {
         abs(intensidad - 1) < 0.001 && rayones == nil && fuga == nil
             && grano == nil && estiloFecha == .dazz
+            && exposicion == nil && contraste == nil
+            && saturacion == nil && temperatura == nil
     }
 }
 
@@ -144,11 +153,11 @@ enum FilterEngine {
             base = mirado
         }
 
-        guard conTextura else { return base }
+        guard conTextura else { return ajustesFinos(base, controles: controles) }
 
         return aplicarTextura(
             a,
-            a: base,
+            a: ajustesFinos(base, controles: controles),
             semilla: semilla,
             momento: momento
         )
@@ -191,6 +200,53 @@ enum FilterEngine {
         else { return imagen }
 
         return UIImage(cgImage: cg, scale: base.scale, orientation: .up)
+    }
+
+    /// Ajustes finos del editor: exposicion, contraste, saturacion y
+    /// temperatura. Van despues del look y antes del dano de pelicula, para
+    /// que el grano y los rayones caigan encima del color ya corregido.
+    private static func ajustesFinos(
+        _ imagen: CIImage,
+        controles: ControlesLook
+    ) -> CIImage {
+        var salida = imagen
+
+        if let exposicion = controles.exposicion, abs(exposicion) > 0.001,
+           let filtro = CIFilter(name: "CIExposureAdjust") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(exposicion * 1.2, forKey: kCIInputEVKey)
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        let contraste = controles.contraste ?? 0
+        let saturacion = controles.saturacion ?? 0
+
+        if abs(contraste) > 0.001 || abs(saturacion) > 0.001,
+           let filtro = CIFilter(name: "CIColorControls") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(1 + contraste * 0.5, forKey: kCIInputContrastKey)
+            filtro.setValue(max(0, 1 + saturacion), forKey: kCIInputSaturationKey)
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        if let temperatura = controles.temperatura, abs(temperatura) > 0.001,
+           let filtro = CIFilter(name: "CITemperatureAndTint") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            filtro.setValue(
+                CIVector(x: 6500 + temperatura * 2500, y: 0),
+                forKey: "inputTargetNeutral"
+            )
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        return salida
     }
 
     /// Resuelve lo que trae la camara y lo que el usuario movio a mano.
