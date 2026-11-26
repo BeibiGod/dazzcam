@@ -22,6 +22,14 @@ struct Guia {
     /// Texto del zoom que daria un buen encuadre ("0.5x", "1x", "3x"):
     /// ela poe decir si esta bien o si se ve mejor en otro.
     var zoomRecomendado: String?
+
+    /// Eje del movimiento pedido. La flecha y el texto usan el mismo, asi
+    /// nunca se contradicen.
+    enum Eje {
+        case ninguno, horizontal, vertical
+    }
+
+    var eje: Eje = .ninguno
 }
 
 /// Lo que devuelve el analisis de una escena.
@@ -266,7 +274,8 @@ enum AestheticAnalyzer {
         esCara: Bool,
         destinoAnterior: CGPoint? = nil,
         estabaListo: Bool = false,
-        grados: Double = 0
+        grados: Double = 0,
+        ejeAnterior: Guia.Eje? = nil
     ) -> Guia? {
         guard caja.width > 0.004, caja.height > 0.004 else { return nil }
         return componerGuia(
@@ -275,7 +284,8 @@ enum AestheticAnalyzer {
             esCara: esCara,
             destinoAnterior: destinoAnterior,
             estabaListo: estabaListo,
-            grados: grados
+            grados: grados,
+            ejeAnterior: ejeAnterior
         )
     }
 
@@ -319,7 +329,8 @@ enum AestheticAnalyzer {
         esCara: Bool,
         destinoAnterior: CGPoint? = nil,
         estabaListo: Bool = false,
-        grados: Double = 0
+        grados: Double = 0,
+        ejeAnterior: Guia.Eje? = nil
     ) -> Guia? {
         let centro = CGPoint(x: base.midX, y: base.midY)
 
@@ -418,25 +429,19 @@ enum AestheticAnalyzer {
         // Una sola instruccion a la vez, como un fotografo al lado: primero
         // mover el encuadre, despues enderezar, despues acercarse.
         var instruccion: String
+        var eje: Guia.Eje = .ninguno
 
-        if listo {
-            instruccion = L("Buen encuadre. Dispara.")
-        } else if !cerca {
-            if abs(dx) >= abs(dy) {
-                instruccion = dx >= 0
-                    ? L("Mueve a la izquierda el teléfono")
-                    : L("Mueve a la derecha el teléfono")
-            } else {
-                instruccion = dy >= 0
-                    ? L("Mueve hacia arriba el teléfono")
-                    : L("Mueve hacia abajo el teléfono")
-            }
-        } else if torcido {
-            instruccion = L("Endereza el teléfono")
-        } else if muyLejos {
-            instruccion = L("Acércate un poco")
-        } else {
-            instruccion = L("Aléjate un poco")
+        // Eje del movimiento. Se queda en el mismo eje mientras el otro no
+        // gane por 25%: asi el texto no brinca entre "izquierda" y "arriba"
+        // cuadro a cuadro cuando el sujeto esta casi en diagonal.
+        var horizontal: Bool
+        switch ejeAnterior ?? .ninguno {
+        case .horizontal:
+            horizontal = abs(dx) >= abs(dy) * 1.25
+        case .vertical:
+            horizontal = abs(dx) * 1.25 >= abs(dy)
+        case .ninguno:
+            horizontal = abs(dx) >= abs(dy)
         }
 
         // La IA acerca sola: si el sujeto esta lejos, sube el zoom en vez de
@@ -457,6 +462,33 @@ enum AestheticAnalyzer {
             zoom = max(0.55 / max(altoSujeto, 0.2), 0.55)
         }
 
+        if listo {
+            instruccion = L("Buen encuadre. Dispara.")
+        } else if !cerca {
+            // Se dice a donde mover el telefono, no a donde mover al sujeto:
+            // el recuadro fantasma ya muestra el destino.
+            if horizontal {
+                eje = .horizontal
+                instruccion = dx >= 0
+                    ? L("Mueve el teléfono a la izquierda")
+                    : L("Mueve el teléfono a la derecha")
+            } else {
+                eje = .vertical
+                instruccion = dy >= 0
+                    ? L("Sube el teléfono")
+                    : L("Baja el teléfono")
+            }
+        } else if torcido {
+            instruccion = L("Endereza el teléfono")
+        } else if zoom != nil {
+            // El zoom lo ajusta la app: pedirle que camine seria contradecirla.
+            instruccion = L("Mantén el teléfono quieto")
+        } else if muyLejos {
+            instruccion = L("Acércate un poco")
+        } else {
+            instruccion = L("Aléjate un poco")
+        }
+
         // Tipo de zoom que conviene dejar puesto, para que la IA pueda decir
         // si esta bien la distancia o se ve mejor en otro nivel.
         let zoomRecomendado = String(format: "%.1fx", zoom ?? 1.0)
@@ -468,7 +500,8 @@ enum AestheticAnalyzer {
             encuadrado: cerca,
             instruccion: instruccion,
             zoom: zoom,
-            zoomRecomendado: zoomRecomendado
+            zoomRecomendado: zoomRecomendado,
+            eje: eje
         )
     }
 

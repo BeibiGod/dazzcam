@@ -401,7 +401,8 @@ struct CameraView: View {
                    esCara: esCara,
                    destinoAnterior: guia?.destino,
                    estabaListo: guia?.listo ?? false,
-                   grados: nivel.angulo * 180 / .pi
+                   grados: nivel.angulo * 180 / .pi,
+                   ejeAnterior: guia?.eje
                ) {
                 sujetoEsCara = esCara
                 let tamano = vivo.imagen?.size ?? tamanoGuia ?? CGSize(width: 9, height: 16)
@@ -875,7 +876,13 @@ struct CameraView: View {
                     .position(x: objetivo.x, y: objetivo.y)
 
                 // Flecha en el borde: hacia donde mover el telefono.
-                flechasGuia(sujeto: rect, destino: objetivo, en: tamano, color: color)
+                flechasGuia(
+                    sujeto: rect,
+                    destino: objetivo,
+                    eje: guia.eje,
+                    en: tamano,
+                    color: color
+                )
             }
 
             // Recuadro del sujeto. Cuando queda listo se pone verde y se
@@ -905,14 +912,17 @@ struct CameraView: View {
     private func flechasGuia(
         sujeto: CGRect,
         destino: CGPoint,
+        eje: Guia.Eje,
         en tamano: CGSize,
         color: Color
     ) -> some View {
         let dx = destino.x - sujeto.midX
         let dy = destino.y - sujeto.midY
 
+        // Mismo eje que el texto: si el texto dice "izquierda", la flecha
+        // apunta a la izquierda. Nunca se contradicen.
         return ZStack {
-            if abs(dx) >= abs(dy), abs(dx) > 18 {
+            if eje == .horizontal {
                 // El sujeto tiene que ir a la derecha: el telefono va a la
                 // izquierda, por eso la flecha va al borde izquierdo.
                 Image(systemName: dx > 0 ? "chevron.left" : "chevron.right")
@@ -923,7 +933,8 @@ struct CameraView: View {
                         x: dx > 0 ? 26 : tamano.width - 26,
                         y: tamano.height * 0.46
                     )
-            } else if abs(dy) > 18 {
+            } else if eje == .vertical {
+                // El sujeto tiene que bajar: se sube el telefono.
                 Image(systemName: dy > 0 ? "chevron.up" : "chevron.down")
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(color.opacity(0.95))
