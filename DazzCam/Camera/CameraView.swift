@@ -290,29 +290,7 @@ struct CameraView: View {
                                         .frame(width: 38, alignment: .trailing)
                                 }
 
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 7) {
-                                        ForEach(Marco.allCases) { opcion in
-                                            Button {
-                                                marco = opcion
-                                            } label: {
-                                                Text(LocalizedStringKey(opcion.nombre))
-                                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                                    .foregroundStyle(
-                                                        marco == opcion ? Color.black : Color.white.opacity(0.85)
-                                                    )
-                                                    .padding(.horizontal, 9)
-                                                    .padding(.vertical, 6)
-                                                    .background(
-                                                        marco == opcion ? Color.white : Color.white.opacity(0.12),
-                                                        in: Capsule()
-                                                    )
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                                .frame(height: 28)
+                                filaMarcoCaptura
 
                                 HStack(spacing: 10) {
                                     Button {
@@ -481,11 +459,6 @@ struct CameraView: View {
         }
         .onChange(of: sello) { _, _ in
             guardarPreferencias()
-            if mostrarCaptura {
-                programarRecalculo()
-            }
-        }
-        .onChange(of: marco) { _, _ in
             if mostrarCaptura {
                 programarRecalculo()
             }
@@ -1880,9 +1853,43 @@ struct CameraView: View {
         }
     }
 
+    /// Fila de marcos de la revision. Sin onChange para no inflar el `body`.
+    private var filaMarcoCaptura: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(Marco.allCases) { opcion in
+                    Button {
+                        elegirMarco(opcion)
+                    } label: {
+                        Text(LocalizedStringKey(opcion.nombre))
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(
+                                marco == opcion ? Color.black : Color.white.opacity(0.85)
+                            )
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(
+                                marco == opcion ? Color.white : Color.white.opacity(0.12),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(height: 28)
+    }
+
+    private func elegirMarco(_ nuevo: Marco) {
+        marco = nuevo
+        if mostrarCaptura {
+            programarRecalculo(marcoNuevo: nuevo)
+        }
+    }
+
     /// Recalcula la foto de la revision sin trabar el visor: espera a que el
     /// dedo deje de moverse y hace el trabajo pesado en segundo plano.
-    private func programarRecalculo() {
+    private func programarRecalculo(marcoNuevo: Marco? = nil) {
         guard let base = foto.ultimaFoto else { return }
 
         let look = preset
@@ -1890,7 +1897,7 @@ struct CameraView: View {
         let relacion = proporcion.relacion
         let marca = sello
         let azar = semillaCaptura
-        let borde = marco
+        let borde = marcoNuevo ?? marco
 
         tokenAjuste += 1
         let mio = tokenAjuste
