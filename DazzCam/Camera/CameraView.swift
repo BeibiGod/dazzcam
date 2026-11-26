@@ -64,7 +64,7 @@ struct CameraView: View {
     @State private var fechaVideoGrabado = Date()
     @State private var mostrarRevisionVideo = false
     @State private var controles = ControlesLook()
-    @State private var marco: Marco = .ninguno
+    @State private var marco: Marco = .plain
     @State private var mostrarAjustes = false
     @State private var mostrarAjustesCamara = false
     @State private var favoritas = Preferencias.cargarFavoritas()
@@ -1950,7 +1950,7 @@ struct CameraView: View {
         relacion: CGFloat?,
         marca: SelloFecha,
         semilla: UInt64,
-        marco: Marco = .ninguno
+        marco: Marco = .plain
     ) -> UIImage {
         // Primero el color, despues la fecha y al final el dano de pelicula:
         // asi el grano, los rayones y la fuga tambien caen sobre la fecha y

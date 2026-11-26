@@ -18,7 +18,7 @@ struct PhotoEditorView: View {
     @State private var error: String?
     @State private var token = 0
     @State private var semilla = UInt64.random(in: 1...UInt64.max)
-    @State private var marco: Marco = .ninguno
+    @State private var marco: Marco = .plain
 
     @Environment(\.dismiss) private var cerrar
 
