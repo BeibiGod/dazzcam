@@ -9,7 +9,6 @@ struct AjustesCamaraView: View {
 
     @Environment(\.dismiss) private var cerrar
 
-    @State private var mostrarDuo = false
 
     var body: some View {
         NavigationStack {
@@ -85,28 +84,6 @@ struct AjustesCamaraView: View {
                         .buttonStyle(.plain)
                     }
 
-                    seccion(
-                        titulo: "DUO",
-                        detalle: "Dos cuadritos juntos: toma 2 fotos o importa 2 y se hace una sola"
-                    ) {
-                        Button {
-                            mostrarDuo = true
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "square.on.square")
-                                    .font(.system(size: 15, weight: .semibold))
-                                Text("HACER DUO")
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                Spacer()
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 11)
-                            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     Text(version)
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.35))
@@ -128,9 +105,6 @@ struct AjustesCamaraView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .fullScreenCover(isPresented: $mostrarDuo) {
-            DuoView()
-        }
     }
 
     private var version: String {

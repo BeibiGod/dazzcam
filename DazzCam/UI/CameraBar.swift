@@ -22,6 +22,7 @@ struct CameraBar: View {
     var alFavorita: (FilterPreset) -> Void
     var alImportar: (() -> Void)?
     var alSelector: (() -> Void)?
+    var alDuo: (() -> Void)?
 
     private var camaras: [FilterPreset] {
         FilterPreset.ordenadas(FilterPreset.allCases, favoritas: favoritas)
@@ -139,6 +140,8 @@ struct CameraBar: View {
                 disparador
 
                 HStack(spacing: 8) {
+                    botonDuo
+
                     botonImportar
 
                     botonModo(.foto)
@@ -265,6 +268,27 @@ struct CameraBar: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
+    }
+
+    /// Boton DUO: dos cuadritos se vuelven una sola foto. Un toque, sin
+    /// engranaje. Sencillo incluso para un nino.
+    private var botonDuo: some View {
+        Button {
+            alDuo?()
+        } label: {
+            VStack(spacing: 1) {
+                Image(systemName: "square.on.square")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("DUO")
+                    .font(.system(size: 7, weight: .bold, design: .monospaced))
+            }
+            .foregroundStyle(.white)
+            .frame(width: 30, height: 30)
+            .background(Color.black.opacity(0.45), in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("DUO")
     }
 
     /// Botón de "escanear" (Framed): escanea la escena actual y abre el

@@ -69,6 +69,7 @@ struct CameraView: View {
     @State private var mostrarAjustesCamara = false
     @State private var favoritas = Preferencias.cargarFavoritas()
     @State private var mostrarEscaneo = false
+    @State private var mostrarDuo = false
     @State private var escaneo: EscaneoFramed.Escaneo?
     @State private var dibujandoFrame = false
     @State private var rectDibujado: CGRect?
@@ -602,6 +603,9 @@ struct CameraView: View {
                     }
                 }
             }
+        }
+        .fullScreenCover(isPresented: $mostrarDuo) {
+            DuoView()
         }
         .fullScreenCover(isPresented: $mostrarRevisionVideo, onDismiss: {
             if let url = videoGrabado {
@@ -1436,7 +1440,8 @@ struct CameraView: View {
             alIA: analizarEscena,
             alFavorita: alternarFavorita,
             alImportar: { mostrarImportar = true },
-            alSelector: { mostrarTodas = true }
+            alSelector: { mostrarTodas = true },
+            alDuo: { mostrarDuo = true }
         )
         .padding(.bottom, insetAbajo + 6)
     }
