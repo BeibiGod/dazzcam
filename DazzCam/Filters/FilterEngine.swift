@@ -47,12 +47,19 @@ struct ControlesLook: Equatable, Codable {
     var saturacion: CGFloat? = nil
     var temperatura: CGFloat? = nil
 
+    // Efectos de pelicula estilo Framed. nil = apagado.
+    var glow: CGFloat? = nil       // halo brillante (bloom)
+    var fringe: CGFloat? = nil     // aberracion cromatica
+    var vignette: CGFloat? = nil   // oscurecer esquinas
+    var motion: CGFloat? = nil     // desenfoque de movimiento
+
     /// true si el usuario no ha tocado nada.
     var automatico: Bool {
         abs(intensidad - 1) < 0.001 && rayones == nil && fuga == nil
             && grano == nil && estiloFecha == .dazz
             && exposicion == nil && contraste == nil
             && saturacion == nil && temperatura == nil
+            && glow == nil && fringe == nil && vignette == nil && motion == nil
     }
 }
 
@@ -153,11 +160,11 @@ enum FilterEngine {
             base = mirado
         }
 
-        guard conTextura else { return ajustesFinos(base, controles: controles) }
+        guard conTextura else { return efectosFilmicos(ajustesFinos(base, controles: controles), controles: controles) }
 
         return aplicarTextura(
             a,
-            a: ajustesFinos(base, controles: controles),
+            a: efectosFilmicos(ajustesFinos(base, controles: controles), controles: controles),
             semilla: semilla,
             momento: momento
         )
@@ -247,6 +254,72 @@ enum FilterEngine {
         }
 
         return salida
+    }
+
+    /// Efectos de pelicula: glow, fringe, vignette, motion. Van despues de
+    /// los ajustes finos y antes del dano (grano/rayones/fuga).
+    private static func efectosFilmicos(
+        _ imagen: CIImage,
+        controles: ControlesLook
+    ) -> CIImage {
+        var salida = imagen
+        let extento = salida.extent
+
+        // GLOW: halo brillante (bloom).
+        if let glow = controles.glow, glow > 0.001,
+           let filtro = CIFilter(name: "CIBloom") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(glow, forKey: kCIInputIntensityKey)
+            filtro.setValue(max(extento.width, extento.height) * 0.02, forKey: kCIInputRadiusKey)
+            if let r = filtro.outputImage { salida = r.cropped(to: extento) }
+        }
+
+        // FRINGE: aberracion cromatica, separa rojo y azul en los bordes.
+        if let fringe = controles.fringe, fringe > 0.001 {
+            salida = aberracionCromatica(salida, cantidad: fringe)
+        }
+
+        // VIGNETTE: oscurece las esquinas.
+        if let vignette = controles.vignette, vignette > 0.001,
+           let filtro = CIFilter(name: "CIVignette") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(vignette, forKey: kCIInputIntensityKey)
+            filtro.setValue(max(extento.width, extento.height) * 0.5, forKey: kCIInputRadiusKey)
+            if let r = filtro.outputImage { salida = r.cropped(to: extento) }
+        }
+
+        // MOTION: desenfoque de movimiento horizontal.
+        if let motion = controles.motion, motion > 0.001,
+           let filtro = CIFilter(name: "CIMotionBlur") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(motion * max(extento.width, extento.height) * 0.01, forKey: kCIInputRadiusKey)
+            filtro.setValue(0, forKey: kCIInputAngleKey)
+            if let r = filtro.outputImage { salida = r.cropped(to: extento) }
+        }
+
+        return salida
+    }
+
+    /// Aberracion cromatica: rojo se corre a un lado, azul al otro.
+    private static func aberracionCromatica(_ imagen: CIImage, cantidad: CGFloat) -> CIImage {
+        let fuente = """
+        kernel vec4 fringe(sampler image, float amount) {
+            vec2 dc = destCoord();
+            float shift = amount * samplerSize(image).x * 0.006;
+            float r = sample(image, dc + vec2(shift, 0.0)).r;
+            float g = sample(image, dc).g;
+            float b = sample(image, dc - vec2(shift, 0.0)).b;
+            float a = sample(image, dc).a;
+            return vec4(r, g, b, a);
+        }
+        """
+
+        guard let nucleo = CIColorKernel(source: fuente) else { return imagen }
+        return nucleo.apply(
+            extent: imagen.extent,
+            roiCallback: { _, rect in rect.insetBy(dx: -10, dy: 0) },
+            arguments: [imagen, cantidad]
+        )?.cropped(to: imagen.extent) ?? imagen
     }
 
     /// Resuelve lo que trae la camara y lo que el usuario movio a mano.

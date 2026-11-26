@@ -1,48 +1,33 @@
 import CoreImage
 import UIKit
 
-/// Marco de papel alrededor de la foto, como los que trae Framed.
+/// Marco de papel alrededor de la foto. Los mismos seis que trae Framed:
+/// PLAIN, SPECS, WHITE, PAPER, INSTANT, FILM.
 /// El borde come un poco de la orilla: la proporcion de la foto no cambia.
 enum Marco: String, CaseIterable, Identifiable, Codable {
-    // Framed: Polaroid, Paper, Spots, Negative, Film, Instant, Digital,
-    // White, Postcard, Black, Floral + el marco "shot on iPhone".
-    case ninguno
-    case polaroid
-    case papel
-    case puntos
-    case negativo
+    case plain
+    case specs
+    case white
+    case paper
+    case instant
     case film
-    case instantaneo
-    case digital
-    case blanco
-    case postal
-    case negro
-    case floral
-    case nombre
 
     var id: String { rawValue }
 
     var nombre: String {
         switch self {
-        case .ninguno: return "SIN MARCO"
-        case .polaroid: return "POLAROID"
-        case .papel: return "PAPEL"
-        case .puntos: return "PUNTOS"
-        case .negativo: return "NEGATIVO"
+        case .plain: return "PLAIN"
+        case .specs: return "SPECS"
+        case .white: return "WHITE"
+        case .paper: return "PAPER"
+        case .instant: return "INSTANT"
         case .film: return "FILM"
-        case .instantaneo: return "INSTANTANEO"
-        case .digital: return "DIGITAL"
-        case .blanco: return "BLANCO"
-        case .postal: return "POSTAL"
-        case .negro: return "NEGRO"
-        case .floral: return "FLORAL"
-        case .nombre: return "SHOT ON"
         }
     }
 
     /// Dibuja el marco encima de la foto ya procesada.
     func aplicar(a imagen: UIImage) -> UIImage {
-        guard self != .ninguno,
+        guard self != .plain,
               imagen.size.width > 1,
               imagen.size.height > 1
         else { return imagen }
@@ -57,48 +42,26 @@ enum Marco: String, CaseIterable, Identifiable, Codable {
         var fondo = UIColor.white
 
         switch self {
-        case .ninguno:
+        case .plain:
             return imagen
-        case .polaroid:
-            // Abajo mas ancho: ahi va la firma en una polaroid de verdad.
-            arriba = 0.055
-            lados = 0.055
-            abajo = 0.17
-        case .papel, .puntos, .floral:
-            fondo = UIColor(red: 0.96, green: 0.93, blue: 0.86, alpha: 1)
-        case .postal:
+        case .white:
             arriba = 0.045
             abajo = 0.045
             lados = 0.045
+        case .paper:
+            fondo = UIColor(red: 0.96, green: 0.93, blue: 0.86, alpha: 1)
+        case .instant:
+            // Polaroid: blanco y abajo mas ancho.
+            arriba = 0.05
+            lados = 0.05
+            abajo = 0.12
         case .film:
             fondo = .black
             arriba = 0.055
             abajo = 0.055
             lados = 0.045
-        case .negativo:
-            fondo = .white
-            arriba = 0.045
-            abajo = 0.045
-            lados = 0.045
-        case .instantaneo:
-            arriba = 0.05
-            lados = 0.05
-            abajo = 0.12
-        case .digital:
-            fondo = .black
-            arriba = 0.02
-            abajo = 0.02
-            lados = 0.02
-        case .blanco:
-            arriba = 0.045
-            abajo = 0.045
-            lados = 0.045
-        case .negro:
-            fondo = .black
-            arriba = 0.045
-            abajo = 0.045
-            lados = 0.045
-        case .nombre:
+        case .specs:
+            // Marco de "origen": blanco, abajo ancho para la linea de datos.
             arriba = 0.05
             lados = 0.05
             abajo = 0.14
@@ -120,22 +83,12 @@ enum Marco: String, CaseIterable, Identifiable, Codable {
         formato.scale = imagen.scale
         formato.opaque = true
 
-        let base = (self == .negativo) ? invertida(imagen) : imagen
-
         return UIGraphicsImageRenderer(size: imagen.size, format: formato).image { contexto in
             let cg = contexto.cgContext
             fondo.setFill()
             cg.fill(CGRect(origin: .zero, size: imagen.size))
 
-            base.draw(in: destino)
-
-            if self == .postal {
-                // Linea fina por dentro, como las postales de antes.
-                let linea = UIBezierPath(rect: destino.insetBy(dx: 1, dy: 1))
-                UIColor.black.withAlphaComponent(0.18).setStroke()
-                linea.lineWidth = 1
-                linea.stroke()
-            }
+            imagen.draw(in: destino)
 
             if self == .film {
                 // Perforaciones arriba y abajo, en la banda negra.
@@ -166,54 +119,11 @@ enum Marco: String, CaseIterable, Identifiable, Codable {
                 }
             }
 
-            if self == .puntos {
-                // Puntos pequenos dispersos en el papel.
-                UIColor.black.withAlphaComponent(0.14).setFill()
-                var azar: UInt64 = 0x9E37_79B9_7F4A_7C15
-                let total = Int((ancho + alto) / corto * 24)
-                for _ in 0..<max(1, total) {
-                    azar ^= azar >> 33
-                    azar = azar &* 0xFF51_AFD7_ED55_8CCD
-                    let px = CGFloat(azar % 10_000) / 10_000 * ancho
-                    azar ^= azar >> 29
-                    azar = azar &* 0xC4CE_B9FE_1A85_EC53
-                    let py = CGFloat(azar % 10_000) / 10_000 * alto
-                    let punto = CGRect(x: px, y: py, width: 1.5, height: 1.5)
-                    // solo fuera de la foto
-                    if !destino.intersects(punto) {
-                        UIBezierPath(ovalIn: punto).fill()
-                    }
-                }
-            }
-
-            if self == .floral {
-                // Petalos pequenos repetidos en los margenes.
-                UIColor(red: 0.82, green: 0.45, blue: 0.55, alpha: 0.8).setFill()
-                let r = corto * 0.012
-                let paso = r * 4
-                var posiciones: [CGPoint] = []
-                var x = r
-                while x < ancho - r {
-                    posiciones.append(CGPoint(x: x, y: r))
-                    posiciones.append(CGPoint(x: x, y: alto - r))
-                    x += paso
-                }
-                var y = r
-                while y < alto - r {
-                    posiciones.append(CGPoint(x: r, y: y))
-                    posiciones.append(CGPoint(x: ancho - r, y: y))
-                    y += paso
-                }
-                for centro in posiciones where !destino.contains(centro) {
-                    dibujarPetalos(en: centro, radio: r)
-                }
-            }
-
-            if self == .nombre {
-                // Shot on <dispositivo>, como los marcos de "origen".
+            if self == .specs {
+                // Shot on <dispositivo>, como el marco "specs" de Framed.
                 let texto = "SHOT ON " + Self.nombreDispositivo().uppercased()
                 let atributos: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: max(9, margenAbajo * 0.28), weight: .semibold),
+                    .font: UIFont.systemFont(ofSize: max(9, margenAbajo * 0.26), weight: .semibold),
                     .foregroundColor: UIColor.black.withAlphaComponent(0.75),
                     .kern: 1.2
                 ]
@@ -225,34 +135,6 @@ enum Marco: String, CaseIterable, Identifiable, Codable {
                 (texto as NSString).draw(at: punto, withAttributes: atributos)
             }
         }
-    }
-
-    private func dibujarPetalos(en centro: CGPoint, radio r: CGFloat) {
-        for angulo in stride(from: 0, to: 360, by: 90) {
-            let rad = CGFloat(angulo) * .pi / 180
-            let petalo = CGRect(
-                x: centro.x + cos(rad) * r - r / 2,
-                y: centro.y + sin(rad) * r - r / 2,
-                width: r,
-                height: r
-            )
-            UIBezierPath(ovalIn: petalo).fill()
-        }
-        UIColor(red: 0.95, green: 0.78, blue: 0.25, alpha: 1).setFill()
-        UIBezierPath(ovalIn: CGRect(x: centro.x - r / 4, y: centro.y - r / 4, width: r / 2, height: r / 2)).fill()
-    }
-
-    private func invertida(_ imagen: UIImage) -> UIImage {
-        guard let entrada = CIImage(image: imagen),
-              let filtro = CIFilter(name: "CIColorInvert")
-        else { return imagen }
-
-        filtro.setValue(entrada, forKey: kCIInputImageKey)
-        guard let salida = filtro.outputImage,
-              let cg = CIContext().createCGImage(salida, from: salida.extent)
-        else { return imagen }
-
-        return UIImage(cgImage: cg, scale: imagen.scale, orientation: imagen.imageOrientation)
     }
 
     /// Nombre del iPhone, ej. "iPhone 13 Pro Max".

@@ -55,6 +55,30 @@ struct AjustesLookView: View {
                         clave: \.temperatura
                     )
 
+                    filaEfecto(
+                        titulo: "GLOW",
+                        detalle: "Halo brillante alrededor de las luces",
+                        clave: \.glow
+                    )
+
+                    filaEfecto(
+                        titulo: "FRINGE",
+                        detalle: "Aberracion cromatica en los bordes",
+                        clave: \.fringe
+                    )
+
+                    filaEfecto(
+                        titulo: "VIGNETTE",
+                        detalle: "Oscurece las esquinas",
+                        clave: \.vignette
+                    )
+
+                    filaEfecto(
+                        titulo: "MOTION",
+                        detalle: "Desenfoque de movimiento",
+                        clave: \.motion
+                    )
+
                     fila(
                         titulo: "RAYONES",
                         detalle: "Rayones finos de pelicula vieja",
@@ -301,6 +325,40 @@ struct AjustesLookView: View {
             }
 
             Slider(value: valor, in: -1...1)
+                .tint(.white)
+
+            Text(detalle)
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+    }
+
+    /// Fila 0..100 para efectos de pelicula (apagado = 0).
+    private func filaEfecto(
+        titulo: String,
+        detalle: String,
+        clave: WritableKeyPath<ControlesLook, CGFloat?>
+    ) -> some View {
+        let valor = Binding(
+            get: { controles[keyPath: clave] ?? 0 },
+            set: { controles[keyPath: clave] = $0 > 0.001 ? $0 : nil }
+        )
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titulo)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text("\(Int((valor.wrappedValue * 100).rounded()))")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .monospacedDigit()
+            }
+
+            Slider(value: valor, in: 0...1)
                 .tint(.white)
 
             Text(detalle)
