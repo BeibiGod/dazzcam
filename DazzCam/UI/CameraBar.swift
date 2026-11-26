@@ -276,16 +276,12 @@ struct CameraBar: View {
         Button {
             alDuo?()
         } label: {
-            VStack(spacing: 1) {
-                Image(systemName: "square.on.square")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("DUO")
-                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-            }
-            .foregroundStyle(.white)
-            .frame(width: 30, height: 30)
-            .background(Color.black.opacity(0.45), in: Circle())
-            .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+            Image(systemName: "square.on.square")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("DUO")

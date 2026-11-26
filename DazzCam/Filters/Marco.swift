@@ -118,22 +118,6 @@ enum Marco: String, CaseIterable, Identifiable, Codable {
                     x += anchoAgujero * 2
                 }
             }
-
-            if self == .specs {
-                // Shot on <dispositivo>, como el marco "specs" de Framed.
-                let texto = "SHOT ON " + Self.nombreDispositivo().uppercased()
-                let atributos: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: max(9, margenAbajo * 0.26), weight: .semibold),
-                    .foregroundColor: UIColor.black.withAlphaComponent(0.75),
-                    .kern: 1.2
-                ]
-                let tamano = (texto as NSString).size(withAttributes: atributos)
-                let punto = CGPoint(
-                    x: (ancho - tamano.width) / 2,
-                    y: alto - margenAbajo + (margenAbajo - tamano.height) / 2
-                )
-                (texto as NSString).draw(at: punto, withAttributes: atributos)
-            }
         }
     }
 

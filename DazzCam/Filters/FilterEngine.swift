@@ -52,6 +52,15 @@ struct ControlesLook: Equatable, Codable {
     var fringe: CGFloat? = nil     // aberracion cromatica
     var vignette: CGFloat? = nil   // oscurecer esquinas
     var motion: CGFloat? = nil     // desenfoque de movimiento
+    var halation: CGFloat? = nil   // halo calido de luz en los bordes brillantes
+    var dust: CGFloat? = nil       // motas de polvo/pelicula
+
+    // Ajustes finos extra (CoreImage). nil = como viene.
+    var highlights: CGFloat? = nil // luces
+    var shadows: CGFloat? = nil    // sombras
+    var vibrance: CGFloat? = nil   // vibrancia
+    var tinte: CGFloat? = nil      // tinte (magenta/verde)
+    var sharpen: CGFloat? = nil    // nitidez
 
     /// true si el usuario no ha tocado nada.
     var automatico: Bool {
@@ -60,6 +69,9 @@ struct ControlesLook: Equatable, Codable {
             && exposicion == nil && contraste == nil
             && saturacion == nil && temperatura == nil
             && glow == nil && fringe == nil && vignette == nil && motion == nil
+            && halation == nil && dust == nil
+            && highlights == nil && shadows == nil && vibrance == nil
+            && tinte == nil && sharpen == nil
     }
 }
 
@@ -245,9 +257,51 @@ enum FilterEngine {
             filtro.setValue(salida, forKey: kCIInputImageKey)
             filtro.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
             filtro.setValue(
-                CIVector(x: 6500 + temperatura * 2500, y: 0),
+                CIVector(x: 6500 + temperatura * 2500, y: controles.tinte == nil ? 0 : (controles.tinte ?? 0) * 100),
                 forKey: "inputTargetNeutral"
             )
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        } else if let tinte = controles.tinte, abs(tinte) > 0.001,
+                  let filtro = CIFilter(name: "CITemperatureAndTint") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            filtro.setValue(CIVector(x: 6500, y: tinte * 100), forKey: "inputTargetNeutral")
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        // LUCES + SOMBRAS.
+        if (controles.highlights != nil || controles.shadows != nil),
+           let filtro = CIFilter(name: "CIHighlightShadowAdjust") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            // highlights: 1 = intacto, baja para recuperar; shadows: sube para aclarar.
+            let luces = controles.highlights ?? 1
+            let sombras = controles.shadows ?? 0
+            filtro.setValue(max(0, min(1, luces)), forKey: "inputHighlightAmount")
+            filtro.setValue(max(-1, min(1, sombras)), forKey: "inputShadowAmount")
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        // VIBRANCE.
+        if let vibrance = controles.vibrance, abs(vibrance) > 0.001,
+           let filtro = CIFilter(name: "CIVibrance") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(vibrance, forKey: kCIInputAmountKey)
+            if let resultado = filtro.outputImage {
+                salida = resultado
+            }
+        }
+
+        // SHARPEN.
+        if let sharpen = controles.sharpen, sharpen > 0.001,
+           let filtro = CIFilter(name: "CISharpenLuminance") {
+            filtro.setValue(salida, forKey: kCIInputImageKey)
+            filtro.setValue(sharpen, forKey: kCIInputSharpnessKey)
             if let resultado = filtro.outputImage {
                 salida = resultado
             }
@@ -297,7 +351,52 @@ enum FilterEngine {
             if let r = filtro.outputImage { salida = r.cropped(to: extento) }
         }
 
+        // HALATION: halo calido alrededor de lo que revienta de luz.
+        if let halation = controles.halation, halation > 0.001,
+           let bloom = CIFilter(name: "CIBloom") {
+            bloom.setValue(salida, forKey: kCIInputImageKey)
+            bloom.setValue(halation * 1.2, forKey: kCIInputIntensityKey)
+            bloom.setValue(max(extento.width, extento.height) * 0.02, forKey: kCIInputRadiusKey)
+            var r = bloom.outputImage ?? salida
+
+            if let calor = CIFilter(name: "CIColorMatrix") {
+                calor.setValue(r, forKey: kCIInputImageKey)
+                calor.setValue(
+                    CIVector(x: halation * 0.18, y: halation * 0.03, z: halation * 0.01, w: 0),
+                    forKey: "inputBiasVector"
+                )
+                r = calor.outputImage ?? r
+            }
+
+            salida = r.cropped(to: extento)
+        }
+
+        // DUST: motas de polvo dispersas.
+        if let dust = controles.dust, dust > 0.001 {
+            salida = motas(salida, cantidad: dust)
+        }
+
         return salida
+    }
+
+    /// Motas de polvo: puntos blancos dispersos, azar por coordenada.
+    private static func motas(_ imagen: CIImage, cantidad: CGFloat) -> CIImage {
+        let fuente = """
+        kernel vec4 dust(sampler image, float amount) {
+            vec4 c = sample(image, destCoord());
+            vec2 p = floor(destCoord());
+            float h = fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+            if (h > 1.0 - amount * 0.02) { return vec4(1.0, 1.0, 1.0, c.a); }
+            return c;
+        }
+        """
+
+        guard let nucleo = CIColorKernel(source: fuente) else { return imagen }
+        return nucleo.apply(
+            extent: imagen.extent,
+            roiCallback: { _, rect in rect },
+            arguments: [imagen, cantidad]
+        )?.cropped(to: imagen.extent) ?? imagen
     }
 
     /// Aberracion cromatica: rojo se corre a un lado, azul al otro.

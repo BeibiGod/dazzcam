@@ -55,6 +55,40 @@ struct AjustesLookView: View {
                         clave: \.temperatura
                     )
 
+                    filaAjuste(
+                        titulo: "TINTE",
+                        detalle: "Magenta a verde",
+                        clave: \.tinte
+                    )
+
+                    filaEfectoSignado(
+                        titulo: "LUCES",
+                        detalle: "Recupera las luces que revientan",
+                        clave: \.highlights,
+                        valorNeutro: 1,
+                        rango: 0...1
+                    )
+
+                    filaEfectoSignado(
+                        titulo: "SOMBRAS",
+                        detalle: "Aclara u oscurece las sombras",
+                        clave: \.shadows,
+                        valorNeutro: 0
+                    )
+
+                    filaEfectoSignado(
+                        titulo: "VIBRANCE",
+                        detalle: "Saturacion inteligente sin quemar",
+                        clave: \.vibrance,
+                        valorNeutro: 0
+                    )
+
+                    filaEfecto(
+                        titulo: "NITIDEZ",
+                        detalle: "Detalle fino",
+                        clave: \.sharpen
+                    )
+
                     filaEfecto(
                         titulo: "GLOW",
                         detalle: "Halo brillante alrededor de las luces",
@@ -77,6 +111,18 @@ struct AjustesLookView: View {
                         titulo: "MOTION",
                         detalle: "Desenfoque de movimiento",
                         clave: \.motion
+                    )
+
+                    filaEfecto(
+                        titulo: "HALATION",
+                        detalle: "Halo calido en las luces fuertes",
+                        clave: \.halation
+                    )
+
+                    filaEfecto(
+                        titulo: "DUST",
+                        detalle: "Motas de polvo de pelicula",
+                        clave: \.dust
                     )
 
                     fila(
@@ -325,6 +371,43 @@ struct AjustesLookView: View {
             }
 
             Slider(value: valor, in: -1...1)
+                .tint(.white)
+
+            Text(detalle)
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.35))
+        }
+    }
+
+    /// Fila -100..100 con neutro propio (luces neutro 100, sombras 0...).
+    private func filaEfectoSignado(
+        titulo: String,
+        detalle: String,
+        clave: WritableKeyPath<ControlesLook, CGFloat?>,
+        valorNeutro: CGFloat,
+        rango: ClosedRange<CGFloat>? = nil
+    ) -> some View {
+        let valor = Binding(
+            get: { controles[keyPath: clave] ?? valorNeutro },
+            set: { controles[keyPath: clave] = $0 }
+        )
+        let limites = rango ?? (valorNeutro - 1)...(valorNeutro + 1)
+
+        return VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titulo)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text("\(Int((valor.wrappedValue * 100).rounded()))")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .monospacedDigit()
+            }
+
+            Slider(value: valor, in: limites)
                 .tint(.white)
 
             Text(detalle)
