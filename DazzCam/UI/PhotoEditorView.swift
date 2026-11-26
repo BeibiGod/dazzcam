@@ -18,6 +18,7 @@ struct PhotoEditorView: View {
     @State private var error: String?
     @State private var token = 0
     @State private var semilla = UInt64.random(in: 1...UInt64.max)
+    @State private var marco: Marco = .ninguno
 
     @Environment(\.dismiss) private var cerrar
 
@@ -149,6 +150,31 @@ struct PhotoEditorView: View {
                 }
                 .padding(.horizontal, 18)
 
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Marco.allCases) { opcion in
+                            Button {
+                                marco = opcion
+                            } label: {
+                                Text(LocalizedStringKey(opcion.nombre))
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(
+                                        marco == opcion ? Color.black : Color.white.opacity(0.85)
+                                    )
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        marco == opcion ? Color.white : Color.white.opacity(0.1),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                }
+                .frame(height: 30)
+
                 Button {
                     mostrarAjustes = true
                 } label: {
@@ -211,6 +237,9 @@ struct PhotoEditorView: View {
         .onChange(of: sello) { _, _ in
             recalcular()
         }
+        .onChange(of: marco) { _, _ in
+            recalcular()
+        }
         .sheet(isPresented: $mostrarAjustes) {
             AjustesLookView(controles: $controles, sello: $sello, preset: preset)
                 .presentationDetents([.height(660)])
@@ -228,6 +257,7 @@ struct PhotoEditorView: View {
         let marca = sello
         let ajustes = controles
         let azar = semilla
+        let borde = marco
 
         token += 1
         let mio = token
@@ -261,6 +291,8 @@ struct PhotoEditorView: View {
                     controles: ajustes,
                     semilla: azar
                 )
+                // El marco va al final: tapa las orillas y el dano no lo cruza.
+                salida = borde.aplicar(a: salida)
 
                 DispatchQueue.main.async {
                     guard mio == token else { return }

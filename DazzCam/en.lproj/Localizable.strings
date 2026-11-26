@@ -172,3 +172,8 @@
 "Toca la estrella para que salga primero." = "Tap the star to make it come first.";
 "Marcar favorita" = "Mark as favorite";
 "Quitar de favoritas" = "Remove from favorites";
+
+/* ---- paso 75: marcos ---- */
+"SIN MARCO" = "NO FRAME";
+"PAPEL" = "PAPER";
+"POSTAL" = "POSTCARD";
