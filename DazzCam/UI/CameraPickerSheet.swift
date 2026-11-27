@@ -18,58 +18,73 @@ struct CameraPickerSheet: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if !camarasFavoritas.isEmpty {
-                        encabezado("FAVORITAS", cuenta: camarasFavoritas.count)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // La camara que estas usando, siempre arriba y marcada.
+                        encabezado("EN USO")
 
                         LazyVGrid(columns: columnas, spacing: 16) {
-                            ForEach(camarasFavoritas) { preset in
-                                camara(preset)
-                            }
+                            camara(seleccionado)
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
-                    }
+                        .id("en-uso")
 
-                    encabezado("SIN FILTRO")
+                        if !camarasFavoritas.isEmpty {
+                            encabezado("FAVORITAS", cuenta: camarasFavoritas.count)
 
-                    LazyVGrid(columns: columnas, spacing: 16) {
-                        camara(.original)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
+                            LazyVGrid(columns: columnas, spacing: 16) {
+                                ForEach(camarasFavoritas) { preset in
+                                    camara(preset)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                        }
 
-                    ForEach(FilterPreset.porTipo) { grupo in
-                        encabezado(grupo.titulo, cuenta: grupo.camaras.count)
+                        encabezado("SIN FILTRO")
 
                         LazyVGrid(columns: columnas, spacing: 16) {
-                            ForEach(FilterPreset.ordenadas(
-                                grupo.camaras,
-                                favoritas: favoritas
-                            )) { preset in
-                                camara(preset)
-                            }
+                            camara(.original)
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
-                    }
 
-                    Text("Toca la estrella para que salga primero.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.35))
-                        .padding(.horizontal, 20)
-                        .padding(.top, 18)
+                        ForEach(FilterPreset.porTipo) { grupo in
+                            encabezado(grupo.titulo, cuenta: grupo.camaras.count)
+
+                            LazyVGrid(columns: columnas, spacing: 16) {
+                                ForEach(FilterPreset.ordenadas(
+                                    grupo.camaras,
+                                    favoritas: favoritas
+                                )) { preset in
+                                    camara(preset)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                        }
+
+                        Text("Toca la estrella para que salga primero.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.white.opacity(0.35))
+                            .padding(.horizontal, 20)
+                            .padding(.top, 18)
+                    }
+                    .padding(.bottom, 30)
                 }
-                .padding(.bottom, 30)
-            }
-            .background(Color.black.ignoresSafeArea())
-            .navigationTitle("Camaras")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Listo") { cerrar() }
-                        .foregroundStyle(.white)
+                .background(Color.black.ignoresSafeArea())
+                .navigationTitle("Camaras")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Listo") { cerrar() }
+                            .foregroundStyle(.white)
+                    }
+                }
+                .onAppear {
+                    proxy.scrollTo("en-uso", anchor: .top)
                 }
             }
         }
