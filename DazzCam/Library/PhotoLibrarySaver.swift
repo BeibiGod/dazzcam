@@ -30,6 +30,19 @@ enum PhotoLibrarySaver {
         }
     }
 
+    /// Guarda datos JPG/PNG renderizados tal cual.
+    static func guardarDatos(_ datos: Data) async throws {
+        try await pedirPermiso()
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let peticion = PHAssetCreationRequest.forAsset()
+                peticion.addResource(with: .photo, data: datos, options: nil)
+            }
+        } catch {
+            throw ErrorGuardado.fallo(error.localizedDescription)
+        }
+    }
+
     /// Guarda un video que ya esta en disco.
     static func guardarVideo(_ url: URL) async throws {
         try await pedirPermiso()

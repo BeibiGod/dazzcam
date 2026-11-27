@@ -4,11 +4,12 @@ import UIKit
 enum DuoFoto {
     /// Un solo lienzo cuadrado: la 1a llena el cuadro, la 2a encima en una
     /// esquina con marquita. (No son dos archivos ni lado a lado.)
-    static func combinar(_ a: UIImage, _ b: UIImage, lado: CGFloat = 1080) -> UIImage {
+    static func combinar(_ a: UIImage, _ b: UIImage, lado: CGFloat? = nil, insetScale: CGFloat = 0.45) -> UIImage {
+        let salida = lado ?? max(1080, pixelSize(a), pixelSize(b))
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = 1
         formato.opaque = true
-        let medida = CGSize(width: lado, height: lado)
+        let medida = CGSize(width: salida, height: salida)
 
         return UIGraphicsImageRenderer(size: medida, format: formato).image { _ in
             // Fondo blanco por si algo sobra.
@@ -19,11 +20,11 @@ enum DuoFoto {
             dibujar(a, en: CGRect(origin: .zero, size: medida))
 
             // 2a foto: encima, esquina inferior derecha, con marquita.
-            let lado2 = lado * 0.45
-            let margen = lado * 0.05
+            let lado2 = salida * insetScale
+            let margen = salida * 0.05
             let caja2 = CGRect(
-                x: lado - lado2 - margen,
-                y: lado - lado2 - margen,
+                x: salida - lado2 - margen,
+                y: salida - lado2 - margen,
                 width: lado2,
                 height: lado2
             )
@@ -54,5 +55,9 @@ enum DuoFoto {
         UIBezierPath(rect: caja).addClip()
         imagen.draw(in: destino)
         contexto?.restoreGState()
+    }
+
+    private static func pixelSize(_ i: UIImage) -> CGFloat {
+        max(i.size.width, i.size.height) * i.scale
     }
 }
