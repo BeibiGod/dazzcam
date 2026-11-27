@@ -284,7 +284,7 @@ struct CameraBar: View {
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("DUO")
+        .accessibilityLabel("CIRCLES")
     }
 
     /// Botón de "escanear" (Framed): escanea la escena actual y abre el

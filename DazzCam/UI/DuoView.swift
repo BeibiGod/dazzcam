@@ -1,7 +1,7 @@
 import PhotosUI
 import SwiftUI
 
-/// DUO: toma 2 fotos o importa 2 y se hace una sola (dos cuadritos juntos).
+/// CIRCLES: toma 2 fotos o importa 2 y se hace una sola (dos cuadritos juntos).
 struct DuoView: View {
     @Environment(\.dismiss) private var cerrar
 
@@ -57,7 +57,7 @@ struct DuoView: View {
                     } label: {
                         HStack(spacing: 8) {
                             if guardando { ProgressView().tint(.black) }
-                            Text(guardando ? "GUARDANDO" : "HACER DUO")
+                            Text(guardando ? "GUARDANDO" : "CIRCLES")
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                         }
                         .foregroundStyle(.black)
@@ -73,7 +73,7 @@ struct DuoView: View {
                 .padding(.vertical, 18)
             }
             .background(Color(red: 0.06, green: 0.06, blue: 0.08).ignoresSafeArea())
-            .navigationTitle("DUO")
+            .navigationTitle("CIRCLES")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
