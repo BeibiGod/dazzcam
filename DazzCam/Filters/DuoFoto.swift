@@ -1,17 +1,37 @@
 import UIKit
 
-/// Duo: dos fotos se vuelven una sola, dos cuadritos juntos.
+/// CIRCLES: dos fotos se vuelven una sola sobre el mismo cuadro.
 enum DuoFoto {
-    /// Lado a lado, cada una en un cuadrado que llena su mitad.
+    /// Un solo lienzo cuadrado: la 1a llena el cuadro, la 2a encima en una
+    /// esquina con marquita. (No son dos archivos ni lado a lado.)
     static func combinar(_ a: UIImage, _ b: UIImage, lado: CGFloat = 1080) -> UIImage {
         let formato = UIGraphicsImageRendererFormat.default()
         formato.scale = 1
         formato.opaque = true
-        let medida = CGSize(width: lado * 2, height: lado)
+        let medida = CGSize(width: lado, height: lado)
 
         return UIGraphicsImageRenderer(size: medida, format: formato).image { _ in
-            dibujar(a, en: CGRect(x: 0, y: 0, width: lado, height: lado))
-            dibujar(b, en: CGRect(x: lado, y: 0, width: lado, height: lado))
+            // Fondo blanco por si algo sobra.
+            UIColor.white.setFill()
+            UIRectFill(CGRect(origin: .zero, size: medida))
+
+            // 1a foto: llena todo el cuadro.
+            dibujar(a, en: CGRect(origin: .zero, size: medida))
+
+            // 2a foto: encima, esquina inferior derecha, con marquita.
+            let lado2 = lado * 0.45
+            let margen = lado * 0.05
+            let caja2 = CGRect(
+                x: lado - lado2 - margen,
+                y: lado - lado2 - margen,
+                width: lado2,
+                height: lado2
+            )
+
+            // Borde blanco alrededor de la segunda.
+            UIColor.white.setFill()
+            UIRectFill(caja2.insetBy(dx: -margen * 0.5, dy: -margen * 0.5))
+            dibujar(b, en: caja2)
         }
     }
 
