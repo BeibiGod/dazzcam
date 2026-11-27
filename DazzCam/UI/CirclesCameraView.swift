@@ -71,8 +71,8 @@ struct CirclesCameraView: View {
             }
         }
         .task {
-            await camara.arrancar()
             _ = foto.conectar(a: camara.session)
+            await camara.arrancar()
         }
         .onDisappear { camara.detener() }
         .onChange(of: foto.capturas) { _, _ in
