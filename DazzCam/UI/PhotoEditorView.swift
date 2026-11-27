@@ -4,6 +4,8 @@ import SwiftUI
 /// Elige la camara, mira el resultado y guarda una copia.
 struct PhotoEditorView: View {
     let imagen: UIImage
+    /// Data original del import (para leer EXIF / dia que se tomo).
+    var originalData: Data? = nil
     let proporcion: Proporcion
     var alGuardar: (UIImage, FilterPreset) -> Void
 
@@ -28,9 +30,11 @@ struct PhotoEditorView: View {
         proporcion: Proporcion,
         sello: SelloFecha,
         controles: ControlesLook = ControlesLook(),
+        originalData: Data? = nil,
         alGuardar: @escaping (UIImage, FilterPreset) -> Void
     ) {
         self.imagen = imagen
+        self.originalData = originalData
         self.proporcion = proporcion
         self.alGuardar = alGuardar
         _preset = State(initialValue: preset)
@@ -181,7 +185,7 @@ struct PhotoEditorView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("RAYONES, FUGAS Y GRANO")
+                        Text("EDIT")
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                     }
                     .foregroundStyle(.white)
@@ -255,6 +259,7 @@ struct PhotoEditorView: View {
         let elegido = preset
         let relacion = proporcion.relacion
         let marca = sello
+        let fechaSello = originalData.flatMap(FechaOriginal.leer(de:)) ?? Date()
         let ajustes = controles
         let azar = semilla
         let borde = marco
@@ -283,7 +288,8 @@ struct PhotoEditorView: View {
                     salida,
                     modo: marca,
                     estilo: ajustes.estiloFecha,
-                    rotulo: elegido.rotulo
+                    rotulo: elegido.rotulo,
+                    fecha: fechaSello
                 )
                 salida = FilterEngine.textura(
                     elegido,

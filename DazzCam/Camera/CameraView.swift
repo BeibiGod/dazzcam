@@ -57,6 +57,7 @@ struct CameraView: View {
     @State private var mostrarImportar = false
     @State private var fotoElegida: PhotosPickerItem?
     @State private var fotoImportada: UIImage?
+    @State private var fotoImportadaDatos: Data?
     @State private var mostrarEditor = false
     @State private var videoImportado: URL?
     @State private var mostrarEditorVideo = false
@@ -302,7 +303,7 @@ struct CameraView: View {
                                         HStack(spacing: 6) {
                                             Image(systemName: "slider.horizontal.3")
                                                 .font(.system(size: 11, weight: .semibold))
-                                            Text("MÁS AJUSTES")
+                                            Text("EDIT")
                                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                                         }
                                         .foregroundStyle(.white)
@@ -575,6 +576,7 @@ struct CameraView: View {
                 } else if let datos = try? await item.loadTransferable(type: Data.self),
                           let imagen = UIImage(data: datos) {
                     fotoImportada = imagen
+                    fotoImportadaDatos = datos
                     mostrarEditor = true
                 } else {
                     aviso = L("No pude abrir esa foto")
@@ -644,6 +646,7 @@ struct CameraView: View {
                     proporcion: proporcion,
                     sello: sello,
                     controles: controles,
+                    originalData: fotoImportadaDatos,
                     alGuardar: { _, elegido in
                         preset = elegido
                         aviso = L("Copia guardada con %@", elegido.nombre)
@@ -1976,7 +1979,8 @@ struct CameraView: View {
             procesada,
             modo: marca,
             estilo: ajustes.estiloFecha,
-            rotulo: look.rotulo
+            rotulo: look.rotulo,
+            fecha: Date()
         )
 
         return marco.aplicar(a: FilterEngine.textura(

@@ -186,6 +186,9 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
     // ---- agregada en la v1.24: sello de vision nocturna ----
     case vision
 
+    // ---- AUTOMATIC: dia que se tomo; usa fecha original (EXIF) ----
+    case automatico
+
     var id: String { rawValue }
 
     var etiqueta: String {
@@ -197,6 +200,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .fecha: return "FECHA"
         case .fechaHora: return "F+HORA"
         case .vision: return "NIGHT"
+        case .automatico: return "AUTO"
         }
     }
 
@@ -210,6 +214,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .fecha: return "12/11/2026"
         case .fechaHora: return "12/11/2026 2:28 AM"
         case .vision: return "2026 2 15 8:47 PM"
+        case .automatico: return "Automatica"
         }
     }
 
@@ -222,6 +227,7 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         case .vision: return .fecha
         case .fecha: return .fechaHora
         case .fechaHora: return .apagado
+        case .automatico: return .apagado
         }
     }
 
@@ -254,6 +260,9 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
             // Como la videocamara: año, mes y dia arriba, hora con segundos
             // abajo, sin espacio antes de AM/PM.
             return formatear(fecha, patron: "yyyy M d\nh:mm:ssa")
+
+        case .automatico:
+            return formatear(fecha, patron: "dd/MM/yyyy")
         }
     }
 
@@ -292,9 +301,10 @@ enum SelloFecha: String, CaseIterable, Identifiable, Codable {
         _ imagen: UIImage,
         modo: SelloFecha,
         estilo: EstiloFecha = .dazz,
-        rotulo: String? = nil
+        rotulo: String? = nil,
+        fecha: Date = Date()
     ) -> UIImage {
-        let texto = textoCompleto(modo, rotulo: rotulo)
+        let texto = textoCompleto(modo, fecha: fecha, rotulo: rotulo)
         guard !texto.isEmpty else { return imagen }
 
         let base = FilterEngine.normalizar(imagen)
