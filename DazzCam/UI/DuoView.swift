@@ -6,6 +6,7 @@ struct DuoView: View {
     var preset: FilterPreset = .original
     var controles: ControlesLook = ControlesLook()
     var sello: SelloFecha = .apagado
+    var proporcion: Proporcion = .dieciseisNueve
     @Environment(\.dismiss) private var cerrar
 
     enum Ruta: Identifiable { case camara, editor; var id: String { "\(self)" } }
@@ -68,7 +69,7 @@ struct DuoView: View {
         }
         .fullScreenCover(isPresented: Binding(get: { ruta == .editor }, set: { if !$0 { ruta = nil } })) {
             if let a, let b {
-                CirclesEditor(inicialA: a, inicialB: b) { cerrar() }
+                CirclesEditor(inicialA: a, inicialB: b, proporcionInicial: proporcion) { cerrar() }
             }
         }
     }

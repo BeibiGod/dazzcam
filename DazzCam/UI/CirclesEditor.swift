@@ -4,9 +4,11 @@ import SwiftUI
 struct CirclesEditor: View {
     let inicialA: UIImage
     let inicialB: UIImage
+    var proporcionInicial: Proporcion = .dieciseisNueve
     var onDone: () -> Void
 
     @State private var comp = CirclesComposition()
+    @State private var proporcion: Proporcion = .dieciseisNueve
     @State private var swapOrder = false
     @State private var formato: Formato = .jpg
     @State private var guardando = false
@@ -21,7 +23,8 @@ struct CirclesEditor: View {
     private var combinada: UIImage {
         var c = comp
         c.swapOrder = swapOrder
-        return DuoFoto.combinar(inicialA, inicialB, composicion: c)
+        let base = DuoFoto.combinar(inicialA, inicialB, composicion: c)
+        return FilterEngine.recortar(base, relacion: proporcion.relacion)
     }
 
     var body: some View {
@@ -44,6 +47,11 @@ struct CirclesEditor: View {
                     slider("POSICION Y 2a", value: offsetY, range: -0.5...0.5)
                     slider("TAMANO 2a", value: $comp.scale2, range: 0.3...1.5)
                     slider("INTENSIDAD", value: $comp.intensity, range: 0...1)
+
+                    Picker("PROPORCION", selection: $proporcion) {
+                        ForEach(Proporcion.allCases, id: \.self) { Text($0.etiqueta).tag($0) }
+                    }
+                    .pickerStyle(.segmented).padding(.horizontal, 14)
 
                     Picker("Mezcla", selection: $comp.blend) {
                         ForEach(CirclesComposition.Blend.allCases) { m in Text(m.nombre).tag(m) }
@@ -84,6 +92,7 @@ struct CirclesEditor: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear { proporcion = proporcionInicial }
         .sheet(isPresented: $compartir) {
             ShareSheet(items: [datosExportados(combinada)])
         }

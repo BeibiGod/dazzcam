@@ -614,7 +614,7 @@ struct CameraView: View {
         }
                     Color.clear
                 .frame(width: 0, height: 0)
-                .fullScreenCover(isPresented: $mostrarDuo) { DuoView(preset: preset, controles: controles, sello: sello) }
+                .fullScreenCover(isPresented: $mostrarDuo) { DuoView(preset: preset, controles: controles, sello: sello, proporcion: proporcion) }
                 .fullScreenCover(isPresented: $mostrarDuoCamera) {
                     CirclesCameraView(preset: preset, controles: controles, sello: sello) { imgs in
                         if imgs.count >= 2 {
@@ -624,7 +624,7 @@ struct CameraView: View {
                     }
                 }
                 .fullScreenCover(isPresented: $mostrarDuoEditor) {
-                    if let duoA, let duoB { CirclesEditor(inicialA: duoA, inicialB: duoB) { mostrarDuoEditor = false } }
+                    if let duoA, let duoB { CirclesEditor(inicialA: duoA, inicialB: duoB, proporcionInicial: proporcion) { mostrarDuoEditor = false } }
                 }
                 .photosPicker(isPresented: $mostrarDuoGaleria, selection: $duoPicks, maxSelectionCount: 2, matching: .images)
                 .onChange(of: duoPicks) { _, picks in cargarDuoGaleria(picks) }
@@ -1393,6 +1393,8 @@ struct CameraView: View {
     /// en amarillo, como en Framed.
     private var barraLentes: some View {
         HStack(spacing: 8) {
+            duoLensButton
+
             ForEach(camara.lentes) { lente in
                 Button {
                     camara.irA(lente)
@@ -1434,6 +1436,20 @@ struct CameraView: View {
         .animation(.easeOut(duration: 0.18), value: mostrarGuia)
     }
 
+    /// DUO + IMPORT aqui, al nivel del 0.5x.
+    private var duoLensButton: some View {
+        HStack(spacing: 8) {
+            Button { mostrarDuoCamera = true } label: {
+                Image(systemName: "square.on.square").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 36, height: 36).background(Color.black.opacity(0.5), in: Circle()).overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+            }.buttonStyle(.plain).disabled(video.grabando).accessibilityLabel("DUO")
+            Button { mostrarDuoGaleria = true } label: {
+                Image(systemName: "photo.on.rectangle.angled").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 36, height: 36).background(Color.black.opacity(0.5), in: Circle()).overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
+            }.buttonStyle(.plain).disabled(video.grabando).accessibilityLabel("IMPORT")
+        }
+    }
+
     /// Herramientas y lentes. Los botones FOTO, VIDEO y la IA viven en la
     /// barra de abajo, junto al disparador.
     private var barraInferior: some View {
@@ -1462,9 +1478,7 @@ struct CameraView: View {
             alIA: analizarEscena,
             alFavorita: alternarFavorita,
             alImportar: { mostrarImportar = true },
-            alSelector: { mostrarTodas = true },
-            alDuo: { mostrarDuoCamera = true },
-            alImportarDuo: { mostrarDuoGaleria = true }
+            alSelector: { mostrarTodas = true }
         )
         .padding(.bottom, insetAbajo + 6)
     }
