@@ -3,6 +3,9 @@ import SwiftUI
 
 /// CIRCLES. Dos opciones independientes + UN editor + UN motor `DuoFoto`.
 struct DuoView: View {
+    var preset: FilterPreset = .original
+    var controles: ControlesLook = ControlesLook()
+    var sello: SelloFecha = .apagado
     @Environment(\.dismiss) private var cerrar
 
     enum Ruta: Identifiable { case camara, editor; var id: String { "\(self)" } }

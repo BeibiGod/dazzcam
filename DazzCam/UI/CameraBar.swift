@@ -23,6 +23,7 @@ struct CameraBar: View {
     var alImportar: (() -> Void)?
     var alSelector: (() -> Void)?
     var alDuo: (() -> Void)?
+    var alImportarDuo: (() -> Void)?
 
     private var camaras: [FilterPreset] {
         FilterPreset.ordenadas(FilterPreset.allCases, favoritas: favoritas)
@@ -141,6 +142,8 @@ struct CameraBar: View {
 
                 HStack(spacing: 8) {
                     botonDuo
+
+                    botonImportarDuo
 
                     botonImportar
 
@@ -273,6 +276,21 @@ struct CameraBar: View {
     /// Boton DUO: dos cuadritos se vuelven una sola foto. Un toque, sin
     /// engranaje. Sencillo incluso para un nino.
     private var botonDuo: some View {
+        Button { alDuo?() } label: {
+            Image(systemName: "square.on.square").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 30, height: 30).background(Color.black.opacity(0.45), in: Circle()).overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        }.buttonStyle(.plain).accessibilityLabel("DUO").disabled(grabando)
+    }
+
+    /// IMPORT independiente: dos fotos de la galeria, sin abrir la camara.
+    private var botonImportarDuo: some View {
+        Button { alImportarDuo?() } label: {
+            Image(systemName: "photo.on.rectangle.angled").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 30, height: 30).background(Color.black.opacity(0.45), in: Circle()).overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        }.buttonStyle(.plain).accessibilityLabel("IMPORT DUO").disabled(grabando)
+    }
+
+    private var _botonDuoOriginal: some View {
         Button {
             alDuo?()
         } label: {
@@ -284,7 +302,7 @@ struct CameraBar: View {
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("CIRCLES")
+        .accessibilityLabel("DUO")
     }
 
     /// Botón de "escanear" (Framed): escanea la escena actual y abre el

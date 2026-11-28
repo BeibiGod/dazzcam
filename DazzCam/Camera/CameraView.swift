@@ -71,6 +71,12 @@ struct CameraView: View {
     @State private var favoritas = Preferencias.cargarFavoritas()
     @State private var mostrarEscaneo = false
     @State private var mostrarDuo = false
+    @State private var mostrarDuoCamera = false
+    @State private var mostrarDuoGaleria = false
+    @State private var mostrarDuoEditor = false
+    @State private var duoA: UIImage?
+    @State private var duoB: UIImage?
+    @State private var duoPicks: [PhotosPickerItem] = []
     @State private var escaneo: EscaneoFramed.Escaneo?
     @State private var dibujandoFrame = false
     @State private var rectDibujado: CGRect?
@@ -607,7 +613,39 @@ struct CameraView: View {
             }
         }
         .fullScreenCover(isPresented: $mostrarDuo) {
-            DuoView()
+            DuoView(preset: preset, controles: controles, sello: sello)
+        }
+        .fullScreenCover(isPresented: $mostrarDuoCamera) {
+            CirclesCameraView(preset: preset, controles: controles, sello: sello) { imgs in
+                if imgs.count >= 2 {
+                    duoA = procesarCircles(imgs[0])
+                    duoB = procesarCircles(imgs[1])
+                    mostrarDuoCamera = false
+                    mostrarDuoEditor = true
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $mostrarDuoEditor) {
+            if let duoA, let duoB {
+                CirclesEditor(inicialA: duoA, inicialB: duoB) { mostrarDuoEditor = false }
+            }
+        }
+        .photosPicker(isPresented: $mostrarDuoGaleria, selection: $duoPicks, maxSelectionCount: 2, matching: .images)
+        .onChange(of: duoPicks) { _, picks in
+            guard picks.count == 2 else { return }
+            Task {
+                var imgs: [UIImage] = []
+                for p in picks {
+                    if let d = try? await p.loadTransferable(type: Data.self), let i = UIImage(data: d) { imgs.append(i) }
+                }
+                if imgs.count == 2 {
+                    duoA = procesarCircles(imgs[0])
+                    duoB = procesarCircles(imgs[1])
+                    mostrarDuoGaleria = false
+                    mostrarDuoEditor = true
+                }
+                duoPicks = []
+            }
         }
         .fullScreenCover(isPresented: $mostrarRevisionVideo, onDismiss: {
             if let url = videoGrabado {
@@ -1444,7 +1482,8 @@ struct CameraView: View {
             alFavorita: alternarFavorita,
             alImportar: { mostrarImportar = true },
             alSelector: { mostrarTodas = true },
-            alDuo: { mostrarDuo = true }
+            alDuo: { mostrarDuoCamera = true },
+            alImportarDuo: { mostrarDuoGaleria = true }
         )
         .padding(.bottom, insetAbajo + 6)
     }
@@ -1951,7 +1990,7 @@ struct CameraView: View {
 
     /// Aplica el look, recorta y quema la fecha. Se usa en el visor, en la
     /// revision y al guardar, para que los tres den exactamente lo mismo.
-    private static func componer(
+    static func componer(
         _ base: UIImage,
         look: FilterPreset,
         ajustes: ControlesLook,
@@ -1989,6 +2028,21 @@ struct CameraView: View {
             controles: ajustes,
             semilla: semilla
         ))
+    }
+
+
+    /// Aplica la camara seleccionada + ajustes actuales a una imagen para
+    /// Circles, reutilizando `componer`. No crea filtros nuevos.
+    private func procesarCircles(_ imagen: UIImage) -> UIImage {
+        Self.componer(
+            imagen,
+            look: preset,
+            ajustes: controles,
+            relacion: nil,
+            marca: sello,
+            semilla: UInt64.random(in: 1...UInt64.max),
+            marco: .plain
+        )
     }
 
     private func voltearCamara() {

@@ -3,6 +3,9 @@ import SwiftUI
 /// Flujo CAMERA→CIRCLES: camara real con visor en vivo + disparo grande
 /// circular. Captura 1a, luego 2a, muestra ambas y pasa al editor Circles.
 struct CirclesCameraView: View {
+    var preset: FilterPreset = .original
+    var controles: ControlesLook = ControlesLook()
+    var sello: SelloFecha = .apagado
     var onDone: ([UIImage]) -> Void
 
     @StateObject private var camara = CameraSession()
