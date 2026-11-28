@@ -24,7 +24,8 @@ struct CirclesEditor: View {
         var c = comp
         c.swapOrder = swapOrder
         let base = DuoFoto.combinar(inicialA, inicialB, composicion: c)
-        return FilterEngine.recortar(base, relacion: proporcion.relacion)
+        if let r = proporcion.relacion { return FilterEngine.recortar(base, relacion: r) }
+        return base
     }
 
     var body: some View {
